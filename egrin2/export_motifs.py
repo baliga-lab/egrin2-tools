@@ -19,6 +19,8 @@ def export_run_motifs_to_meme(dbfile, targetdir, basename):
     iteration = cursor.fetchone()[0]
     filename = '%s.meme' % basename
 
+    # these are currently just for legacy runs, cmonkey-python has a table for
+    # global background now
     a_perc = 0.284
     c_perc = 0.216
     g_perc = 0.216
@@ -30,11 +32,11 @@ def export_run_motifs_to_meme(dbfile, targetdir, basename):
         for rowid, cluster, motif_num, evalue, num_sites in cursor.fetchall():
             motif_name = '%s_%03d_%02d' % (basename, cluster, motif_num)
             outfile.write('\nMOTIF %s\n' % motif_name)
-            outfile.write('BL   %s width=0 seqs=0\n' % motif_name)
+            outfile.write('BL   MOTIF %s width=0 seqs=0\n' % motif_name)
 
             cursor2.execute('select a,c,g,t from motif_pssm_rows where motif_info_id=? order by row', [rowid])
             pssm_rows = [(a, c, g, t) for a, c, g, t in cursor2.fetchall()]
-            outfile.write('letter-probability matrix: alenght= 4 w= %d nsites= %d E= %.3e\n' % (len(pssm_rows), num_sites, evalue))
+            outfile.write('letter-probability matrix: alength= 4 w= %d nsites= %d E= %.3e\n' % (len(pssm_rows), num_sites, evalue))
             for a, c, g, t in pssm_rows:
                 outfile.write('%5.3f %5.3f %5.3f %5.3f\n' % (a, c, g, t))
 
