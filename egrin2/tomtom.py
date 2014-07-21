@@ -16,7 +16,7 @@ Q_PSEUDO      = 0
 T_PSEUDO      = 0
 
 
-def run_tomtom(targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_method=DIST_METHOD,
+def run_tomtom(targetdir, targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_method=DIST_METHOD,
                min_overlap=MIN_OVERLAP, q_pseudo=Q_PSEUDO, t_pseudo=T_PSEUDO):
     command = ['tomtom',
                '-verbosity', '1',
@@ -28,22 +28,35 @@ def run_tomtom(targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_method=DIST_MET
                '-target-pseudo', '%.3f' % t_pseudo,
                '-target', targetfile, '-query', queryfile]
     try:
-        output = subprocess.check_output(command)
-        print output
-    except:
         print " ".join(command)
+        output = subprocess.check_output(command)
+        targetname = os.path.basename(targetfile).rstrip('.meme')
+        queryname = os.path.basename(queryfile).rstrip('.meme')
+        with open(os.path.join(targetdir, '%s_vs_%s.tsv' % (queryname, targetname)), 'w') as outfile:
+            outfile.write(output)
+    except:
         raise
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="tomtom.py - run tomtom on cmonkey results")
-    parser.add_argument('--resultdb', required=True)
+    parser.add_argument('--dir', default='.')
+    parser.add_argument('--prefix', required=True)
     parser.add_argument('--targetdir', required=True)
 
     args = parser.parse_args()
     if not os.path.exists(args.targetdir):
         os.mkdir(args.targetdir)
+    resultdirs = [entry for entry in os.listdir(args.dir)
+                if entry.startswith(args.prefix) and os.path.isdir(entry)]
+    basenames = []
+    for resultdir in resultdirs:
+        basename = os.path.basename(resultdir)
+        print "processing", resultdir, '...'
+        export_motifs.export_run_motifs_to_meme(os.path.join(resultdir, 'cmonkey_run.db'),
+                                                args.targetdir, basename)
+    
+        basenames.append(basename)
 
-    export_motifs.export_run_motifs_to_meme(args.resultdb, args.targetdir, 'myrun')
-
-    #run_tomtom(os.path.join(args.targetdir, 'cmresults-postproc-15.meme'),
-    #           os.path.join(args.targetdir, 'cmresults-postproc-142.meme'))
+    run_tomtom(args.targetdir,
+               os.path.join(args.targetdir, '%s.meme' % basenames[0]),
+               os.path.join(args.targetdir, '%s.meme' % basenames[1]))
