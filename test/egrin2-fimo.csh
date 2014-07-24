@@ -12,4 +12,4 @@ setenv BATCHNUM `printf "%03d" $SGE_TASK_ID`
 #$ -pe serial 1
 #$ -l mem_free=32G
 
-python egrin2-fimo.py -g Seqs_file -o "eco-out-$BATCHNUM/fimo_out" -p progs -w true -i eco-out-$BATCHNUM
+python egrin2-fimo.py --cache_dir cache --seqs_file Escherichia_coli_K12_NC_000913.2 --output_dir "eco-out-$BATCHNUM/fimo_out" --progs_dir progs --overwrite true --input_dir eco-out-$BATCHNUM
