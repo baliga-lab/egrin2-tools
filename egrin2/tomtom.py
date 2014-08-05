@@ -1,5 +1,23 @@
 #!/usr/bin/env python
 
+"""tomtom.py - running MEME tomtom on cmonkey-python ensemble runs
+
+This script assumes an ensemble run under a directory structure that 
+is as follows:
+
+<dir>
+  |-- <prefix>001
+             |-- cmonkey_run.db
+             |-- ...
+  |-- <prefix>002
+  |-- ...
+
+It extracts the PSSMs from the clusters in each individual ensemble run
+and then runs them against the motifs of enother ensemble run.
+
+The results of tomtom are stored in an appropriately named tab-separated
+file in the target directory
+"""
 import argparse
 import bz2
 import os
@@ -7,6 +25,8 @@ import subprocess
 
 import export_motifs
 
+
+# These are default parameters for tomtom that we chose for now
 EVALUE_CUTOFF = 100
 RESID_CUTOFF  = 0.8
 DIST_METHOD   = "ed"
@@ -16,8 +36,12 @@ Q_PSEUDO      = 0
 T_PSEUDO      = 0
 
 
+MAX_CLUSTER_RESIDUAL = None
+MAX_EVALUE = None
+
 def run_tomtom(targetdir, targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_method=DIST_METHOD,
                min_overlap=MIN_OVERLAP, q_pseudo=Q_PSEUDO, t_pseudo=T_PSEUDO):
+    """a wrapper around the tomtom script"""
     command = ['tomtom',
                '-verbosity', '1',
                '-q-thresh', '%.3f' % q_thresh,
@@ -53,8 +77,8 @@ if __name__ == '__main__':
         basename = os.path.basename(resultdir)
         print "processing", resultdir, '...'
         export_motifs.export_run_motifs_to_meme(os.path.join(resultdir, 'cmonkey_run.db'),
-                                                args.targetdir, basename)
-    
+                                                args.targetdir, basename,
+                                                max_residual=None, max_evalue=None)
         basenames.append(basename)
 
     run_tomtom(args.targetdir,
