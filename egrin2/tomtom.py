@@ -92,8 +92,9 @@ def write_pssm(outfile, cursor, run_name, cluster, motif_info_id,
 def make_meme_file(dbpaths, maxiter, targetdir, gene,
                    max_residual=None, max_evalue=None,
                    a_perc=0.284, c_perc=0.216, g_perc=0.216, t_perc=0.284):
-    """creates a meme file for a specific gene"""
-    print "processing gene '%s'..." % gene
+    """Creates a meme file for a specific gene. Returns the number of
+    PSSMs that were written"""
+    num_written = 0
     targetpath = os.path.join(targetdir, '%s.meme' % gene)
     with open(targetpath, 'w') as outfile:
         outfile.write(MEME_FILE_HEADER % (a_perc, c_perc, g_perc, t_perc))
@@ -133,9 +134,11 @@ def make_meme_file(dbpaths, maxiter, targetdir, gene,
                 write_pssm(outfile, cursor2,
                            os.path.basename(os.path.dirname(dbpath)),
                            cluster, rowid, motif_num, evalue, num_sites)
+                num_written += 1
             cursor2.close()
             cursor.close()
             conn.close()
+    return num_written
 
 
 def make_meme_files(inpath, prefix, targetdir):
@@ -154,7 +157,10 @@ def make_meme_files(inpath, prefix, targetdir):
     genes = [row[0] for row in cursor.fetchall()]
     conn.close()
     for gene in genes:
-        make_meme_file(dbpaths, max_iteration, targetdir, gene)
+        print "processing gene '%s'..." % gene,
+        num_written = make_meme_file(dbpaths, max_iteration, targetdir, gene)
+        print "%d motifs written." % num_written
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="tomtom.py - run tomtom on cmonkey results")
