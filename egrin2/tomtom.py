@@ -39,6 +39,22 @@ T_PSEUDO      = 0
 MAX_CLUSTER_RESIDUAL = None
 MAX_EVALUE = None
 
+# Template for tomtom 4.9.0
+QSUB_TEMPLATE = """#!/bin/bash
+
+export PATH=/tools/bin:${PATH}
+
+#$ -S /bin/bash
+#$ -m be
+#$ -q baliga
+#$ -P Bal_%s
+#$ -M %s@systemsbiology.org
+#$ -cwd
+#$ -pe serial %d
+#$ -l mem_free=32G
+
+tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s > %s"""
+
 def run_tomtom(targetdir, targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_method=DIST_METHOD,
                min_overlap=MIN_OVERLAP, q_pseudo=Q_PSEUDO, t_pseudo=T_PSEUDO):
     """a wrapper around the tomtom script"""
@@ -61,6 +77,14 @@ def run_tomtom(targetdir, targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_meth
     except:
         raise
 
+def emit_tomtom_script(targetdir, filepath, q_thresh=Q_THRESHOLD, dist_method=DIST_METHOD,
+               min_overlap=MIN_OVERLAP, q_pseudo=Q_PSEUDO, t_pseudo=T_PSEUDO):
+    login = 'wwu'
+    num_cores = 1
+    with open(os.path.join(targetdir, 'cluster_tomtom.sh'), 'w') as outfile:
+        outfile.write(QSUB_TEMPLATE % (login, login, num_cores, q_thresh,
+                                       dist_method, min_overlap, q_pseudo, t_pseudo,
+                                       filepath, filepath, '%s-tomtom.tsv' % filepath))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="tomtom.py - run tomtom on cmonkey results")
@@ -72,11 +96,20 @@ if __name__ == '__main__':
     if not os.path.exists(args.targetdir):
         os.mkdir(args.targetdir)
     #export_motifs.make_meme_files(args.dir, args.prefix, args.targetdir)
+    """
     num_pssms = export_motifs.export_run_motifs_to_meme('eco-out-001/cmonkey_run.db',
                                                         args.targetdir,
                                                         'eco-out-001')
     print "# written: %d" % num_pssms
     """
+    """
     run_tomtom(args.targetdir,
                os.path.join(args.targetdir, '%s.meme' % basenames[0]),
                os.path.join(args.targetdir, '%s.meme' % basenames[1]))"""
+    """
+    run_tomtom(args.targetdir,
+               os.path.join(args.targetdir, 'eco-out-001.meme'),
+               os.path.join(args.targetdir, 'eco-out-001.meme'))
+    """
+    emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, 'eco-out-001.meme'))
+    
