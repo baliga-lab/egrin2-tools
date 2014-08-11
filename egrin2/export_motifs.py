@@ -147,3 +147,4 @@ def make_meme_files(inpath, prefix, targetdir):
         print "processing gene '%s'..." % gene,
         num_written = make_meme_file(dbpaths, max_iteration, targetdir, gene)
         print "%d motifs written." % num_written
+    return genes

@@ -95,21 +95,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if not os.path.exists(args.targetdir):
         os.mkdir(args.targetdir)
-    #export_motifs.make_meme_files(args.dir, args.prefix, args.targetdir)
-    """
-    num_pssms = export_motifs.export_run_motifs_to_meme('eco-out-001/cmonkey_run.db',
-                                                        args.targetdir,
-                                                        'eco-out-001')
-    print "# written: %d" % num_pssms
-    """
-    """
-    run_tomtom(args.targetdir,
-               os.path.join(args.targetdir, '%s.meme' % basenames[0]),
-               os.path.join(args.targetdir, '%s.meme' % basenames[1]))"""
-    """
-    run_tomtom(args.targetdir,
-               os.path.join(args.targetdir, 'eco-out-001.meme'),
-               os.path.join(args.targetdir, 'eco-out-001.meme'))
-    """
-    emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, 'eco-out-001.meme'))
+    genes = export_motifs.make_meme_files(args.dir, args.prefix, args.targetdir)
+    
+    resultnames = sorted([entry for entry in os.listdir(args.dir)
+                          if entry.startswith(prefix) and os.path.isdir(entry)])
+    for gene in genes:
+        emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, '%s.meme' % name))
     
