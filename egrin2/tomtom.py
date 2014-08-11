@@ -88,17 +88,14 @@ def emit_tomtom_script(targetdir, filepath, q_thresh=Q_THRESHOLD, dist_method=DI
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="tomtom.py - run tomtom on cmonkey results")
-    parser.add_argument('--dir', default='.')
-    parser.add_argument('--prefix', required=True)
-    parser.add_argument('--targetdir', required=True)
+    parser.add_argument('--dir', default='.', help="directory holding the ensemble run results")
+    parser.add_argument('--prefix', required=True, help='a common prefix of the result directories')
+    parser.add_argument('--targetdir', required=True, help='the directory to store the results')
 
     args = parser.parse_args()
     if not os.path.exists(args.targetdir):
         os.mkdir(args.targetdir)
-    genes = export_motifs.make_meme_files(args.dir, args.prefix, args.targetdir)
-    
-    resultnames = sorted([entry for entry in os.listdir(args.dir)
-                          if entry.startswith(prefix) and os.path.isdir(entry)])
+    genes = export_motifs.make_meme_files(args.dir, args.prefix, args.targetdir)    
     for gene in genes:
         emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, '%s.meme' % name))
     
