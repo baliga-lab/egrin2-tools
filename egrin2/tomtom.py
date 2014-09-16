@@ -77,11 +77,11 @@ def run_tomtom(targetdir, targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_meth
     except:
         raise
 
-def emit_tomtom_script(targetdir, filepath, q_thresh=Q_THRESHOLD, dist_method=DIST_METHOD,
+def emit_tomtom_script(targetdir, filepath, gene, q_thresh=Q_THRESHOLD, dist_method=DIST_METHOD,
                min_overlap=MIN_OVERLAP, q_pseudo=Q_PSEUDO, t_pseudo=T_PSEUDO):
     login = 'wwu'
     num_cores = 1
-    with open(os.path.join(targetdir, 'cluster_tomtom.sh'), 'w') as outfile:
+    with open(os.path.join(targetdir, 'cluster_tomtom-%s.sh' % gene), 'w') as outfile:
         outfile.write(QSUB_TEMPLATE % (login, login, num_cores, q_thresh,
                                        dist_method, min_overlap, q_pseudo, t_pseudo,
                                        filepath, filepath, '%s-tomtom.tsv' % filepath))
@@ -97,5 +97,4 @@ if __name__ == '__main__':
         os.mkdir(args.targetdir)
     genes = export_motifs.make_meme_files(args.dir, args.prefix, args.targetdir)    
     for gene in genes:
-        emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, '%s.meme' % gene))
-    
+        emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, '%s.meme' % gene), gene)
