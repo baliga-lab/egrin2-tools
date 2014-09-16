@@ -90,38 +90,41 @@ def make_meme_file(dbpaths, maxiter, targetdir, gene,
             conn = sqlite3.connect(dbpath)
             cursor = conn.cursor()
             cursor2 = conn.cursor()
-            cursor.execute('select order_num from row_names where name=?', [gene])
-            order_num = cursor.fetchone()[0]
-            query = """select mi.rowid, mi.cluster, motif_num, evalue,
-                       count(mms.pvalue) as num_sites
-                       from (select rowid,cluster,motif_num,evalue from motif_infos
-                             where iteration=?) mi
-                       join (select cluster from row_members where iteration=?
-                              and order_num=?) as rm on mi.cluster=rm.cluster
-                       join (select cluster, residual from cluster_residuals
-                             where iteration=?) cr on rm.cluster=cr.cluster
-                       join meme_motif_sites mms on mi.rowid=mms.motif_info_id"""
-            params = [maxiter, maxiter, order_num, maxiter]
+            cursor.execute('select count(*) from row_names where name=?', [gene])
+            # make sure we have at least one
+            if cursor.fetchone()[0] > 0:
+              cursor.execute('select order_num from row_names where name=?', [gene])
+              order_num = cursor.fetchone()[0]
+              query = """select mi.rowid, mi.cluster, motif_num, evalue,
+                         count(mms.pvalue) as num_sites
+                         from (select rowid,cluster,motif_num,evalue from motif_infos
+                               where iteration=?) mi
+                         join (select cluster from row_members where iteration=?
+                                and order_num=?) as rm on mi.cluster=rm.cluster
+                         join (select cluster, residual from cluster_residuals
+                               where iteration=?) cr on rm.cluster=cr.cluster
+                         join meme_motif_sites mms on mi.rowid=mms.motif_info_id"""
+              params = [maxiter, maxiter, order_num, maxiter]
 
-            # optional residual and evalue filters
-            if max_residual is not None or max_evalue is not None:
-                query += " where"
-            if max_residual is not None:
-                query += " residual <= ?"
-                params.append(max_residual)
-            if max_evalue is not None:
-                if max_residual is not None:
-                    query += " and "
-                query += " evalue <= ?"
-                params.append(max_evalue)
+              # optional residual and evalue filters
+              if max_residual is not None or max_evalue is not None:
+                  query += " where"
+              if max_residual is not None:
+                  query += " residual <= ?"
+                  params.append(max_residual)
+              if max_evalue is not None:
+                  if max_residual is not None:
+                      query += " and "
+                  query += " evalue <= ?"
+                  params.append(max_evalue)
 
-            query += " group by mi.rowid"
-            cursor.execute(query, params)
-            for rowid, cluster, motif_num, evalue, num_sites in cursor.fetchall():
-                write_pssm(outfile, cursor2,
-                           os.path.basename(os.path.dirname(dbpath)),
-                           cluster, rowid, motif_num, evalue, num_sites)
-                num_written += 1
+              query += " group by mi.rowid"
+              cursor.execute(query, params)
+              for rowid, cluster, motif_num, evalue, num_sites in cursor.fetchall():
+                  write_pssm(outfile, cursor2,
+                             os.path.basename(os.path.dirname(dbpath)),
+                             cluster, rowid, motif_num, evalue, num_sites)
+                  num_written += 1
             cursor2.close()
             cursor.close()
             conn.close()
@@ -131,9 +134,14 @@ def make_meme_file(dbpaths, maxiter, targetdir, gene,
 def make_meme_files(inpath, prefix, targetdir):
     """create MEME files based on each gene in the ensemble run and writing
     all clusters in all runs that contain the gene"""
+    def finalpath(entry):
+	return os.path.join(inpath, entry)
+
+    print os.listdir(inpath)
     resultdirs = map(lambda s: os.path.join(inpath, s),
                      sorted([entry for entry in os.listdir(inpath)
-                             if entry.startswith(prefix) and os.path.isdir(entry)]))
+                             if entry.startswith(prefix) and os.path.isdir(finalpath(entry))]))
+    print "resultdirs for '%s', prefix: '%s': %s" % (inpath, prefix, str(resultdirs))
     dbpaths = [os.path.join(resultdir, 'cmonkey_run.db') for resultdir in resultdirs]
     # extract max iteration
     conn = sqlite3.connect(dbpaths[0])

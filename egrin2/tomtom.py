@@ -97,5 +97,5 @@ if __name__ == '__main__':
         os.mkdir(args.targetdir)
     genes = export_motifs.make_meme_files(args.dir, args.prefix, args.targetdir)    
     for gene in genes:
-        emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, '%s.meme' % name))
+        emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, '%s.meme' % gene))
     
