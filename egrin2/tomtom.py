@@ -48,6 +48,22 @@ QSUB_TEMPLATE = """#!/bin/bash
 
 export PATH=/tools/bin:${PATH}
 
+#$ -S /bin/csh
+#$ -m be
+#$ -q baliga
+#$ -P Bal_%s
+#$ -M %s@systemsbiology.org
+#$ -cwd
+#$ -pe serial %d
+#$ -l mem_free=32G
+
+tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s > %s"""
+
+# Template for tomtom 4.9.0
+QSUB_TEMPLATE_CSH = """#!/bin/csh
+
+setenv PATH /tools/bin:${PATH}
+
 #$ -S /bin/bash
 #$ -m be
 #$ -q baliga
@@ -83,8 +99,9 @@ def run_tomtom(targetdir, targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_meth
 
 def emit_tomtom_script(targetdir, filepath, gene, q_thresh=Q_THRESHOLD, dist_method=DIST_METHOD,
                min_overlap=MIN_OVERLAP, q_pseudo=Q_PSEUDO, t_pseudo=T_PSEUDO):
-    login = 'wwu'
+    login = 'mharris'
     num_cores = 1
+
     with open(os.path.join(targetdir, 'cluster_tomtom-%s.sh' % gene), 'w') as outfile:
         outfile.write(QSUB_TEMPLATE % (login, login, num_cores, q_thresh,
                                        dist_method, min_overlap, q_pseudo, t_pseudo,
@@ -95,8 +112,13 @@ if __name__ == '__main__':
     parser.add_argument('--dir', default='.', help="directory holding the ensemble run results")
     parser.add_argument('--prefix', required=True, help='a common prefix of the result directories')
     parser.add_argument('--targetdir', required=True, help='the directory to store the results')
+    parser.add_argument('--csh', action='store_true')
 
     args = parser.parse_args()
+
+    if args.csh:
+      QSUB_TEMPLATE = QSUB_TEMPLATE_CSH
+
     if not os.path.exists(args.targetdir):
         os.mkdir(args.targetdir)
     genes = export_motifs.make_meme_files(args.dir, args.prefix, args.targetdir)    
