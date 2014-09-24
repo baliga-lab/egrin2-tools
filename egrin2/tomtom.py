@@ -17,6 +17,10 @@ and then runs them against the motifs of enother ensemble run.
 
 The results of tomtom are stored in an appropriately named tab-separated
 file in the target directory
+
+Usage:
+
+./tomtom.py --dir <dir> --prefix <prefix> --targetdir <target directory>
 """
 import argparse
 import bz2

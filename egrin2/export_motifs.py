@@ -1,5 +1,7 @@
 import sqlite3
 import os
+import time
+import math
 
 """export_motifs.py - module to support motif extraction from
 a cmonkey-python run database
@@ -131,6 +133,11 @@ def make_meme_file(dbpaths, maxiter, targetdir, gene,
     return num_written
 
 
+def current_millis():
+    """returns the current time in milliseconds"""
+    return int(math.floor(time.time() * 1000))
+
+
 def make_meme_files(inpath, prefix, targetdir):
     """create MEME files based on each gene in the ensemble run and writing
     all clusters in all runs that contain the gene"""
@@ -141,7 +148,7 @@ def make_meme_files(inpath, prefix, targetdir):
     resultdirs = map(lambda s: os.path.join(inpath, s),
                      sorted([entry for entry in os.listdir(inpath)
                              if entry.startswith(prefix) and os.path.isdir(finalpath(entry))]))
-    print "resultdirs for '%s', prefix: '%s': %s" % (inpath, prefix, str(resultdirs))
+    #print "resultdirs for '%s', prefix: '%s': %s" % (inpath, prefix, str(resultdirs))
     dbpaths = [os.path.join(resultdir, 'cmonkey_run.db') for resultdir in resultdirs]
     # extract max iteration
     conn = sqlite3.connect(dbpaths[0])
@@ -151,8 +158,13 @@ def make_meme_files(inpath, prefix, targetdir):
     cursor.execute('select name from row_names order by name')
     genes = [row[0] for row in cursor.fetchall()]
     conn.close()
+    start_time0 = time.current_millis()
     for gene in genes:
+        start_time = time.current_millis()
         print "processing gene '%s'..." % gene,
         num_written = make_meme_file(dbpaths, max_iteration, targetdir, gene)
-        print "%d motifs written." % num_written
+        elapsed = time.current_millis() - start_time
+        print "%d motifs written in %.2f s." % (num_written, elapsed / 1000.0)
+    elapsed0 = time.current_millis() - start_time0
+    print "%d genes processed in %.2f s." % (len(genes), elapsed0 / 1000.0)
     return genes
