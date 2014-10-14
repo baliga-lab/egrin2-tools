@@ -1,0 +1,124 @@
+#!/usr/bin/env Rscript
+library('getopt')
+
+LINKCOMM.SIMTHRESINC=.1
+
+spec = matrix(c(
+  'verbose',   'v',   2, "integer",
+  'matrix',    'm',   2, "character"
+  ), byrow=TRUE, ncol=4)
+
+opt <- getopt(spec, usage=FALSE)
+
+#
+# Extract the backbone from the graph
+# removes noise
+# From PMID: 19357301
+#
+multiscaleBackbone <- function(gBg, pval=BACKBONE.PVAL,multicore=MULTICORE,makeFullyConnected=FULLY.CONNECTED) {
+  # gBg is any arbitrary matrix
+  require(multicore)
+  if (makeFullyConnected) {
+    k <- sum(apply(gBg,1,sum)>0)-1
+  }
+  # define uniform random integrand
+  integrand <- function(x,k) {(1-x)^(k-2)}
+  # fcn to calculate degree,k
+  calc_k <- function(i) {sum(i>0)}
+  # only bother with non-zero entries (also to determine k)
+  index <- which(gBg>0,arr.ind=T)
+  # score each non-zero entry, computes p that defines "significance of edge"
+  if (multicore) {
+    a_ij <- unlist( mclapply( seq( 1:dim(index)[1] ), function(i) { 
+      # Calc degree
+      if (!makeFullyConnected) {
+        k<-calc_k( gBg[ index[i,1], ] ) ;
+      } 
+      # Integration to determine p
+      o <- 1-(k-1)*integrate(integrand,0,gBg[ index[i,1], index[i,2] ],k=k)$value; 
+      return(o) 
+    } ) )
+  } else {
+    a_ij <- unlist( lapply( seq( 1:dim(index)[1] ), function(i) { 
+      # Calc degree
+      if (!makeFullyConnected) {
+        k<-calc_k( gBg[ index[i,1], ] ) ;
+      } 
+      # Integration to determine p
+      o <- 1-(k-1)*integrate(integrand,0,gBg[ index[i,1], index[i,2] ],k=k)$value; 
+      return(o) 
+    } ) )
+  }
+  # Select edges with p less than pval cutoff
+  a_ij_sig <- a_ij <= pval
+  index_sig <- index[a_ij <= pval, ]
+  o <- gBg; o[] <- 0
+  o[index_sig] <- gBg[index_sig]
+  # Make symmetric. If two undirected edges are both sig, keep highest weight. 
+  upper.index <- which(upper.tri(o),arr.ind=T)
+  upper.index.sym <- cbind(upper.index[,2],upper.index[,1])
+  max.weight <- apply(cbind(o[upper.index],o[upper.index.sym]),1,max)
+  o[upper.index] = max.weight
+  o[upper.index.sym] = max.weight
+  return(o)
+}
+
+#
+# Write clean gBg matrix in format that can be read by Antoine's
+# corem detection code
+#
+writeEdgeList <- function(matrix,file=paste(OUTDIR,"out",sep=""), weighted=T) {
+  index <- which(upper.tri(matrix),arr.ind=T)
+  index <- index[which(matrix[index]>0),]
+  namesI <- rownames(matrix)
+  namesJ <- colnames(matrix)
+  for (i in 1:dim(index)[1]) {
+    if (weighted) {
+      write(x=paste(namesI[index[i,1]],namesJ[index[i,2]],matrix[index[i,1],index[i,2]]),file=file,append=T)
+    } else {
+      write(x=paste(namesI[index[i,1]],namesJ[index[i,2]]),file=file,append=T)
+    }
+  }
+}
+
+
+# make sure the stuff is in PATH
+# remove this function
+runCoremDetection2 <- function(numGenes, edgefile, s=0, numcores=4) {
+  require(multicore)
+
+  #system(paste(c("adjmat2wpairs", edgefile, "0", "0"), sep=" "))
+
+  empty<-mclapply(seq(1, numcores),function(i) {
+    message(paste("i is ", i, "\n"))
+    ref <- round(seq(0, numGenes + 1, length.out=numcores + 1))
+    message(paste("ref is ", ref, "\n"))
+    #system(paste(c("compute_tanimoto", edgefile, s, ref[i], ref[i+1]), sep=" "))
+    message(paste("compute_tanimoto", edgefile, s, ref[i], ref[i+1], sep=" "))
+    invisible(NULL)
+  })
+
+  #system("cat out.tanimoto_* > out.tanimoto")
+  #empty<-mclapply(seq(0, 1, LINKCOMM.SIMTHRESINC)[2:length(seq(0, 1, LINKCOMM.SIMTHRESINC))],
+  #                function(i) {
+  #                    system(paste("cluster_communities out",i,sep=" "))
+  #                    invisible(NULL)
+  #                })
+  #system("cat out.density_* > out.density")
+}
+
+if (!is.null(opt$matrix)) {
+  message("processing...")
+  message("reading the input matrix...")
+  gbg.normalized <- as.matrix(read.table('outmatrix', as.is=T, row.names=1, header=T))
+
+  message('computing backbone...')
+  gbg.backbone <- multiscaleBackbone(gbg.normalized, makeFullyConnected=F, multicore=T, pval=0.05)
+
+  message('writing edge list...')
+  writeEdgeList(gbg.backbone, file='backbone.edges')
+
+  message('DONE.')
+} else {
+  print(getopt(spec, usage=TRUE))
+}

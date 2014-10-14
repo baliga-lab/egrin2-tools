@@ -26,8 +26,6 @@ import argparse
 import bz2
 import os
 import subprocess
-import sqlite3
-
 import export_motifs
 
 # These are default parameters for tomtom that we chose for now
