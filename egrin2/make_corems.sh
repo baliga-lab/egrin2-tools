@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # This shell script controls the entire corem computation process.
 # It delegates cmonkey data processing to python scripts, and the respective
@@ -6,7 +7,7 @@
 
 readonly NUM_CORES=4
 readonly EDGE_FILE="backbone.edges"
-
+readonly INCREMENT=0.1
 
 # Run compute_tanimoto on n separate cores, join the individual results
 # into a single tanimoto.out file
@@ -44,11 +45,35 @@ run_tanimoto() {
     done
     wait
     echo "Tanimoto processes finished, joining results..."
-    echo "cat $edge_file.tanimoto_* > tanimoto.out"
-    cat $edge_file.tanimoto_* > tanimoto.out    
+    echo "cat $edge_file.tanimoto_* > $edge_file.tanimoto"
+    cat $edge_file.tanimoto_* > $edge_file.tanimoto
     echo "rm $edge_file.tanimoto_*"
     rm $edge_file.tanimoto_*
 }
+
+make_cluster_communities() {
+    local edge_file=$1
+    local i
+
+    vals=`seq 0 $INCREMENT 1`
+    for i in $vals
+    do
+        if [ "$i" != "0.0" ]; then
+            echo "cluster_communities $edge_file $i"
+            cluster_communities $edge_file $i &
+        fi
+    done
+
+    # collect the results
+    wait
+
+    cat $edge_file.density_* > $edge_file.density
+    echo "cat $edge_file.density_* > $edge_file.density"
+
+    rm $edge_file.density_*
+    echo "rm $edge_file.density_*"
+}
+
 
 main() {
   Rscript extract_backbone.Rscript --matrix $1
@@ -58,6 +83,7 @@ main() {
   # this will create the *.numid2name and *.wpairs files
   adjmat2wpairs $EDGE_FILE 0 0
   run_tanimoto $num_genes $NUM_CORES $EDGE_FILE
+  make_cluster_communities $EDGE_FILE
   echo "DONE !"
 }
 
