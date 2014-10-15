@@ -84,7 +84,8 @@ main() {
   adjmat2wpairs $EDGE_FILE 0 0
   run_tanimoto $num_genes $NUM_CORES $EDGE_FILE
   make_cluster_communities $EDGE_FILE
-  echo "DONE !"
+  cutoff=`Rscript choose_cutoff.Rscript --densityfile $EDGE_FILE.density`
+  echo "DONE with cutoff: $cutoff"
 }
 
 usage() {

@@ -81,32 +81,6 @@ writeEdgeList <- function(matrix,file=paste(OUTDIR,"out",sep=""), weighted=T) {
   }
 }
 
-
-# make sure the stuff is in PATH
-# remove this function
-runCoremDetection2 <- function(numGenes, edgefile, s=0, numcores=4) {
-  require(multicore)
-
-  #system(paste(c("adjmat2wpairs", edgefile, "0", "0"), sep=" "))
-
-  empty<-mclapply(seq(1, numcores),function(i) {
-    message(paste("i is ", i, "\n"))
-    ref <- round(seq(0, numGenes + 1, length.out=numcores + 1))
-    message(paste("ref is ", ref, "\n"))
-    #system(paste(c("compute_tanimoto", edgefile, s, ref[i], ref[i+1]), sep=" "))
-    message(paste("compute_tanimoto", edgefile, s, ref[i], ref[i+1], sep=" "))
-    invisible(NULL)
-  })
-
-  #system("cat out.tanimoto_* > out.tanimoto")
-  #empty<-mclapply(seq(0, 1, LINKCOMM.SIMTHRESINC)[2:length(seq(0, 1, LINKCOMM.SIMTHRESINC))],
-  #                function(i) {
-  #                    system(paste("cluster_communities out",i,sep=" "))
-  #                    invisible(NULL)
-  #                })
-  #system("cat out.density_* > out.density")
-}
-
 if (!is.null(opt$matrix)) {
   message("processing...")
   message("reading the input matrix...")
