@@ -121,8 +121,11 @@ main() {
   communities_file=$EDGE_FILE.communities_$cutoff
   echo "getting_communities -> $communities_file"
   getting_communities $EDGE_FILE $cutoff
-  # TODO: load all corems where Community.Weighted.Density > 0
+  # filter corems where Community.Weighted.Density > 0
   cat $communities_file | ./filter_communities.py > $communities_file.filtered
+
+  # TODO: load into filtered communities into gene-by-gene matrix
+  # TODO: normalize ratios ?
 }
 
 usage() {
