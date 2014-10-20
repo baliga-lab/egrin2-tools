@@ -32,52 +32,88 @@ run_tanimoto() {
     if [ ${interv[$last]} -ne $num_genes ]; then
         interv[$last]=$num_genes
     fi
-
+    local pids=""
     for i in $(seq 0 $(expr $num_elems - 2))
     do
         echo "compute_tanimoto $edge_file 0 ${interv[$i]} ${interv[`expr $i + 1`]}"
         compute_tanimoto $edge_file 0 ${interv[$i]} ${interv[`expr $i + 1`]} &
+        pids="$pids $!"
     done
-    wait
-    echo "Tanimoto processes finished, joining results..."
-    echo "cat $edge_file.tanimoto_* > $edge_file.tanimoto"
-    cat $edge_file.tanimoto_* > $edge_file.tanimoto
-    echo "rm $edge_file.tanimoto_*"
-    rm $edge_file.tanimoto_*
+
+    local num_errors=0
+    for pid in $pids
+    do
+       echo "wait for job $pid..."
+       wait $pid || let "num_errors+=1"
+    done
+    # we check for error
+    if [ $num_errors -eq 0 ]; then
+        echo "Tanimoto processes finished, joining results..."
+        echo "cat $edge_file.tanimoto_* > $edge_file.tanimoto"
+        cat $edge_file.tanimoto_* > $edge_file.tanimoto
+        echo "rm $edge_file.tanimoto_*"
+        rm $edge_file.tanimoto_*
+        return 0
+    else
+        echo "errors while running compute_tanimoto"
+        return 1
+    fi
 }
 
 make_cluster_communities() {
     local edge_file=$1
     local i
+    local num_errors=0
+    local vals=`seq 0 $INCREMENT 1`
+    local pids=""
 
-    vals=`seq 0 $INCREMENT 1`
     for i in $vals
     do
         if [ "$i" != "0.0" ]; then
             echo "cluster_communities $edge_file $i"
             cluster_communities $edge_file $i &
+            pids="$pids $!"
         fi
     done
 
+    for pid in $pids
+    do
+       echo "wait for job $pid..."
+       wait $pid || let "num_errors+=1"
+    done
+
     # collect the results
-    wait
+    if [ $num_errors -eq 0 ]; then
+        cat $edge_file.density_* > $edge_file.density
+        echo "cat $edge_file.density_* > $edge_file.density"
 
-    cat $edge_file.density_* > $edge_file.density
-    echo "cat $edge_file.density_* > $edge_file.density"
-
-    rm $edge_file.density_*
-    echo "rm $edge_file.density_*"
+        rm $edge_file.density_*
+        echo "rm $edge_file.density_*"
+        return 0
+    else
+        echo "error while running cluster_communities"
+        return 1
+    fi
 }
-
 
 main() {
   Rscript extract_backbone.Rscript --matrix $1
   local num_genes=$(expr $(cat $1 | wc -l) - 1)
+  local retcode
 
   # this will create the *.numid2name and *.wpairs files
   adjmat2wpairs $EDGE_FILE 0 0
-  run_tanimoto $num_genes $NUM_PARTS $EDGE_FILE
-  make_cluster_communities $EDGE_FILE
+
+  if ! run_tanimoto $num_genes $NUM_PARTS $EDGE_FILE ; then
+      echo "ERROR: running compute_tanimoto incomplete"
+      exit 1
+  fi
+
+  if ! make_cluster_communities $EDGE_FILE ; then
+      echo "ERROR: running cluster_communities incomplete"
+      exit 1
+  fi
+
   cutoff=`Rscript choose_cutoff.Rscript --densityfile $EDGE_FILE.density`
   echo "DONE with cutoff: $cutoff"
   # the result of get_communities is a tab separated file with the 5 columns
