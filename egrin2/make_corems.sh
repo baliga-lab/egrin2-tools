@@ -80,6 +80,13 @@ main() {
   make_cluster_communities $EDGE_FILE
   cutoff=`Rscript choose_cutoff.Rscript --densityfile $EDGE_FILE.density`
   echo "DONE with cutoff: $cutoff"
+  # the result of get_communities is a tab separated file with the 5 columns
+  # gene1 gene2 community_id community_density community_weighted_density
+  communities_file=$EDGE_FILE.communities_$cutoff
+  echo "getting_communities -> $communities_file"
+  getting_communities $EDGE_FILE $cutoff
+  # TODO: load all corems where Community.Weighted.Density > 0
+  cat $communities_file | ./filter_communities.py > $communities_file.filtered
 }
 
 usage() {
