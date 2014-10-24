@@ -13,4 +13,4 @@ The tools are intended to be run in the following order
 2. Run ensemble on cluster
 3. Tomtom job generation
 4. Run tomtom on cluster
-
+5. Run corems
