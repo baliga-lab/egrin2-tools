@@ -86,7 +86,7 @@ def fix_meme_files(meme_files):
 	#  Read memefile line by line and output line by line, replacing strange e-value formats (e.g. "E= 10.0e+003" to "E= 1.0e+004")
 	for memef in meme_files:
 		IN = open(memef,'rb')
-		OUT = open(memef+'4fimo')
+		OUT = open(memef+'4fimo', 'wb')
 		for line in IN:
 			if 'letter-probability matrix' in line: # Note: fimo uses this matrix for input
 				linespl = line.split()
@@ -99,11 +99,11 @@ def fix_meme_files(meme_files):
 					newevalue = ''
 					if '+' in p2:
 						p2 = p2.replace('+','')
-						p2 = int(p2.replace('0','')) + 1 # now an int
+						p2 = int(p2.lstrip("0")) + 1 # now an int
 						newevalue = "%se+%03d" % (str(p1),p2)
-					if '-' in p2:
+					else:
 						p2 = p2.replace('-','')
-						p2 = int(p2.replace('0','')) - 1 # now an int
+						p2 = int(p2.lstrip("0")) - 1 # now an int
 						newevalue = "%se-%03d" % (str(p1),p2)
 					linespl[9] = newevalue
 					OUT.write(' '.join(linespl)+'\n')
