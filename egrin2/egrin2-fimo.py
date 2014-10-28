@@ -58,16 +58,16 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 
 # Templates for csh
 
-SHELL_HEADER_CSH = """#!/bin/csh"""
+SHELL_HEADER_CSH = """#!/bin/csh -f"""
 
-QSUB_TEMPLATE_HEADER_CSH = """#!/bin/csh
+QSUB_TEMPLATE_HEADER_CSH = """#!/bin/csh -f
 
 setenv LD_LIBRARY_PATH /tools/lib:/tools/R-3.0.3/lib64/R/lib
 setenv PATH /tools/bin:${PATH}
 set BATCHNUM="`printf '%03d' ${SGE_TASK_ID}`"
 """
 
-QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
+QSUB_TEMPLATE_CSH = """#$ -S /bin/csh -f
 #$ -m be
 #$ -q baliga
 #$ -P Bal_%s
@@ -78,6 +78,42 @@ QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -l mem_free=32G
 
 %s"""
+
+def fix_meme_files(meme_files):
+
+	newmemes = [] # The new file names - TODO:  can get rid of this by just using os to move the name to original
+
+	#  Read memefile line by line and output line by line, replacing strange e-value formats (e.g. "E= 10.0e+003" to "E= 1.0e+004")
+	for memef in meme_files:
+		IN = open(memef,'rb')
+		OUT = open(memef+'4fimo')
+		for line in IN:
+			if 'letter-probability matrix' in line: # Note: fimo uses this matrix for input
+				linespl = line.split()
+				evalue = linespl[9].split('e')
+				p1 = float(evalue[0]) # first part of evalue, want format to be 1.0 instead of 10.0 for e.g.
+				if p1 >= 10.0: # this is something we need to change!
+					p1 /= 10. # shift decimal
+					p1 = round(p1,1) # round to 1 decimal place
+					p2 = evalue[1] # second part of evalue, will have a + or - at beginning
+					newevalue = ''
+					if '+' in p2:
+						p2 = p2.replace('+','')
+						p2 = int(p2.replace('0','')) + 1 # now an int
+						newevalue = "%se+%03d" % (str(p1),p2)
+					if '-' in p2:
+						p2 = p2.replace('-','')
+						p2 = int(p2.replace('0','')) - 1 # now an int
+						newevalue = "%se-%03d" % (str(p1),p2)
+					linespl[9] = newevalue
+					OUT.write(' '.join(linespl)+'\n')
+			else:
+				OUT.write(line)
+		IN.close()
+		OUT.close()
+		newmemes.append(memef+'4fimo')
+	return newmemes
+
 
 def main():
 
@@ -134,7 +170,8 @@ def main():
 	for org_dir in org_out_dirs:
 		#  Find MEME files
 		meme_files = glob.glob(os.path.join(org_dir, "meme-out-*"))
-		out_dir_dict[org_dir] = meme_files
+		newnames = fix_meme_files(meme_files) # TODO! get rid of this by changing fix_meme_files output filename
+		out_dir_dict[org_dir] = newnames
 
 	#  We will make a subscripts for each run directory to call fimo on all meme files within that directory
 	sub_scripts = {}
@@ -144,7 +181,7 @@ def main():
 
 		#  We will make a subscript for each run directory to call fimo on all meme files within that directory
 		for meme in meme_files:
-			num = os.path.basename(meme).split('-')[3]
+			num = os.path.basename(meme).split('-')[3].replace('4fimo','') #  TODO! get rid of this by changing fix_meme_files output filename
 			num = num[1:] # remove leading 0
 			fimo_cmd += '\n' + FIMO_TEMPLATE % (meme, seqsfile_out, os.path.join(org_dir, "fimo-out-%s" % num)) + '\n'
 
