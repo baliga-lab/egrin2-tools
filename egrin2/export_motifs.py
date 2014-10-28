@@ -103,8 +103,8 @@ def make_meme_file(dbpaths, maxiter, targetdir, gene,
                                where iteration=?) mi
                          join (select cluster from row_members where iteration=?
                                 and order_num=?) as rm on mi.cluster=rm.cluster
-                         join (select cluster, residual from cluster_residuals
-                               where iteration=?) cr on rm.cluster=cr.cluster
+                         join (select cluster, residual from cluster_stats
+                               where iteration=?) cs on rm.cluster=cs.cluster
                          join meme_motif_sites mms on mi.rowid=mms.motif_info_id"""
               params = [maxiter, maxiter, order_num, maxiter]
 
