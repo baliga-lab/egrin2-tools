@@ -57,10 +57,10 @@ def export_run_motifs_to_meme(dbfile, targetdir, basename, max_residual=None,
     num_pssms = 0
     with open(os.path.join(targetdir, filename), 'w') as outfile:
         outfile.write(MEME_FILE_HEADER % (a_perc, c_perc, g_perc, t_perc))
-        query = 'select mi.rowid, mi.cluster, motif_num, evalue, count(mms.pvalue) as num_sites from motif_infos mi join meme_motif_sites mms on mi.rowid = mms.motif_info_id join cluster_residuals cr on mi.cluster=cr.cluster and mi.iteration=cr.iteration where mi.iteration=?'
+        query = 'select mi.rowid, mi.cluster, motif_num, evalue, count(mms.pvalue) as num_sites from motif_infos mi join meme_motif_sites mms on mi.rowid = mms.motif_info_id join cluster_stats cs on mi.cluster=cs.cluster and mi.iteration=cs.iteration where mi.iteration=?'
         params = [iteration]
         if max_residual is not None:
-            query += ' and cr.residual <= ?'
+            query += ' and cs.residual <= ?'
             params.append(max_residual)
         if max_evalue is not None:
             query += ' and mi.evalue <= ?'
