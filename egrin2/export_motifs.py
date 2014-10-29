@@ -150,6 +150,21 @@ def make_meme_files(inpath, prefix, targetdir):
                              if entry.startswith(prefix) and os.path.isdir(finalpath(entry))]))
     #print "resultdirs for '%s', prefix: '%s': %s" % (inpath, prefix, str(resultdirs))
     dbpaths = [os.path.join(resultdir, 'cmonkey_run.db') for resultdir in resultdirs]
+
+    print "adding indexes..."
+    for dbpath in dbpaths:
+        conn = sqlite3.connect(dbpath)
+        cursor = conn.cursor()
+        cursor.execute("create index if not exists cluststat_iter_index on cluster_stats (iteration)")
+        cursor.execute("create index if not exists rowmemb_order_index on row_members (order_num)")
+        cursor.execute("create index if not exists rowmemb_clust_index on row_members (cluster)")
+        cursor.execute("create index if not exists motinf_clust_index on motif_infos (cluster)")
+        cursor.close()
+        conn.close()
+    print "indexes added."
+
+
+
     # extract max iteration
     conn = sqlite3.connect(dbpaths[0])
     cursor = conn.cursor()
