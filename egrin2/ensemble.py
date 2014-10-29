@@ -32,7 +32,10 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -pe serial %d
 #$ -l mem_free=32G
 
-python cmonkey_ensemble.py --organism %s --ratios %s --out %s --num_cores %d --ensemble_run_id $SGE_TASK_ID --minimize_io"""
+python cmonkey_ensemble.py --organism %s --ratios %s --out %s --num_cores %d --ensemble_run_id $SGE_TASK_ID --minimize_io
+
+bzip2 -f %s/*.pkl
+"""
 
 
 # Templates for csh
@@ -54,7 +57,10 @@ QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -pe serial %d
 #$ -l mem_free=32G
 
-python cmonkey_ensemble.py --organism %s --ratios %s --out %s --num_cores %d --ensemble_run_id $SGE_TASK_ID"""
+python cmonkey_ensemble.py --organism %s --ratios %s --out %s --num_cores %d --ensemble_run_id $SGE_TASK_ID
+
+bzip2 -f %s/*.pkl
+"""
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=DESCRIPTION)
@@ -89,4 +95,5 @@ if __name__ == '__main__':
                                   args.organism,
                                   os.path.join(args.targetdir, "ratios-$BATCHNUM.tsv.gz"),
                                   "%s-out-$BATCHNUM" % (args.organism),
-                                  args.num_cores))
+                                  args.num_cores),
+                                  "%s-out-$BATCHNUM" % (args.organism))
