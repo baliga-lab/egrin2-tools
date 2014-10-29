@@ -29,6 +29,11 @@ import sys
 import os
 import glob
 
+#  TODO:
+#	-Instead of creating a fimo_script.sh for every run with simple multiple calls to fimo
+#		make it such that this is more parallel (see a fimo_script.sh file under a run dir)
+#	-Fix shell header to bash with an option like the '-f' in the csh shell header (maybe -profile?)
+#	-Make the iteration through all MEME files to check e-value formats more efficient
 
 #  Fimo command
 FIMO_TEMPLATE = """fimo --max-stored-scores 9999999 --max-seq-length 1e8 --text --verbosity 2 %s %s > %s"""
@@ -67,7 +72,7 @@ setenv PATH /tools/bin:${PATH}
 set BATCHNUM="`printf '%03d' ${SGE_TASK_ID}`"
 """
 
-QSUB_TEMPLATE_CSH = """#$ -S /bin/csh -f
+QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -m be
 #$ -q baliga
 #$ -P Bal_%s
@@ -99,20 +104,27 @@ def fix_meme_files(meme_files):
 					newevalue = ''
 					if '+' in p2:
 						p2 = p2.replace('+','')
-						p2 = int(p2.lstrip("0")) + 1 # now an int
-						newevalue = "%se+%03d" % (str(p1),p2)
+						if p2 == '000':
+							p2 = 0
+							newevalue = "%se+%03d" % (str(p1),p2)
+						else:
+							p2 = int(p2.lstrip("0")) + 1 # now an int
+							newevalue = "%se+%03d" % (str(p1),p2)
 					else:
 						p2 = p2.replace('-','')
-						p2 = int(p2.lstrip("0")) - 1 # now an int
-						newevalue = "%se-%03d" % (str(p1),p2)
+						if p2 == '000':
+							p2 = 0
+							newevalue = "%se+%03d" % (str(p1),p2)
+						else:
+							p2 = int(p2.lstrip("0")) - 1 # now an int
+							newevalue = "%se-%03d" % (str(p1),p2)
 					linespl[9] = newevalue
 					OUT.write(' '.join(linespl)+'\n')
 			else:
 				OUT.write(line)
 		IN.close()
 		OUT.close()
-		newmemes.append(memef+'4fimo')
-	return newmemes
+		os.rename((memef+'4fimo'),memef)
 
 
 def main():
@@ -140,6 +152,12 @@ def main():
 		op.error('need --num_cores option.  Use -h for help.')
 	if not opt.qsub_script:
 		op.error('need --qsub_script option.  Use -h for help.')
+	if not opt.organism_name:
+		op.error('need --organism_name option.  Use -h for help.')
+	if not opt.user:
+		op.error('need --user option.  Use -h for help.')
+	if not opt.num_cores:
+		op.error('need --num_cores option.  Use -h for help.')
 
 	if opt.csh:
 		header = QSUB_TEMPLATE_HEADER_CSH
@@ -170,8 +188,8 @@ def main():
 	for org_dir in org_out_dirs:
 		#  Find MEME files
 		meme_files = glob.glob(os.path.join(org_dir, "meme-out-*"))
-		newnames = fix_meme_files(meme_files) # TODO! get rid of this by changing fix_meme_files output filename
-		out_dir_dict[org_dir] = newnames
+		fix_meme_files(meme_files) # Fixes e-value formats (iterates thru every line of MEME file - TODO: make more efficient)
+		out_dir_dict[org_dir] = meme_files
 
 	#  We will make a subscripts for each run directory to call fimo on all meme files within that directory
 	sub_scripts = {}
@@ -181,7 +199,7 @@ def main():
 
 		#  We will make a subscript for each run directory to call fimo on all meme files within that directory
 		for meme in meme_files:
-			num = os.path.basename(meme).split('-')[3].replace('4fimo','') #  TODO! get rid of this by changing fix_meme_files output filename
+			num = os.path.basename(meme).split('-')[3] # Get the run number
 			num = num[1:] # remove leading 0
 			fimo_cmd += '\n' + FIMO_TEMPLATE % (meme, seqsfile_out, os.path.join(org_dir, "fimo-out-%s" % num)) + '\n'
 
