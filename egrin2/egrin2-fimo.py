@@ -31,7 +31,7 @@ import glob
 
 #  TODO:
 #	-Instead of creating a fimo_script.sh for every run with simple multiple calls to fimo
-#		make it such that this is more parallel (see a fimo_script.sh file under a run dir)
+#		make it such that this is more parallel (perhaps a fimo script for each meme file)
 #	-Fix shell header to bash with an option like the '-f' in the csh shell header (maybe -profile?)
 #	-Make the iteration through all MEME files to check e-value formats more efficient
 
