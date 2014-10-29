@@ -137,19 +137,29 @@ def current_millis():
     """returns the current time in milliseconds"""
     return int(math.floor(time.time() * 1000))
 
-
-def make_meme_files(inpath, prefix, targetdir):
-    """create MEME files based on each gene in the ensemble run and writing
-    all clusters in all runs that contain the gene"""
+def get_all_genes(inpath, prefix):
     def finalpath(entry):
 	return os.path.join(inpath, entry)
 
-    print os.listdir(inpath)
+    #print os.listdir(inpath)
     resultdirs = map(lambda s: os.path.join(inpath, s),
                      sorted([entry for entry in os.listdir(inpath)
                              if entry.startswith(prefix) and os.path.isdir(finalpath(entry))]))
     #print "resultdirs for '%s', prefix: '%s': %s" % (inpath, prefix, str(resultdirs))
     dbpaths = [os.path.join(resultdir, 'cmonkey_run.db') for resultdir in resultdirs]
+
+    print "adding indexes..."
+    for dbpath in dbpaths:
+        conn = sqlite3.connect(dbpath)
+        cursor = conn.cursor()
+        cursor.execute("create index if not exists cluststat_iter_index on cluster_stats (iteration)")
+        cursor.execute("create index if not exists rowmemb_order_index on row_members (order_num)")
+        cursor.execute("create index if not exists rowmemb_clust_index on row_members (cluster)")
+        cursor.execute("create index if not exists motinf_clust_index on motif_infos (cluster)")
+        cursor.close()
+        conn.close()
+    print "indexes added."
+
     # extract max iteration
     conn = sqlite3.connect(dbpaths[0])
     cursor = conn.cursor()
@@ -158,6 +168,16 @@ def make_meme_files(inpath, prefix, targetdir):
     cursor.execute('select name from row_names order by name')
     genes = [row[0] for row in cursor.fetchall()]
     conn.close()
+    return genes, dbpaths, max_iteration
+
+def make_meme_files(inpath, prefix, targetdir, gene=None):
+    """create MEME files based on each gene in the ensemble run and writing
+    all clusters in all runs that contain the gene"""
+
+    genes, dbpaths, max_iteration = get_all_genes(inpath, prefix)
+    if gene is not None:
+        genes = [gene]
+
     start_time0 = current_millis()
     for gene in genes:
         start_time = current_millis()

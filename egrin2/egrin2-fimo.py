@@ -36,7 +36,7 @@ import glob
 #	-Make the iteration through all MEME files to check e-value formats more efficient
 
 #  Fimo command
-FIMO_TEMPLATE = """fimo --max-stored-scores 9999999 --max-seq-length 1e8 --text --verbosity 2 %s %s > %s"""
+FIMO_TEMPLATE = """fimo --max-stored-scores 9999999 --max-seq-length 1e8 --text --verbosity 2 %s %s | bzip2 -c > %s.bz2"""
 
 SHELL_HEADER = """#!/bin/bash"""
 

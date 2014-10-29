@@ -6,6 +6,7 @@ import subprocess
 import os
 import glob
 import csv
+import bz2
 
 import time
 
@@ -39,7 +40,8 @@ def main():
 		fin = fimo_files[i]
 		bc = os.path.basename(fin)
 
-		with open(fin, 'rb') as f:
+#		with open(fin, 'rb') as f:
+		with bz2.BZ2File(fin, 'rb') as f:
 			
 			innerdict = {}
 			cnt = 0
