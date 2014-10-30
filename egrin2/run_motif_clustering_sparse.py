@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import optparse
 import bz2
 import glob
 import time
@@ -13,9 +14,16 @@ from igraph import *
 
 def main():
 
+	op = optparse.OptionParser()
+	op.add_option('-i', '--input_dir', help="The location of tomtom results, bzip'd")
 
-	files = glob.glob("/Users/mharris/Documents/work/ecoli/tomtom_clust_motifs/good/*.bz2") # My test folder with the meme files bzip'd
-	orgname = 'eco'
+	opt, args = op.parse_args()
+
+	if not opt.input_dir:
+		op.error('need --input_dir option.  Use -h for help.')
+
+	files = glob.glob(os.path.join(opt.input_dir)+'*.bz2')
+	#orgname = 'eco'
 
 	motifs1 = []
 	motifs2 = []

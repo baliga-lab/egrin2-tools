@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import optparse
 import bz2
 import glob
 import time
@@ -11,7 +12,17 @@ from pandas import *
 
 def main():
 
-	files = glob.glob("/Users/mharris/Documents/work/ecoli/tomtom_clust_motifs/good/*.bz2") # My test folder with the meme files bzip'd
+	op = optparse.OptionParser()
+	op.add_option('-i', '--input_dir', help="The location of tomtom results, bzip'd")
+
+	opt, args = op.parse_args()
+
+	if not opt.input_dir:
+		op.error('need --input_dir option.  Use -h for help.')
+
+
+
+	files = glob.glob(os.path.join(opt.input_dir)+'*.bz2') # My test folder with the meme files bzip'd
 	cnt = 1
 	#pvs = []
 	df = DataFrame()
