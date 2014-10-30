@@ -6,7 +6,7 @@ import glob
 #import math
 import numpy as np
 #import scipy.sparse as sparse
-#import os
+import os
 import pandas as pd
 import igraph as ig
 import itertools
