@@ -2,6 +2,7 @@
 
 import bz2
 import glob
+import optparse
 #import time
 #import math
 import numpy as np
@@ -17,7 +18,18 @@ def system( cmd ):
     return tmp
 
 def main():
-    files = glob.glob("tomtom_out/*tomtom.tsv.bz2") # folder with the tomtom files bzip'd
+
+    op = optparse.OptionParser()
+    op.add_option('-i', '--input_dir', help="The location of tomtom results, bzip'd")
+
+    opt, args = op.parse_args()
+
+    if not opt.input_dir:
+        op.error('need --input_dir option.  Use -h for help.')
+
+    files = glob.glob(os.path.join(opt.input_dir,'*.bz2'))
+
+    #files = glob.glob("tomtom_out/*tomtom.tsv.bz2") # folder with the tomtom files bzip'd
     dfs = {}
     for f in files:
         print(f)
