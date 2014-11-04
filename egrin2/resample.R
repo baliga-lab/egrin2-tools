@@ -20,6 +20,7 @@ cvar <- function(genes, conditions, ratios, mode=c("median", "mean", "none")[1])
 make.to.r.item <- function(ratios, geneSetSize, resamples, mode, genePool) {
 
   message(paste(c("gene set size=", geneSetSize), collapse=""))
+  # generate a (resamples x |genes|) matrix
   i <- do.call(rbind, lapply(seq(1:resamples), function(j) {
     # returns the first to.r that is non completely NA
     repeat {
@@ -45,6 +46,8 @@ make.to.r.item <- function(ratios, geneSetSize, resamples, mode, genePool) {
   i.2 <- as(i.2, "sparseMatrix")
 }
 
+# This functions creates a lookup table for each gene set
+# 
 resampleRandomConditions <- function(ratios, geneSetSizes=seq(3, 200, 1),
                                      resamples=20000, mode="none") {
   require('multicore')
