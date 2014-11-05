@@ -12,7 +12,10 @@ import itertools
 import cPickle as pickle   ## make shelve much faster!
 import shelve ## shove    ## see http://www.evilchuck.com/2008/02/tell-python-to-shove-it.html about shove
 
-import utils
+def system( cmd ):
+    print cmd
+    tmp = os.popen( cmd ).read()
+    return tmp
 
 op = optparse.OptionParser()
 op.add_option('-i', '--input_dir', default='tomtom_out', help="The location of tomtom results, bzip'd")
