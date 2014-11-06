@@ -30,8 +30,7 @@ def main():
 	if not opt.input_dir:
 		op.error('need --input_dir option.  Use -h for help.')
 
-
-	fimo_files = glob.glob(os.path.join(opt.input_dir, "fimo-out-*"))
+	fimo_files = glob.glob(opt.input_dir + "/fimo-outs/fimo-out-*")
 	print 'Number of fimo files = ', str(len(fimo_files))
 
 	fimodict = {}
@@ -99,6 +98,7 @@ def main():
 	badmotifs = {}
 
 	for bc in fimodict: # So... there are multiple motifs in a bicluster fimo file
+                print bc
 		fimomotifs = fimodict[bc]
 		badmotifsset = set()
 
