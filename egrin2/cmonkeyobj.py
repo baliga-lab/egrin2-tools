@@ -28,12 +28,30 @@ class cMonkey2:
     tables = None
     iteration = 2001
     k_clust = None
+    organism = None
+    species = None
 
     def __init__( self, dbfile ):
         self.dbfile = dbfile
         self.tables = read_all_tables( dbfile )
         self.iteration = max(self.tables['motif_infos'].iteration)
         self.k_clust = self.tables['run_infos'].num_clusters[0] ##max(self.tables['row_members'].cluster)
+        self.organism = self.tables['run_infos'].organism[0]
+        self.species = self.tables['run_infos'].species[0]
+
+    def get_feature_names( self ):
+        feature_names_file = './cache/' + self.species + '_feature_names'
+        feature_names = pd.read_table( feature_names_file, sep='\t', header=None, skiprows=4 )
+        feature_names.columns = ['id','names','type']
+        #feature_names = feature_names.set_index( 'names' )
+        return feature_names
+
+    def get_features( self ):
+        features_file = './cache/' + self.species + '_features'
+        features = pd.read_table( features_file, sep='\t', header=None, skiprows=16 )
+        cols = features.columns.values; cols[0] = 'id'; features.columns = cols
+        #features = features.set_index( 'od' )
+        return features
 
     def get_rows( self, k ):
         t1 = self.tables['row_members']
@@ -57,7 +75,18 @@ class cMonkey2:
         t2 = self.tables['motif_infos']
         t2 = t2[ t2.cluster == k ]
         t2 = t2.drop( ['iteration', 'cluster'], 1 )
-        return {'cluster':t1, 'motif':t2}
+
+        ## Extract it.
+        out = {'residual':t1.residual.values[0],
+               'nrows':t1.num_rows.values[0],
+               'ncols':t1.num_cols.values[0],
+               'e_values:':t2.evalue.values}
+
+        ## Also get p-clust
+        pclusts = np.array([self.get_motif_pclust(k,i) for i in range(1,t2.shape[0]+1)])
+        out['pclusts'] = pclusts
+        
+        return out
 
     def clusters_w_genes( self, genes ):
         t1 = self.tables['row_members']
@@ -103,6 +132,27 @@ class cMonkey2:
         pssm = motif_pssm_rows[(motif_pssm_rows.iteration==self.iteration) & (motif_pssm_rows.motif_info_id==rowid)]
         pssm.drop( ['motif_info_id', 'iteration', 'row'], 1, inplace=True )
         return pssm
+
+    def get_motif_sites(self, cluster_num, motif_num):
+        motif_infos = self.tables['motif_infos']
+        rowid = motif_infos[(motif_infos.iteration==self.iteration) & 
+                            (motif_infos.cluster==cluster_num) & (motif_infos.motif_num==motif_num)].index.values[0]+1
+
+        sites = self.tables['meme_motif_sites']
+        sites = sites[ sites.motif_info_id == rowid ]
+        sites = sites.drop( ['motif_info_id'], 1 )
+
+        feature_names = self.get_feature_names()
+        tmp = pd.merge( sites, feature_names, left_on='seq_name', right_on='id' )
+        tmp = tmp[ np.in1d( tmp.names.values, self.tables['row_names'].name.values ) ]
+        tmp = tmp.drop( ['seq_name', 'type'], 1 )
+        tmp = tmp.drop_duplicates()
+
+        return tmp ## need to update genes based on synonyms
+
+    def get_motif_pclust(self, cluster_num, motif_num):
+        sites = self.get_motif_sites(cluster_num, motif_num)
+        return np.mean( np.log10(sites.pvalue.values) )
 
     def get_biop_motif(self, cluster_num, motif_num, option='sites'):
         ##import egrin2.export_motifs as em
@@ -209,8 +259,8 @@ class cMonkey2:
         output = cStringIO.StringIO(tmp)
         img = mpimg.imread(output)
         imgplot = plt.imshow( img )
-        plt.show()
-        return img
+        #plt.show()
+        return plt
 
 
 ##from egrin2.cmonkeyobj import cMonkey2 as cm2
