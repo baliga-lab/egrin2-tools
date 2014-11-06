@@ -125,6 +125,7 @@ def main():
 		#print frac
 
 	#  Print the fimo file name and the resulting fraction of goodmotifs to all motifs
+        # NO THIS IS WRONG - should have separate fractions for each of the 2 motifs in each fimo file!!!
 
 	OUT = open(os.path.join(opt.input_dir,'coding_fracs.tsv'), 'wb')
 
