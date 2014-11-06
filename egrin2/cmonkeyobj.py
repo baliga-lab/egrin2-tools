@@ -30,6 +30,7 @@ class cMonkey2:
     k_clust = None
     organism = None
     species = None
+    ratios = None
 
     def __init__( self, dbfile ):
         self.dbfile = dbfile
@@ -53,6 +54,13 @@ class cMonkey2:
         #features = features.set_index( 'od' )
         return features
 
+    def load_ratios( self, ratios_file=None ):
+        import gzip
+        if ratios_file is None:
+            ratios_file = os.path.dirname(self.dbfile) + '/ratios.tsv.gz'
+        self.ratios = pd.read_table( gzip.GzipFile( ratios_file ), sep='\t' )
+        self.ratios
+
     def get_rows( self, k ):
         t1 = self.tables['row_members']
         t1 = t1[ (t1.iteration == self.iteration) & (t1.cluster == k) ]
@@ -66,6 +74,39 @@ class cMonkey2:
         t2 = self.tables['column_names']
         t2 = pd.merge( t1, t2, on='order_num' )
         return t2.name.values
+
+    def get_ratios( self, k=None, rows=None, cols=None, included=True ):
+        """Extract submatrix of ratios for cluster or rows/cols. 
+        If ~included, extract submatrix of ratios for conditions NOT in cluster."""
+        if self.ratios is None:
+            ratios = self.load_ratios()
+        if k is not None:
+            if rows is None:
+                rows = self.get_rows( k )
+            if cols is None:
+                cols = self.get_cols( k )
+        if not included:
+            cols = ratios.columns.values[ np.in1d( ratios.columns.values, cols, invert=True ) ]
+        rats = self.ratios.ix[ rows, cols ]
+        return rats
+
+    def plot_ratios( self, k=None, rows=None, cols=None, included=True, kind='line' ):
+        ## see http://pandas.pydata.org/pandas-docs/version/0.15.0/visualization.html -- cool!
+        ## can use kind = 'box' too!
+        rats = self.get_ratios( k, rows, cols, included )
+        rats = rats.transpose()
+
+        if kind == 'box': ## sort by mean of columns
+            means = rats.mean(1)
+            tmp = pd.concat( [rats, means], 1 )
+            cols = tmp.columns.values; cols[-1] = 'MEANS'; tmp.columns = cols
+            tmp = tmp.sort( ['MEANS'] )
+            tmp = tmp.drop( 'MEANS', 1 )
+            rats = tmp.transpose()
+            rats.plot(kind=kind, use_index=False, title='Cluster %d'%(k), legend=False, sym='.')
+        else:
+            rats.plot(kind=kind, use_index=False, title='Cluster %d'%(k), legend=False)
+        ## use plt.close() to close the window
 
     def get_cluster_info( self, k ):
         t1 = self.tables['cluster_stats']
