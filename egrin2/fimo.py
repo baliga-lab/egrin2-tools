@@ -61,7 +61,8 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -pe serial %s
 #$ -l mem_free=8G
 
-%s"""
+%s
+"""
 
 
 # Templates for csh
@@ -85,7 +86,8 @@ QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -pe serial %s
 #$ -l mem_free=8G
 
-%s"""
+%s
+"""
 
 def fix_meme_files(meme_files):
     #  Read memefile line by line and output, replacing strange e-value formats (e.g. "E= 10.0e+003" to "E= 1.0e+004")
