@@ -5,6 +5,7 @@ import cStringIO
 import sqlite3
 import bz2
 import cPickle as pickle
+import ConfigParser
 
 from matplotlib import pyplot as plt
 import matplotlib.image as mpimg
@@ -31,6 +32,7 @@ class cMonkey2:
     organism = None
     species = None
     ratios = None
+    config = None
 
     def __init__( self, dbfile ):
         self.dbfile = dbfile
@@ -39,6 +41,7 @@ class cMonkey2:
         self.k_clust = self.tables['run_infos'].num_clusters[0] ##max(self.tables['row_members'].cluster)
         self.organism = self.tables['run_infos'].organism[0]
         self.species = self.tables['run_infos'].species[0]
+        self.config = self.load_config()
 
     def get_feature_names( self ):
         feature_names_file = './cache/' + self.species + '_feature_names'
@@ -59,7 +62,17 @@ class cMonkey2:
         if ratios_file is None:
             ratios_file = os.path.dirname(self.dbfile) + '/ratios.tsv.gz'
         self.ratios = pd.read_table( gzip.GzipFile( ratios_file ), sep='\t' )
-        self.ratios
+        return self.ratios
+
+    def load_config( self, config_file=None ):
+        """then can do e.g., b.config.getfloat('Rows', 'scaling_constant')
+           or simply, dict(b.config.items('Rows'))"""
+        if config_file is None:
+            config_file = os.path.dirname(self.dbfile) + '/final.ini'
+        config_parser = ConfigParser.ConfigParser()
+        config_parser.read( config_file )
+        self.config = config_parser
+        return self.config
 
     def get_rows( self, k ):
         t1 = self.tables['row_members']
