@@ -326,6 +326,7 @@ class cMonkey2:
         
         output = cStringIO.StringIO(tmp)
         img = mpimg.imread(output)
+        plt.axis('off')
         imgplot = plt.imshow( img )
         #plt.show()
         return plt
