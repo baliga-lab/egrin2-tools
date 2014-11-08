@@ -88,6 +88,31 @@ class EGRIN2:
                 None
         hits = pd.concat( hits, 0, ignore_index=True, copy=False )
 
+    def make_dbfiles_shelve( self ):
+        all_dfs = shelve.open('fimo_shelf.db', protocol=2, writeback=False)
+        if len(all_dfs) != len(self.files): ## if using a shelf, once this is done once, you don't have to do it again.
+            ## read in fimo tables and store as shelved dataframes
+            for f in self.files:
+                print(f)
+                fimo_outs = np.sort( np.array( glob.glob(os.path.dirname(f)+'/fimo-outs/fimo-out-*bz2') ) )
+                if len(fimo_outs) <= 0:
+                    continue
+                dfs = {}
+                for ff in fimo_outs:
+                    print '    ' + ff
+                    try:
+                        df = pd.read_table( bz2.BZ2File(ff), sep='\t' )
+                        clust_num = int(os.path.basename(ff).split('-')[2].replace('.bz2',''))
+                        df = pd.concat( [ df, pd.Series(np.repeat(clust_num,df.shape[0])), \
+                                          pd.Series(np.repeat(os.path.dirname(f),df.shape[0])) ], 1 )
+                        cols = df.columns.values; cols[-2] = 'cluster'; cols[-1] = 'run_id'; df.columns = cols
+                        dfs[ clust_num ] = df ##.append( df )
+                    except:
+                        print 'ERROR'
+                dfs = pd.concat( dfs, 0, ignore_index=True, copy=False )
+                all_dfs[f] = dfs
+        return all_dfs
+
 #from egrin2.egrin2obj import EGRIN2 as eg2
 #b = eg2('eco-out-')
 #np.array([bb.config.getfloat('Rows','scaling_const') for bb in b.cms.values()],np.float)
