@@ -69,7 +69,7 @@ setenv PATH /tools/bin:${PATH}
 set BATCHNUM="`printf '%03d' ${SGE_TASK_ID}`"
 """
 
-QSUB_TEMPLATE_CSH = """#$ -S /bin/csh -f
+QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -m be
 #$ -q baliga
 #$ -P Bal_%s
