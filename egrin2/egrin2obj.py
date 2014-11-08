@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import bz2
 import sqlite3
+import shelve
 
 from cmonkeyobj import cMonkey2 as cm2
 
@@ -40,7 +41,7 @@ class EGRIN2:
         row_members = pd.concat( row_members, 0, ignore_index=True, copy=False )
         return row_members
 
-    def make_dbfiles( self ):
+    def make_fimo_dbfiles( self ):
         ## read in fimo tables and store as one big sqlite database, one for each run
         for f in self.files:
             print(f)
@@ -88,7 +89,7 @@ class EGRIN2:
                 None
         hits = pd.concat( hits, 0, ignore_index=True, copy=False )
 
-    def make_dbfiles_shelve( self ):
+    def make_fimo_dbfiles_shelve( self ):
         all_dfs = shelve.open('fimo_shelf.db', protocol=2, writeback=False)
         if len(all_dfs) != len(self.files): ## if using a shelf, once this is done once, you don't have to do it again.
             ## read in fimo tables and store as shelved dataframes
