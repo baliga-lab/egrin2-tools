@@ -124,11 +124,11 @@ class cMonkey2:
     def get_cluster_info( self, k ):
         t1 = self.tables['cluster_stats']
         t1 = t1[ t1.cluster == k ]
-        t1 = t1.drop( ['iteration', 'cluster'], 1 )
+        #t1 = t1.drop( ['iteration', 'cluster'], 1 )
 
         t2 = self.tables['motif_infos']
         t2 = t2[ t2.cluster == k ]
-        t2 = t2.drop( ['iteration', 'cluster'], 1 )
+        #t2 = t2.drop( ['iteration', 'cluster'], 1 )
 
         ## Extract it.
         out = {'residual':t1.residual.values[0],
@@ -160,6 +160,13 @@ class cMonkey2:
         t2 = t2.drop( ['iteration', 'order_num'], 1 )
         return t2
 
+    def __get_motif_id(self, cluster_num, motif_num):
+        motif_infos = self.tables['motif_infos']
+        rowid = motif_infos[(motif_infos.iteration==self.iteration) & 
+                            (motif_infos.cluster==cluster_num) & 
+                            (motif_infos.motif_num==motif_num)].index.values[0]+1
+        return rowid
+
     def get_motif_pssm(self, cluster_num, motif_num):
         """export the specified motif to a pandas dataframe
         Parameters:
@@ -175,9 +182,10 @@ class cMonkey2:
         #params = [self.iteration, cluster_num, motif_num]
         #cursor.execute(query, params)
         #rowid = cursor.fetchone()[0]
-        motif_infos = self.tables['motif_infos']
-        rowid = motif_infos[(motif_infos.iteration==self.iteration) & 
-                            (motif_infos.cluster==cluster_num) & (motif_infos.motif_num==motif_num)].index.values[0]+1
+        #motif_infos = self.tables['motif_infos']
+        #rowid = motif_infos[(motif_infos.iteration==self.iteration) & 
+        #                    (motif_infos.cluster==cluster_num) & (motif_infos.motif_num==motif_num)].index.values[0]+1
+        rowid = self.__get_motif_id(cluster_num, motif_num)
 
         #query = 'select a,c,g,t from motif_pssm_rows where iteration=? and motif_info_id=?'
         #params = [self.iteration, rowid]
@@ -188,9 +196,10 @@ class cMonkey2:
         return pssm
 
     def get_motif_sites(self, cluster_num, motif_num):
-        motif_infos = self.tables['motif_infos']
-        rowid = motif_infos[(motif_infos.iteration==self.iteration) & 
-                            (motif_infos.cluster==cluster_num) & (motif_infos.motif_num==motif_num)].index.values[0]+1
+        #motif_infos = self.tables['motif_infos']
+        #rowid = motif_infos[(motif_infos.iteration==self.iteration) & 
+        #                    (motif_infos.cluster==cluster_num) & (motif_infos.motif_num==motif_num)].index.values[0]+1
+        rowid = self.__get_motif_id(cluster_num, motif_num)
 
         sites = self.tables['meme_motif_sites']
         sites = sites[ sites.motif_info_id == rowid ]
@@ -205,7 +214,10 @@ class cMonkey2:
         return tmp ## need to update genes based on synonyms
 
     def get_motif_pclust(self, cluster_num, motif_num):
-        sites = self.get_motif_sites(cluster_num, motif_num)
+        rowid = self.__get_motif_id(cluster_num, motif_num)
+        sites = self.tables['meme_motif_sites']
+        sites = sites[ sites.motif_info_id == rowid ]
+        #sites = sites.drop( ['motif_info_id'], 1 )
         return np.mean( np.log10(sites.pvalue.values) )
 
     def get_biop_motif(self, cluster_num, motif_num, option='sites'):
@@ -225,9 +237,10 @@ class cMonkey2:
         #params = [self.iteration, cluster_num, motif_num]
         #cursor.execute(query, params)
         #rowid = cursor.fetchone()[0]
-        motif_infos = self.tables['motif_infos']
-        rowid = motif_infos[(motif_infos.iteration==self.iteration) & 
-                            (motif_infos.cluster==cluster_num) & (motif_infos.motif_num==motif_num)].index.values[0]+1
+        #motif_infos = self.tables['motif_infos']
+        #rowid = motif_infos[(motif_infos.iteration==self.iteration) & 
+        #                    (motif_infos.cluster==cluster_num) & (motif_infos.motif_num==motif_num)].index.values[0]+1
+        rowid = self.__get_motif_id(cluster_num, motif_num)
         #mot_info = pd.read_sql('select * from motif_infos where rowid=?', conn, params=[rowid])
         #mot_sites = pd.read_sql('select * from meme_motif_sites where motif_info_id=?', conn, params=[rowid])
         mot_sites = self.tables['meme_motif_sites'][self.tables['meme_motif_sites'].motif_info_id == rowid]
@@ -297,9 +310,10 @@ class cMonkey2:
         #mot_info = pd.read_sql('select * from motif_infos where rowid=?', conn, params=[rowid])
         #mot_sites = pd.read_sql('select * from meme_motif_sites where motif_info_id=?', conn, params=[rowid])
 
-        motif_infos = self.tables['motif_infos']
-        rowid = motif_infos[(motif_infos.iteration==self.iteration) & 
-                            (motif_infos.cluster==cluster_num) & (motif_infos.motif_num==motif_num)].index.values[0]+1
+        #motif_infos = self.tables['motif_infos']
+        #rowid = motif_infos[(motif_infos.iteration==self.iteration) & 
+        #                    (motif_infos.cluster==cluster_num) & (motif_infos.motif_num==motif_num)].index.values[0]+1
+        rowid = self.__get_motif_id(cluster_num, motif_num)
         mot_sites = self.tables['meme_motif_sites'][self.tables['meme_motif_sites'].motif_info_id == rowid]
 
         ldata = wl.LogoData.from_seqs(wl.SeqList(mot_sites.seq.values.tolist(), wl.unambiguous_dna_alphabet))
@@ -319,3 +333,5 @@ class cMonkey2:
 
 ##from egrin2.cmonkeyobj import cMonkey2 as cm2
 ##b = cm2('eco-out-001/cmonkey_run.db')
+##pd.Series([b.get_cluster_info(k)['residual'] for k in range(1,b.k_clust)]).plot(kind='hist',bins=20)
+##pd.DataFrame([b.get_cluster_info(k)['pclusts'] for k in range(1,b.k_clust)]).plot(kind='hist',bins=20,stacked=True)
