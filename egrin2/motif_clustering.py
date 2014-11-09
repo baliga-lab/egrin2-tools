@@ -35,7 +35,7 @@ input_dir = opt.input_dir
 files = glob.glob( input_dir + "/*tomtom.tsv.bz2" ) # folder with the tomtom files bzip'd
 ##dfs = {}
 ## can pd.concat work on shelved dataframes? YES. Note protocol=2 is faster and smaller.
-dfs = shelve.open(input_dir+'/shelf.db', protocol=2, writeback=False)
+dfs = shelve.open('tomtom_shelf.db', protocol=2, writeback=False)
 ##dfs = shove.Shove('sqlite:///'+input_dir+'/shove.db', compress=True) ## note this requires SQLAlchemy installed
 ##dfs = shove.Shove('file://./'+input_dir+'/shove.db', compress=True) 
 

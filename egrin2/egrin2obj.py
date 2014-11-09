@@ -111,7 +111,7 @@ class EGRIN2:
                     except:
                         print 'ERROR'
                 dfs = pd.concat( dfs, 0, ignore_index=True, copy=False )
-                all_dfs[f] = dfs
+                all_dfs[os.path.dirname(f)] = dfs
         return all_dfs
 
 #from egrin2.egrin2obj import EGRIN2 as eg2
