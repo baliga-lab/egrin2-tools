@@ -19,7 +19,7 @@ def system( cmd ):
 
 op = optparse.OptionParser()
 op.add_option('-i', '--input_dir', default='tomtom_out', help="The location of tomtom results, bzip'd")
-op.add_option('-opt', '--option', default=2, help="Filtering option, 1 or 2; see comments")
+op.add_option('-o', '--option', default=2, help="Filtering option, 1 or 2; see comments")
 opt, args = op.parse_args()
 if not opt.input_dir:
     op.error('need --input_dir option.  Use -h for help.')
@@ -32,7 +32,7 @@ option = 2
 
 input_dir = 'tomtom_out'
 input_dir = opt.input_dir
-files = glob.glob( input_dir + "/*tomtom.tsv.bz2" ) # folder with the tomtom files bzip'd
+files = np.sort( np.array( glob.glob( input_dir + "/*tomtom.tsv.bz2" ) ) ) # folder with the tomtom files bzip'd
 ##dfs = {}
 ## can pd.concat work on shelved dataframes? YES. Note protocol=2 is faster and smaller.
 dfs = shelve.open('tomtom_shelf.db', protocol=2, writeback=False)
@@ -47,12 +47,17 @@ if len(dfs) != len(files): ## if using a shelf, once this is done once, you don'
         try:
             df = pd.read_table( bz2.BZ2File(f), sep='\t' )
             print df.shape
-            df.drop('Query consensus', 1, inplace=True)
-            df.drop('Target consensus', 1, inplace=True)
+            gene = os.path.basename(f).split('.')[0]
+            df = pd.concat( [ df, pd.Series(np.repeat(gene,df.shape[0])) ], 1 )
+            cols = df.columns.values; cols[-1] = 'gene'; df.columns = cols
+            df.drop(['Query consensus', 'Target consensus'], 1, inplace=True)
+            #df = df[ df['p-value'] <= 0.1 ]
+            #print df.shape
             df = df[ df['p-value'] <= 0.01 ]
+            print df.shape
             df = df[ df['#Query ID'] != df['Target ID'] ]
             print df.shape
-            dfs[ f ] = df
+            dfs[ gene ] = df
         except:
             continue
 
@@ -137,8 +142,16 @@ for i in xrange( len(clusters) ):
         continue
     df = dfs2.ix[ clust ] ##[ np.in1d( dfs2['#Query ID'].values, clust ) ]
     df = df.loc[ np.in1d( df['Target ID'].values, clust ) ]
+    df = df.reset_index( drop=True )
+    df = pd.concat( [ df, pd.Series(np.repeat(i,df.shape[0])) ], 1 )
+    cols = df.columns.values; cols[-1] = 'motif_clust'; df.columns = cols
     print df.shape
     clust_dfs[i] = df
+
+clust_dfs = pd.concat( clust_dfs.values(), axis=0 )
+cols = clust_dfs.columns.values; cols[0] = 'Query'; cols[1] = 'Target'; clust_dfs.columns = cols
+
+clust_dfs.to_csv( bz2.BZ2File('motif_clusts.tsv.bz2', 'w'), sep='\t', index=False, header=True )
 
 ## Create the "aligned pssms" and "combined pssm" for each motif cluster
 ## Not ready yet.
