@@ -25,14 +25,14 @@ def read_all_tables( dbfile ):
     return tables
 
 class cMonkey2:
-    dbfile = None
-    tables = None
+    dbfile = "" #None
+    tables = {} #None
     iteration = 2001
-    k_clust = None
-    organism = None
-    species = None
-    ratios = None
-    config = None
+    k_clust = 999 #None
+    organism = 'eco' #None
+    species = 'Escherichia_coli_K12' #None
+    ratios = pd.DataFrame()
+    config = ConfigParser.ConfigParser() #None
 
     def __init__( self, dbfile ):
         self.dbfile = dbfile
@@ -76,14 +76,16 @@ class cMonkey2:
 
     def get_rows( self, k ):
         t1 = self.tables['row_members']
-        t1 = t1[ (t1.iteration == self.iteration) & (t1.cluster == k) ]
+        t1 = t1[ t1.iteration == self.iteration ]
+        t1 = t1[ t1.cluster == k ]
         t2 = self.tables['row_names']
         t2 = pd.merge( t1, t2, on='order_num' )
         return t2.name.values
 
     def get_cols( self, k ):
         t1 = self.tables['column_members']
-        t1 = t1[ (t1.iteration == self.iteration) & (t1.cluster == k) ]
+        t1 = t1[ t1.iteration == self.iteration ]
+        t1 = t1[ t1.cluster == k ]
         t2 = self.tables['column_names']
         t2 = pd.merge( t1, t2, on='order_num' )
         return t2.name.values
