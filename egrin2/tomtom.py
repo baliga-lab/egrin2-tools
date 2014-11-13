@@ -20,7 +20,7 @@ file in the target directory
 
 Usage:
 
-./tomtom.py --dir <dir> --prefix <prefix> --targetdir <target directory>
+./egrin2/tomtom.py --dir <dir> --prefix <prefix> --targetdir <target directory>
 """
 import argparse
 import bz2
@@ -54,7 +54,7 @@ export PATH=/tools/bin:${PATH}
 #$ -pe serial %d
 #$ -l mem_free=8G
 
-python ./egrin2-python/egrin2/tomtom.py --dir . --prefix eco-out- --targetdir tomtom_out --gene %s
+python ./egrin2/tomtom.py --dir . --prefix eco-out- --targetdir tomtom_out --gene %s
 
 tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s | bzip2 -c  > %s
 """
@@ -73,13 +73,13 @@ setenv PATH /tools/bin:${PATH}
 #$ -pe serial %d
 #$ -l mem_free=8G
 
-python ./egrin2-python/egrin2/tomtom.py --dir . --prefix eco-out- --targetdir tomtom_out --gene %s
+python ./egrin2/tomtom.py --dir . --prefix eco-out- --targetdir tomtom_out --gene %s
 
 tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s | bzip2 -c > %s
 """
 
 QSUB_SCRIPT_CSH = """#!/bin/csh
-foreach f (`ls %s/tomtom*.sh`)
+foreach f (`ls %s/*-tomtom.sh`)
 echo "qsub $f"
 qsub $f
 end
@@ -90,7 +90,7 @@ def emit_tomtom_script(targetdir, filepath, gene, login, q_thresh=Q_THRESHOLD, d
     ##login = 'mharris'
     num_cores = 1
 
-    with open(os.path.join(targetdir, 'tomtom-%s.sh' % gene), 'w') as outfile:
+    with open(os.path.join(targetdir, '%s-tomtom.sh' % gene), 'w') as outfile:
         outfile.write(QSUB_TEMPLATE % (login, login, num_cores, gene, q_thresh,
                                        dist_method, min_overlap, q_pseudo, t_pseudo,
                                        filepath, filepath, '%s-tomtom.tsv.bz2' % filepath))
@@ -121,9 +121,9 @@ def run_tomtom(targetdir, targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_meth
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="tomtom.py - run tomtom on cmonkey results")
-    parser.add_argument('--dir', default='.', help="directory holding the ensemble run results")
+    parser.add_argument('--dir', help="directory holding the ensemble run results", default='.')
     parser.add_argument('--prefix', required=True, help='a common prefix of the result directories')
-    parser.add_argument('--targetdir', required=True, help='the directory to store the results')
+    parser.add_argument('--targetdir', required=True, help='the directory to store the results', default='tomtom_out')
     parser.add_argument('--csh', action='store_true')
     parser.add_argument('--user', default=None, help='username for qsub')
     parser.add_argument('--gene', default=None, help='run tomtom only on motifs from clusters containing this gene')
