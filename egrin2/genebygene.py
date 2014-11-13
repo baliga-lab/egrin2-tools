@@ -35,6 +35,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="genebygene.py - generate gene-by-gene counts")
     parser.add_argument('--dir', default='.', help="directory holding the ensemble run results")
     parser.add_argument('--prefix', required=True, help='a common prefix of the result directories')
+    parser.add_argument('--outfile', required=True, help='output matrix file')
     args = parser.parse_args()
 
     inpath = args.dir
@@ -72,7 +73,7 @@ if __name__ == '__main__':
     row_sums = mat.sum(axis=1)
     mat = (mat.T / row_sums).T
     
-    with open('outmatrix', 'w') as outfile:
+    with open(args.outfile, 'w') as outfile:
         titlerow = '\t'.join(genenames)
         outfile.write(titlerow + '\n')
         for i, rgene in enumerate(genenames):

@@ -58,3 +58,5 @@ resampleRandomConditions <- function(ratios, geneSetSizes=seq(3, 200, 1),
   names(to.r) <- as.character(geneSetSizes)
   invisible(to.r)
 }
+
+ratios <- read.delim('ecoli.tsv', as.is=T, sep='\t', row.name=1)

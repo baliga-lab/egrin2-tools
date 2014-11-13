@@ -84,7 +84,7 @@ writeEdgeList <- function(matrix,file=paste(OUTDIR,"out",sep=""), weighted=T) {
 if (!is.null(opt$matrix)) {
   message("processing...")
   message("reading the input matrix...")
-  gbg.normalized <- as.matrix(read.table('outmatrix', as.is=T, row.names=1, header=T))
+  gbg.normalized <- as.matrix(read.table(opt$matrix, as.is=T, row.names=1, header=T))
 
   message('computing backbone...')
   gbg.backbone <- multiscaleBackbone(gbg.normalized, makeFullyConnected=F, multicore=T, pval=0.05)

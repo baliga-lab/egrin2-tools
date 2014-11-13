@@ -97,39 +97,45 @@ make_cluster_communities() {
 }
 
 main() {
-  Rscript extract_backbone.Rscript --matrix $1
-  local num_genes=$(expr $(cat $1 | wc -l) - 1)
-  local retcode
+    ## Integration of the genebygene script, which generates the input
+    # python genebygene.py --dir $1 --prefix $2  --outfile outmatrix
+    Rscript extract_backbone.Rscript --matrix $1
+    local num_genes=$(expr $(cat $1 | wc -l) - 1)
+    local retcode
 
-  # this will create the *.numid2name and *.wpairs files
-  adjmat2wpairs $EDGE_FILE 0 0
+    # this will create the *.numid2name and *.wpairs files
+    adjmat2wpairs $EDGE_FILE 0 0
 
-  if ! run_tanimoto $num_genes $NUM_PARTS $EDGE_FILE ; then
-      echo "ERROR: running compute_tanimoto incomplete"
-      exit 1
-  fi
+    if ! run_tanimoto $num_genes $NUM_PARTS $EDGE_FILE ; then
+        echo "ERROR: running compute_tanimoto incomplete"
+        exit 1
+    fi
 
-  if ! make_cluster_communities $EDGE_FILE ; then
-      echo "ERROR: running cluster_communities incomplete"
-      exit 1
-  fi
+    if ! make_cluster_communities $EDGE_FILE ; then
+        echo "ERROR: running cluster_communities incomplete"
+        exit 1
+    fi
 
-  cutoff=`Rscript choose_cutoff.Rscript --densityfile $EDGE_FILE.density`
-  echo "DONE with cutoff: $cutoff"
-  # the result of get_communities is a tab separated file with the 5 columns
-  # gene1 gene2 community_id community_density community_weighted_density
-  communities_file=$EDGE_FILE.communities_$cutoff
-  echo "getting_communities -> $communities_file"
-  getting_communities $EDGE_FILE $cutoff
-  # filter corems where Community.Weighted.Density > 0
-  cat $communities_file | ./filter_communities.py > $communities_file.filtered
+    cutoff=`Rscript choose_cutoff.Rscript --densityfile $EDGE_FILE.density`
+    echo "DONE with cutoff: $cutoff"
+    # the result of get_communities is a tab separated file with the 5 columns
+    # gene1 gene2 community_id community_density community_weighted_density
+    # in the reference R implementation the contents of $communties_file is
+    # o$corems$all
+    # and the contents of $communites_file.filtered is o$corems$clean_density
+    communities_file=$EDGE_FILE.communities_$cutoff
+    echo "getting_communities -> $communities_file"
+    getting_communities $EDGE_FILE $cutoff
+    # filter corems where Community.Weighted.Density > 0
+    cat $communities_file | ./filter_communities.py > $communities_file.filtered
 
-  # TODO: load into filtered communities into gene-by-gene matrix
-  # TODO: normalize ratios ?
+    # TODO: load into filtered communities into gene-by-gene matrix
+    # -> we might not need it, since it is not active in the reference
+    # TODO: normalize ratios ? (Maybe not)
 }
 
 usage() {
-  echo "usage: make_corems.sh <matrix-file>"
+    echo "usage: make_corems.sh <matrix-file>"
 }
 if [ "$#" -ne 1 ]; then
     usage
