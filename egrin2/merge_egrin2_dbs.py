@@ -45,6 +45,9 @@ class sql2mongoDB:
     	else:
         		self.prefix = prefix
         	self.files = np.sort( np.array( glob.glob( e_dir + prefix + "???/cmonkey_run.db" ) ) ) # get all cmonkey_run.db files
-        	conn = sqlite3.connect(tmp)
+
+    def parseSQLite( self, db_file ):
+    	"""Create python dictionaries for bulk import into MongoDB collections"""
+        	conn = sqlite3.connect(db_file)
         	c = conn.cursor()
 
