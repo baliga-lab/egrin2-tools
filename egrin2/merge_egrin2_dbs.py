@@ -76,18 +76,21 @@ class sql2mongoDB:
         	# load additional gene info
         	if  row_annot != None:
         		# assumes default microbes online schema
-        		row_annot = pd.read_csv( gzip.open( row_annot, 'rb' ), index_col=7, sep="\t" )	
+        		row_annot = pd.read_csv( gzip.open( row_annot, 'rb' ), sep="\t" )	
         	
         	# make row2id and id2row dicts for lookup
         	rows = self.ratios_standardized.index.values
         	rows.sort()
-        	self.row_info =  pd.DataFrame( zip( range( len( rows ) ), rows ), index = rows, columns = [ "id", "egrin2_row_name"] )
+        	self.row_info =  pd.DataFrame( zip( range( len( rows ) ), rows ), index = rows, columns = [ "row_id", "egrin2_row_name"] )
+        	# join with row_annot
+        	row_table = pd.merge( row_info, row_annot, left_on="egrin2_row_name", right_on="sysName" )
+
         	#tmp.to_json(orient='records')
 
         	# make cond2id and id2cond dicts for lookup
         	cols = self.ratios_standardized.columns.values
         	cols.sort()
-        	self.col_info =  pd.DataFrame( zip( range( len( cols ) ), cols ), columns = [ "id", "egrin2_col_name"] )
+        	self.col_info =  pd.DataFrame( zip( range( len( cols ) ), cols ), columns = [ "col_id", "egrin2_col_name"] )
         	
 
     def parseRatios( self, ratios_files ):
