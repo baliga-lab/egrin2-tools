@@ -39,7 +39,7 @@ import gridfs
 
 class sql2mongoDB:
     
-	def __init__( self, e_dir = None, prefix = None, gene_info = None, ratios_raw = None, col_annot = None, row_annot = None, dbname = None ):
+	def __init__( self, e_dir = None, prefix = None, gene_info = None, ratios_raw = None, gre2motif = None, col_annot = None, row_annot = None, dbname = None ):
 		
 		# connect to database
 		# make sure mongodb is running
@@ -67,6 +67,10 @@ class sql2mongoDB:
 			e_dir = './eco-ens-m3d/'
 		else:
 	    		prefix = prefix
+    		if gre2motif == None:
+    			# default file name?
+    			gre2motif = e_dir + "out.mot_metaclustering.txt.I45.txt"
+
 	    	self.db_files = np.sort( np.array( glob.glob( e_dir + prefix + "???/cmonkey_run.db" ) ) ) # get all cmonkey_run.db files
 	    	self.db_files = checkRuns( self, self.db_files )
 	    	self.run2id = get_run2id(self, self.db_files )
@@ -81,6 +85,7 @@ class sql2mongoDB:
 	    	self.col_info_collection = insert_col_info( self, self.col2id, col_annot )
 	    	print "Inserting into ensemble_info collection"
 	    	self.ensemble_info_collection = insert_ensemble_info( self, self.db_files, self.run2id, self.row2id, self.col2id )
+	    	self.motif2gre = loadGREMap( self, gre2motif )
 
     	def checkRuns( self, db_files ):
 		"""make sure the runs have data!!!"""
@@ -257,7 +262,6 @@ class sql2mongoDB:
 	    	conn.close()
 	    	return d
 
-
 	def insert_ensemble_info( self, db_files, run2id, row2id, col2id ):
 		"""Compile and insert ensemble_info collection into MongoDB collection"""
 	    	to_insert = [ assemble_ensemble_info( self, i, run2id, row2id, col2id ) for i in db_files ]
@@ -268,7 +272,30 @@ class sql2mongoDB:
 	    	ensemble_info_collection.insert( to_insert )
 	    	return ensemble_info_collection
 
-	def assemble_bicluster_info_single( self, db_file, cluster, run2id, row2id, col2id ):
+ 	def loadGREMap( self, gre2motif ):
+ 		count = 1
+ 		mots = {}
+ 		with open(gre2motif, 'r') as f: 
+ 			for line in f:
+ 				for motif in line.strip("\n").split( "\t" ):
+ 					elements = motif.split("_")
+ 					elements[1] = int(elements[1])
+ 					elements[2] = int(elements[2])
+ 					if elements[0] in mots.keys():
+ 						if elements[1] in mots[elements[0]].keys():
+ 							mots[elements[0]][elements[1]][elements[2]] = count
+ 						else:
+ 							mots[elements[0]][elements[1]] = {}
+ 							mots[elements[0]][elements[1]][elements[2]] = count
+ 					else:
+						mots[elements[0]] = {}
+						mots[elements[0]][elements[1]] = {}
+						mots[elements[0]][elements[1]][elements[2]] = count
+				count = count + 1
+ 		return mots
+
+
+	def assemble_bicluster_info_single( self, db_file, cluster, run2id, row2id, col2id, motif2gre, row_info_collection ):
 		"""Create python ensemble_info dictionary for bulk import into MongoDB collections"""
 		run_name = db_file.split("/")[-2]
 		conn = sqlite3.connect(db_file)
@@ -277,14 +304,55 @@ class sql2mongoDB:
 	    	last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!! 
 	    	w = (cluster,last_run)
 	    	c.execute("SELECT residual FROM cluster_stats WHERE cluster = ? AND iteration = ?;", w )
+	    	residual = c.fetchone()[0]
+	    	c.execute("SELECT name FROM row_members JOIN row_names ON row_members.order_num = row_names.order_num WHERE row_members.cluster = ? AND row_members.iteration = ?;", w )
+	    	rows = [ row2id.loc[ str(i[0]) ].row_id for i in c.fetchall() ]
+	    	c.execute("SELECT name FROM column_members JOIN column_names ON column_members.order_num = column_names.order_num WHERE column_members.cluster = ? AND column_members.iteration = ?;", w )
+	    	cols = [ col2id.loc[ str(i[0]) ].col_id for i in c.fetchall() ]
+	    	c.execute("SELECT motif_num FROM motif_infos WHERE cluster = ? AND iteration = ?;", w )
+	    	motif_nums = [ i[0] for i in c.fetchall() ]
 	    	d = {
 	    	"run_id": run2id.loc[run_name].run_id,
-	    	"rows":,
-	    	"columns":,
-	    	"residual":,
-	    	"motif":
+	    	"rows":, rows,
+	    	"columns": cols,
+	    	"residual": residual,
+	    	"motif": [ get_motif_info_single(self, c, last_run, run_name, cluster, i, motif2gre) for i in motif_nums ]
 	    	}
+	    	conn.close()
+	    	return d
 
+   	def get_motif_info_single( self, cursor, iteration, run_name, cluster, motif_num, motif2gre, row_info_collection):
+   		w = (cluster, iteration, motif_num)
+   		cursor.execute("SELECT seqtype, evalue FROM motif_infos WHERE cluster = ? AND iteration = ? AND motif_num = ?;", w )
+	    	motif_data = cursor.fetchone()
+	    	cursor.execute("SELECT meme_motif_sites.rowid FROM meme_motif_sites JOIN motif_infos ON meme_motif_sites.motif_info_id = motif_infos.rowid WHERE motif_infos.cluster = ? AND motif_infos.iteration = ? AND motif_infos.motif_num = ?;", w )
+	    	meme_site = [ i[0] for i in cursor.fetchall()]
+   		d = {
+	    	"gre_id": motif2gre[run_name][cluster][motif_num],
+	    	"motif_num": motif_num,
+	    	"seqtype": motif_data[0],
+	    	"evalue": motif_data[1],
+	    	"meme_motif_site": [],
+	    	"pwm": {}
+	    	}
+	    	return d
+
+	def get_meme_motif_site_single( self, cursor, iteration, run_name, cluster, motif_num, rowid, row_info_collection ):
+		w = (cluster, iteration, motif_num, rowid)
+		cursor.execute("SELECT seq_name, reverse, start, pvalue, flank_left, seq, flank_right FROM meme_motif_sites JOIN motif_infos ON meme_motif_sites.motif_info_id = motif_infos.rowid WHERE motif_infos.cluster = ? AND motif_infos.iteration = ? AND motif_infos.motif_num = ? AND meme_motif_sites.rowid = ?;", w )
+		data = cursor.fetchone()
+
+		d = {
+		"row_id": row_info_collection.find( { "accession" : data[0] } )[0]["row_id"], #translate from accession to row_id, require microbes online table
+		"reverse": data[1],
+		"chr": row_info_collection.find( { "accession" : data[0] } )[0]["scaffoldId"],
+		"start": data[3],
+		"pvalue": data[4],
+		"flank_left": data[5],
+		"seq": data[6],
+		"flank_right": data[7]
+		}
+		return(d)
 
 
 
