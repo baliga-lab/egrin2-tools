@@ -58,27 +58,27 @@ class sql2mongoDB:
 		if dbname == None:
 			self.dbname = "egrin2_db"
 		if dbname in client.database_names():
-			print "WARNING: %s database already exists!!!" % dbname
+			print "WARNING: %s database already exists!!!" % self.dbname
 		else:
-			print "Initializing MongoDB database: %s" % dbname
-		self.db = client[dbname]
+			print "Initializing MongoDB database: %s" % self.dbname
+		self.db = client[self.dbname]
 
 		# get db files in directory
 		if prefix is None:
 			self.prefix = 'eco-out-'
 		else:
-			prefix = prefix
+			self.prefix = prefix
 		if e_dir is None:
-			e_dir = './eco-ens-m3d/'
+			self.e_dir = './'
 		else:
-			prefix = prefix
+			self.e_dir = e_dir
 		if gre2motif == None:
 			# default file name?
-			self.gre2motif = e_dir + "out.mot_metaclustering.txt.I45.txt"
+			self.gre2motif = self.e_dir + "out.mot_metaclustering.txt.I45.txt"
 		else:
 			self.gre2motif = gre2motif
 
-	    	self.db_files = np.sort( np.array( glob.glob( e_dir + prefix + "???/cmonkey_run.db" ) ) ) # get all cmonkey_run.db files
+	    	self.db_files = np.sort( np.array( glob.glob( self.e_dir + self.prefix + "???/cmonkey_run.db" ) ) ) # get all cmonkey_run.db files
 	    	self.db_run_override = db_run_override
 	    	
 	    	if ncbi_code == None:
@@ -385,6 +385,7 @@ class sql2mongoDB:
 		# 		new_df = pd.read_csv( gzip.open( ratios_files[i], 'rb' ), index_col=0, sep="\t" )
 		# 		rats_df = rats_df + new_df
 		# 	i = i+1 
+
 	def insert_gene_expression( self, db, row2id, col2id, ratios, ratios_standardized ):
 		"""
 		Insert gene_expression into mongoDB database
@@ -395,15 +396,19 @@ class sql2mongoDB:
 
 		"""
 		exp_data = []
+		counter = 0
 		for i in ratios.index.values:
+			if counter%200 == 0:
+				print "%s percent done" % round( ( float(counter)/ratios.shape[0] )*100,1 )
 			for j in ratios.columns.values:
 				exp_data.append(
-					d = {
+					{
 				    	"row_id": row2id.loc[i].row_id,
-				    	"col_id": row2id.loc[j].row_id,
+				    	"col_id": col2id.loc[j].col_id,
 			 		"normalized_expression": ratios.loc[i,j],
 			 		"standardized_expression": ratios_standardized.loc[i,j]
 				    	} )
+			counter = counter + 1
 
 		# write to mongoDB collection 
 		gene_expression_collection = db.gene_expression
@@ -486,7 +491,7 @@ class sql2mongoDB:
 				count = count + 1
  		return mots
 
-	def insert_bicluster_info( self, db_file, run2id, row2id, col2id, motif2gre, row_info_collection ): 
+	def insert_bicluster_info( self, db, e_dir, db_file, run2id, row2id, col2id, motif2gre, row_info_collection ): 
 		"""Find all biclusters in a cMonkey run, process and add as documents to bicluster collection
 
 		example queries
@@ -501,7 +506,7 @@ class sql2mongoDB:
 	    	last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!! 
 	    	w = (last_run,)
 	    	c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?;",w)
-		biclusters = [self.assemble_bicluster_info_single( db_file, c, last_run, i[0], run2id, row2id, col2id, motif2gre, row_info_collection ) for i in c.fetchall()]
+		biclusters = [self.assemble_bicluster_info_single( db, e_dir, db_file, c, last_run, i[0], run2id, row2id, col2id, motif2gre, row_info_collection ) for i in c.fetchall()]
 		bicluster_info_collection = self.db.bicluster_info
 	    	# Check whether documents are already present in the collection before insertion
 	    	d_f = filter( None, [ self.check4existence( bicluster_info_collection, i, "run_id", i["run_id"], "cluster", i["cluster"] ) for i in biclusters ] )
@@ -513,7 +518,7 @@ class sql2mongoDB:
 	    	
 	    	return bicluster_info_collection
 
-	def assemble_bicluster_info_single( self, db_file, cursor, iteration, cluster, run2id, row2id, col2id, motif2gre, row_info_collection ):
+	def assemble_bicluster_info_single( self, db, e_dir, db_file, cursor, iteration, cluster, run2id, row2id, col2id, motif2gre, row_info_collection ):
 		"""Create python ensemble_info dictionary for bulk import into MongoDB collections"""
 		#print cluster
 		run_name = db_file.split("/")[-2]
@@ -532,11 +537,11 @@ class sql2mongoDB:
 	    	"rows": rows,
 	    	"columns": cols,
 	    	"residual": residual,
-	    	"motif": [ self.get_motif_info_single(cursor, iteration, run_name, cluster, i, motif2gre, row_info_collection) for i in motif_nums ]
+	    	"motif": [ self.get_motif_info_single( db, e_dir, cursor, iteration, run_name, cluster, i, motif2gre, row_info_collection) for i in motif_nums ]
 	    	}
 	    	return d
 
-	def get_motif_info_single( self, cursor, iteration, run_name, cluster, motif_num, motif2gre, row_info_collection):
+	def get_motif_info_single( self, db, e_dir, cursor, iteration, run_name, cluster, motif_num, motif2gre, row_info_collection):
 		w = (cluster, iteration, motif_num)
 		cursor.execute("SELECT seqtype, evalue FROM motif_infos WHERE cluster = ? AND iteration = ? AND motif_num = ?;", w )
 		motif_data = cursor.fetchone()
@@ -556,7 +561,8 @@ class sql2mongoDB:
 		"seqtype": motif_data[0],
 		"evalue": motif_data[1],
 		"meme_motif_site": [self.get_meme_motif_site_single( cursor, iteration, run_name, cluster, motif_num, i, row_info_collection ) for i in meme_site],
-		"pwm": [self.get_pwm_single( cursor, iteration, run_name, cluster, motif_num, i, row_info_collection ) for i in rows]
+		"pwm": [self.get_pwm_single( cursor, iteration, run_name, cluster, motif_num, i, row_info_collection ) for i in rows],
+		"fimo": self.get_fimo_scans_single( db, e_dir, run_name, cluster, motif_num )
 		}
 		return d
 
@@ -602,11 +608,34 @@ class sql2mongoDB:
 		}
 		return d
 
-	def insert_fimo_scans( self ):
-		tmp = []
+	def get_fimo_scans_single( self, db, e_dir, run_name, cluster, motif_num):
+		genome_collection = db.genome
+		# get all fimo scans in the dir
+		f = e_dir + run_name + "/fimo-outs/fimo-out-" + "%04d" % (cluster,) + ".bz2" 
+		#print motif_num
 
-	def insert_tomtom( self ):
-		tmp = []
+		fimo = pd.read_csv( f, index_col=0, sep="\t", compression = "bz2" )
+
+		if motif_num in fimo.index:
+			fimo = fimo.loc[motif_num]
+			# change sequence_name to scaffoldId
+			fimo.rename(columns={'matched sequence': 'matched_sequence', 'sequence name': 'scaffoldId'}, inplace=True)
+
+			# rename sequence_names to scaffoldId
+			trans_d = {}
+			for i in np.unique(fimo.scaffoldId):
+				NCBI_RefSeq = "_".join(i.split('.')[-2].split("_")[::-1][0:2][::-1])
+				scaffoldId = genome_collection.find_one( { "NCBI_RefSeq": NCBI_RefSeq } )["scaffoldId"]
+				trans_d[i] = scaffoldId
+
+			trans_v = [trans_d[i] for i in fimo.scaffoldId.values]
+			fimo.scaffoldId = trans_v
+
+			d_f = fimo.to_dict( outtype='records' )
+
+	    		return d_f
+    		else:
+    			return None
 
 	def mongoDump( self, db, outfile ):
 		"""Write contents from MongoDB instance to binary file"""
@@ -615,7 +644,7 @@ class sql2mongoDB:
 
 	def mongoRestore( self, db, infile ):
 		"""Read contents of binary MongoDB dump into MongoDB instance"""
-		sys_command = "mongorestore --db " + db + " " infile
+		sys_command = "mongorestore --db " + db + " " + infile
 
 	def compile( self ):
 		"""Compile EGRIN2 ensemble"""
@@ -627,21 +656,21 @@ class sql2mongoDB:
 	    	self.expression = self.loadRatios( self.ratios_raw)
 	    	print "Standardizing gene expression..."
 	    	self.expression_standardized = self.standardizeRatios( self.expression)
-	    	print "Inserting gene expression into database"
-	    	self.gene_expression_collection = self.insert_gene_expression( self.db, self.row2id, self.col2id, self.expression, self.expression_standardized )
 	    	print "Inserting into row_info collection"
 	    	self.row2id = self.get_row2id( self.expression_standardized, self.db )
 	    	self.row_info_collection = self.insert_row_info( self.ncbi_code, self.row2id, self.row_annot, self.row_annot_match_col )
 	    	print "Inserting into col_info collection"
 	    	self.col2id = self.get_col2id( self.expression_standardized, self.db )
 	    	self.col_info_collection = self.insert_col_info( self.col2id, self.col_annot )
+	    	print "Inserting gene expression into database"
+	    	self.gene_expression_collection = self.insert_gene_expression( self.db, self.row2id, self.col2id, self.expression, self.expression_standardized )
 	    	print "Inserting into ensemble_info collection"
 	    	self.ensemble_info_collection = self.insert_ensemble_info( self.db_files, self.db, self.run2id, self.row2id, self.col2id )
 	    	self.motif2gre = self.loadGREMap( self.gre2motif )
 	    	print "Inserting into bicluster collection"
 	    	for i in self.db_files:
 	    		print i
-	    		self.bicluster_info_collection = self.insert_bicluster_info( i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
+	    		self.bicluster_info_collection = self.insert_bicluster_info( self.db, self.e_dir, i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
     		outfile = self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 		print "Writing EGRIN2 MongoDB to %s" % 	os.getcwd() + "/" + outfile   		
     		mongoDump( self.db, self.prefix )

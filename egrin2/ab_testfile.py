@@ -20,7 +20,7 @@ from Bio import SeqIO
 
 from egrin2.merge_egrin2_dbs import *
 
-tmp = sql2mongoDB( ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz", col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz", ncbi_code = "511145",db_run_override = True)
+tmp = sql2mongoDB( ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz", col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz", ncbi_code = "511145",db_run_override = False)
 
 # connect to database
 # make sure mongodb is running
@@ -37,7 +37,7 @@ db = client[dbname]
 
 # get db files in directory
 prefix = 'eco-out-'
-e_dir = './eco-ens-m3d/'
+e_dir = './'
 
 gre2motif = e_dir + "out.mot_metaclustering.txt.I45.txt"
 
@@ -68,3 +68,6 @@ iteration = cursor.fetchone()[0] # i think there is an indexing problem in cMonk
 
 cluster = 5
 
+run_name = 'eco-out-001'
+
+tmp.bicluster_info_collection = tmp.insert_bicluster_info( db, e_dir, db_file, run2id, row2id, col2id, motif2gre, row_info_collection )
