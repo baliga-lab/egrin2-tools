@@ -44,7 +44,7 @@ from Bio import SeqIO
 
 class sql2mongoDB:
     
-	def __init__( self, e_dir = None, prefix = None, gene_info = None, ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None ):
+	def __init__( self, e_dir = None, prefix = None, gene_info = None, ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None , db_run_override = None, genome_file = None, row_annot = None, row_annot_match_col = None ):
 		
 		# connect to database
 		# make sure mongodb is running
@@ -56,16 +56,16 @@ class sql2mongoDB:
 			print "Could not connect to MongoDB: %s" % e
 
 		if dbname == None:
-			dbname = "egrin2_db"
+			self.dbname = "egrin2_db"
 		if dbname in client.database_names():
-			print "WARNING: %s database already exists!!! You are probably just duplicating the data. I don't protect you from this currently." % dbname
+			print "WARNING: %s database already exists!!!" % dbname
 		else:
 			print "Initializing MongoDB database: %s" % dbname
 		self.db = client[dbname]
 
 		# get db files in directory
 		if prefix is None:
-			prefix = 'eco-out-'
+			self.prefix = 'eco-out-'
 		else:
 			prefix = prefix
 		if e_dir is None:
@@ -79,6 +79,7 @@ class sql2mongoDB:
 			self.gre2motif = gre2motif
 
 	    	self.db_files = np.sort( np.array( glob.glob( e_dir + prefix + "???/cmonkey_run.db" ) ) ) # get all cmonkey_run.db files
+	    	self.db_run_override = db_run_override
 	    	
 	    	if ncbi_code == None:
 			# try to find ncbi_code in cmonkey_run.db
@@ -94,6 +95,12 @@ class sql2mongoDB:
 
     		self.ratios_raw = ratios_raw
     		self.col_annot = col_annot
+    		self.genome_file = genome_file
+    		self.row_annot = row_annot
+    		self.row_annot_match_col = row_annot_match_col
+
+    		if len(self.db_files) < 1:
+	    		print "I cannot find any cMonkey SQLite databases in the current directory: %s" % os.getcwd()
 
     		return None
 
@@ -101,23 +108,30 @@ class sql2mongoDB:
 		# Open the url
 		if save_name==None:
 			save_name = "tmp"
-		try:
-			f = urlopen(url)
-			print "downloading " + url
+		count = 1
+		while count < 5:
+			try:
+				f = urlopen(url)
+				print "downloading " + url
 
-			# Open our local file for writing
-			with open(os.path.basename(save_name), "wb") as local_file:
-			    local_file.write(f.read())
-
-		#handle errors
-		except HTTPError, e:
-			print "HTTP Error:", e.code, url
-		except URLError, e:
-			print "URL Error:", e.reason, url
+				# Open our local file for writing
+				with open(os.path.basename(save_name), "wb") as local_file:
+				    local_file.write(f.read())
+				break
+			#handle errors
+			except HTTPError, e:
+				print "HTTP Error:", e.code, url
+				count = count + 1
+				print "Trying to connect again. Attempt %s of 5" % count
+			except URLError, e:
+				print "URL Error:", e.reason, url
+				print "Trying to connect again. Attempt %s of 5" % count
+				count = count + 1
     	
-	def checkRuns( self, db_files ):
+	def checkRuns( self, db_files, db_run_override, db ):
 		"""make sure the runs have data!!!"""
 		to_keep = []
+		ensemble_info_collection = db.ensemble_info
 		for i in db_files:
 			conn = sqlite3.connect( i )
 			c = conn.cursor()
@@ -126,38 +140,79 @@ class sql2mongoDB:
 			if run_info is None:
 				pass
 			else:
-				to_keep.append( i )
+				if db_run_override == None:
+					# do not include runs that are already in the database
+					# check for existence
+					run_name = i.split("/")[-2]
+					if ensemble_info_collection.find( { "run_name": run_name } ).count() > 0:
+						pass
+					else:
+						to_keep.append( i )
+				else:
+					to_keep.append( i )
 		return to_keep
 
-	def get_run2id( self, dbfiles ):
+	def get_run2id( self, dbfiles, db ):
 		"""make run2id"""
-		runs = []
+		ensemble_info_collection = db.ensemble_info
+		run_name = []
+		run_id = []
+		for i in ensemble_info_collection.find():
+			run_name.append(i["run_name"])
+			run_id.append(i["run_id"])
 		for i in dbfiles:
-			runs.append(i.split("/")[-2])
-		row_info =  pd.DataFrame( zip( range( len( runs ) ), runs ), index = runs, columns = [ "run_id", "run_name"] )
-		return row_info
+			if i.split("/")[-2] not in run_name:
+				run_name.append(i.split("/")[-2])
+				if len(run_id) > 0:
+					run_id.append(max(run_id)+1)
+				else:
+					run_id.append(0)
+		run_info =  pd.DataFrame( zip( run_id, run_name ), index = run_name, columns = [ "run_id", "run_name"] )
+		return run_info
 
-	def loadGenome (self, ncbi_code):
-		# download genome from microbes online. store in MongoDB collection
-		# 
-		url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId="+ncbi_code+";export=genome"
-		save_name=ncbi_code+"_genome.fa"
-		self.dlfile( url, save_name)
+	def check4existence( self, collection, document, key1 = None, value1 = None, key2 = None, value2 = None ):
+		if key1 == None:
+			d_check = collection.find( document ).count()
+		else:
+			if key2 == None:
+				d_check = collection.find( { key1 : value1 } ).count()
+			else:
+				d_check = collection.find( { key1 : value1, key2 : value2 } ).count()
+		if d_check == 0:
+			return document
+
+	def loadGenome (self, ncbi_code, genome_file):
+
+		if genome_file == None:
+			print "No custom genome annotation file supplied by 'genome_file' parameter. Attempting automated download from MicrobesOnline"
+			# download genome from microbes online. store in MongoDB collection
+			# 
+			url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId="+ncbi_code+";export=genome"
+			save_name=ncbi_code+"_genome.fa"
+			self.dlfile( url, save_name)
+			
+			seqs_b = []
+			with open( save_name, 'r' ) as f:
+				fasta_sequences = SeqIO.parse( f ,'fasta')
+				for fasta in fasta_sequences:
+		   			seqs_b.append( {
+					"scaffoldId": fasta.id,
+					"NCBI_RefSeq": fasta.description.split(" ")[1],
+					"NCBI_taxonomyId": fasta.description.split(" ")[-1],
+					"sequence": str(fasta.seq)
+					} )
+		else:
+			# TBD
+			seqs_b = []
 		
-		with open( save_name, 'r' ) as f:
-			fasta_sequences = SeqIO.parse( f ,'fasta')
-			for fasta in fasta_sequences:
-	   			d = {
-				"scaffoldId": fasta.id,
-				"NCBI_RefSeq": fasta.description.split(" ")[1],
-				"NCBI_taxonomyId": fasta.description.split(" ")[-1],
-				"sequence": str(fasta.seq)
-				}
 		genome_collection = self.db.genome
-	    	# TODO:
+	    
 	    	# Check whether documents are already present in the collection before insertion
-	    	# In case where they are present, update them
-	    	genome_collection.insert( d )
+	    	seqs_f = filter( None, [ self.check4existence( genome_collection, i ) for i in seqs_b ] )
+
+	    	print "%s new records to write" % len( seqs_f )
+	    	if len(seqs_f) > 0:
+	    		genome_collection.insert( seqs_f )
 
 	    	return genome_collection
 	
@@ -181,14 +236,25 @@ class sql2mongoDB:
 			ratios_standardized.loc[ row[0] ] = zscore( row[1] )
 		return ratios_standardized
 
-	def get_row2id( self, ratios_standardized ):
+	def get_row2id( self, ratios_standardized, db ):
 		"""make row2id and id2row dicts for lookup"""
-	    	rows = ratios_standardized.index.values
-	    	rows.sort()
-	    	row_info =  pd.DataFrame( zip( range( len( rows ) ), rows ), index = rows, columns = [ "row_id", "egrin2_row_name"] )
-	    	return row_info
+		row_info_collection = db.row_info
+		row_name = []
+		row_id = []
+		for i in row_info_collection.find():
+			row_name.append( i["egrin2_row_name"] )
+			row_id.append( i["row_id"] )
+		for i in ratios_standardized.index.values:
+			if i not in row_name:
+				row_name.append( i )
+			if len(row_id) > 0:
+				row_id.append( max(row_id)+1 )
+			else:
+				row_id.append(0)
+		row_info =  pd.DataFrame( zip(row_id, row_name), index = row_name, columns = [ "row_id", "egrin2_row_name"] )
+		return row_info
 
-	def insert_row_info( self, ncbi_code, row_info, left_on = None, right_on = None ):
+	def insert_row_info( self, ncbi_code, row_info, row_annot, row_annot_match_col ):
 		"""
 		Insert row_info into mongoDB database
 
@@ -206,42 +272,61 @@ class sql2mongoDB:
 	    		print i["GO"]
 
 		"""
-		if ncbi_code != None:
-			print "Downloading gene information for NCBI taxonomy ID:", ncbi_code
-		    	url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId="+ncbi_code+";export=tab"
-			save_name=ncbi_code+"_geneInfo.tab"
-			self.dlfile(url,save_name)
-			
-			with open( save_name, 'r' ) as f:
-				row_annot = pd.read_csv( f, sep="\t" )
-		    	if left_on == None:
-		    		left_on="egrin2_row_name"
-		    	if right_on == None:
-		    		right_on="sysName"
-		    	# join with row_annot
-		    	row_table = pd.merge( row_info, row_annot, left_on=left_on, right_on=right_on )
-		    	# write to mongoDB collection 
-		    	
-		    	row_info_collection = self.db.row_info
-		    	# TODO:
-		    	# Check whether documents are already present in the collection before insertion
-		    	# In case where they are present, update them
-		    	row_info_collection.insert( row_table.to_dict( outtype='records' ) )
+		if row_annot == None:
+			print "Row annotation file not suppled as 'row_annot' parameter. Attempting automated download from MicrobesOnline"
+			if ncbi_code != None:
+				print "Downloading gene information for NCBI taxonomy ID:", ncbi_code
+			    	url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId="+ncbi_code+";export=tab"
+				save_name=ncbi_code+"_geneInfo.tab"
+				self.dlfile(url,save_name)
+				
+				with open( save_name, 'r' ) as f:
+					row_annot = pd.read_csv( f, sep="\t" )
+			    	left_on="egrin2_row_name"
+			    	if row_annot_match_col == None:
+			    		row_annot_match_col="sysName"
+			    	# join with row_annot
+			    	row_table = pd.merge( row_info, row_annot, left_on=left_on, right_on=row_annot_match_col )	
+		    	else:
+		    		print "WARNING: could not fetch additional gene information for NCBI taxonomy ID:", ncbi_code
+			    	# TODO:
+			    	# Check whether documents are already present in the collection before insertion
+			    	# In case where they are present, update them
+			    	row_table = row_info
 	    	else:
-	    		print "WARNING: could not fetch additional gene information for NCBI taxonomy ID:", ncbi_code
-	    		row_info_collection = self.db.row_info
-		    	# TODO:
-		    	# Check whether documents are already present in the collection before insertion
-		    	# In case where they are present, update them
-		    	row_info_collection.insert( row_info.to_dict( outtype='records' ) )
+			row_annot = pd.read_csv( open( row_annot, 'rb' ), sep="\t" )	
+			# join with row_annot
+		    	row_table = pd.merge( row_info, row_annot, left_on=left_on, right_on=row_annot_match_col )	
+
+		# write to mongoDB collection 
+		row_info_collection = self.db.row_info
+		# Check whether documents are already present in the collection before insertion
+		d = row_table.to_dict( outtype='records' )
+	    	d_f = filter( None, [ self.check4existence( row_info_collection, i ) for i in d ] )
+
+	    	print "%s new records to write" % len( d_f )
+	    	
+	    	if len(d_f) > 0:
+	    		row_info_collection.insert( d_f )
 
 	    	return row_info_collection
 
-	def get_col2id( self, ratios_standardized ):
+	def get_col2id( self, ratios_standardized, db ):
 		"""make cond2id and id2cond dicts for lookup"""
-	    	cols = ratios_standardized.columns.values
-	    	cols.sort()
-	    	col_info =  pd.DataFrame( zip( range( len( cols ) ), cols ), index = cols, columns = [ "col_id", "egrin2_col_name"] )
+		col_info_collection = db.col_info
+		col_name = []
+		col_id = []
+		for i in col_info_collection.find():
+			col_name.append(i["egrin2_col_name"])
+			col_id.append(i["col_id"])
+		for i in ratios_standardized.columns.values:
+	    		if i not in col_name:
+	    			col_name.append( i )
+	    			if len(col_id) > 0:
+					col_id.append(max(col_id)+1)
+				else:
+					col_id.append(0)
+	    	col_info =  pd.DataFrame( zip( col_id, col_name ), index = col_name, columns = [ "col_id", "egrin2_col_name"] )
 	    	return col_info
 
 	def insert_col_info( self, col_info, col_annot ):
@@ -268,11 +353,17 @@ class sql2mongoDB:
 		col_info_4_mongoDB = []
 		for i in range( 0, len( col_info.egrin2_col_name ) ):
 			col_info_4_mongoDB.append( self.condInfo2Dict( col_table, col_info.egrin2_col_name[i] ) )
+		
+		# write to mongoDB collection 
 		col_info_collection = self.db.col_info
-		# TODO:
+		
 		# Check whether documents are already present in the collection before insertion
-		# In case where they are present, update them
-		col_info_collection.insert( col_info_4_mongoDB )
+	    	d_f = filter( None, [ self.check4existence( col_info_collection, i ) for i in col_info_4_mongoDB ] )
+
+	    	print "%s new records to write" % len( d_f )
+	    	
+	    	if len(d_f) > 0:
+	    		col_info_collection.insert( d_f )
 
 		return col_info_collection
 	    	 	
@@ -294,10 +385,43 @@ class sql2mongoDB:
 		# 		new_df = pd.read_csv( gzip.open( ratios_files[i], 'rb' ), index_col=0, sep="\t" )
 		# 		rats_df = rats_df + new_df
 		# 	i = i+1 
+	def insert_gene_expression( self, db, row2id, col2id, ratios, ratios_standardized ):
+		"""
+		Insert gene_expression into mongoDB database
+
+
+		example queries
+		------------------------------
+
+		"""
+		exp_data = []
+		for i in ratios.index.values:
+			for j in ratios.columns.values:
+				exp_data.append(
+					d = {
+				    	"row_id": row2id.loc[i].row_id,
+				    	"col_id": row2id.loc[j].row_id,
+			 		"normalized_expression": ratios.loc[i,j],
+			 		"standardized_expression": ratios_standardized.loc[i,j]
+				    	} )
+
+		# write to mongoDB collection 
+		gene_expression_collection = db.gene_expression
+		
+		# Check whether documents are already present in the collection before insertion
+	    	d_f = filter( None, [ self.check4existence( gene_expression_collection, i ) for i in exp_data ] )
+
+	    	print "%s new records to write" % len( d_f )
+	    	
+	    	if len(d_f) > 0:
+	    		gene_expression_collection.insert( d_f )
+
+		return gene_expression_collection
 
 	def assemble_ensemble_info( self, db_file, run2id, row2id, col2id ):
-		"""Create python ensemble_info dictionary for bulk import into MongoDB collections"""
+		"""Create python ensemble_info dictionary for bulk import into MongoDB collections"""  
 		run_name = db_file.split("/")[-2]
+		print "Assembling run info for cMonkey run: %s" % run_name
 		conn = sqlite3.connect(db_file)
 	    	c = conn.cursor()
 	    	c.execute("SELECT start_time, finish_time, num_iterations, organism, species, num_rows, num_columns, num_clusters, git_sha FROM run_infos;")
@@ -325,14 +449,19 @@ class sql2mongoDB:
 	    	conn.close()
 	    	return d
 
-	def insert_ensemble_info( self, db_files, run2id, row2id, col2id ):
+	def insert_ensemble_info( self, db_files, db, run2id, row2id, col2id ):
 		"""Compile and insert ensemble_info collection into MongoDB collection"""
 	    	to_insert = [ self.assemble_ensemble_info( i, run2id, row2id, col2id ) for i in db_files ]
-	    	ensemble_info_collection = self.db.ensemble_info
-	    	# TODO:
+	    	ensemble_info_collection = db.ensemble_info
+	    	
 	    	# Check whether documents are already present in the collection before insertion
-	    	# In case where they are present, update them
-	    	ensemble_info_collection.insert( to_insert )
+	    	d_f = filter( None, [ self.check4existence( ensemble_info_collection, i, "run_name", i["run_name"] ) for i in to_insert ] )
+
+	    	print "%s new records to write" % len( d_f )
+	    	
+	    	if len(d_f) > 0:
+	    		ensemble_info_collection.insert( d_f )
+
 	    	return ensemble_info_collection
 
  	def loadGREMap( self, gre2motif ):
@@ -374,11 +503,15 @@ class sql2mongoDB:
 	    	c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?;",w)
 		biclusters = [self.assemble_bicluster_info_single( db_file, c, last_run, i[0], run2id, row2id, col2id, motif2gre, row_info_collection ) for i in c.fetchall()]
 		bicluster_info_collection = self.db.bicluster_info
-	    	# TODO:
 	    	# Check whether documents are already present in the collection before insertion
-	    	# In case where they are present, update them
-	    	bicluster_info_collection.insert( biclusters )
-	    	return None
+	    	d_f = filter( None, [ self.check4existence( bicluster_info_collection, i, "run_id", i["run_id"], "cluster", i["cluster"] ) for i in biclusters ] )
+
+	    	print "%s new records to write" % len( d_f )
+	    	
+	    	if len(d_f) > 0:
+	    		bicluster_info_collection.insert( d_f )
+	    	
+	    	return bicluster_info_collection
 
 	def assemble_bicluster_info_single( self, db_file, cursor, iteration, cluster, run2id, row2id, col2id, motif2gre, row_info_collection ):
 		"""Create python ensemble_info dictionary for bulk import into MongoDB collections"""
@@ -395,6 +528,7 @@ class sql2mongoDB:
 	    	motif_nums = [ i[0] for i in cursor.fetchall() ]
 	    	d = {
 	    	"run_id": run2id.loc[run_name].run_id,
+	    	"cluster": cluster,
 	    	"rows": rows,
 	    	"columns": cols,
 	    	"residual": residual,
@@ -468,28 +602,49 @@ class sql2mongoDB:
 		}
 		return d
 
+	def insert_fimo_scans( self ):
+		tmp = []
+
+	def insert_tomtom( self ):
+		tmp = []
+
+	def mongoDump( self, db, outfile ):
+		"""Write contents from MongoDB instance to binary file"""
+		sys_command = "mongodump --db " + db + " --out " + outfile
+		os.system(sys_command)
+
+	def mongoRestore( self, db, infile ):
+		"""Read contents of binary MongoDB dump into MongoDB instance"""
+		sys_command = "mongorestore --db " + db + " " infile
+
 	def compile( self ):
+		"""Compile EGRIN2 ensemble"""
 		# print "Compiling EGRIN2 ensemble..."  
-		self.db_files = self.checkRuns( self.db_files )
-	    	self.run2id = self.get_run2id( self.db_files )
+		self.db_files = self.checkRuns( self.db_files, self.db_run_override, self.db )
+	    	self.run2id = self.get_run2id( self.db_files, self.db )
 	    	print "Downloading genome information for NCBI taxonomy ID:", self.ncbi_code
-		self.genome_collection = self.loadGenome( self.ncbi_code )
-	    	self.ratios = self.loadRatios( self.ratios_raw)
+		self.genome_collection = self.loadGenome( self.ncbi_code, self.genome_file )
+	    	self.expression = self.loadRatios( self.ratios_raw)
 	    	print "Standardizing gene expression..."
-	    	self.ratios_standardized = self.standardizeRatios( self.ratios)
+	    	self.expression_standardized = self.standardizeRatios( self.expression)
+	    	print "Inserting gene expression into database"
+	    	self.gene_expression_collection = self.insert_gene_expression( self.db, self.row2id, self.col2id, self.expression, self.expression_standardized )
 	    	print "Inserting into row_info collection"
-	    	self.row2id = self.get_row2id( self.ratios_standardized )
-	    	self.row_info_collection = self.insert_row_info( self.ncbi_code, self.row2id )
+	    	self.row2id = self.get_row2id( self.expression_standardized, self.db )
+	    	self.row_info_collection = self.insert_row_info( self.ncbi_code, self.row2id, self.row_annot, self.row_annot_match_col )
 	    	print "Inserting into col_info collection"
-	    	self.col2id = self.get_col2id( self.ratios_standardized )
+	    	self.col2id = self.get_col2id( self.expression_standardized, self.db )
 	    	self.col_info_collection = self.insert_col_info( self.col2id, self.col_annot )
 	    	print "Inserting into ensemble_info collection"
-	    	self.ensemble_info_collection = self.insert_ensemble_info( self.db_files, self.run2id, self.row2id, self.col2id )
+	    	self.ensemble_info_collection = self.insert_ensemble_info( self.db_files, self.db, self.run2id, self.row2id, self.col2id )
 	    	self.motif2gre = self.loadGREMap( self.gre2motif )
 	    	print "Inserting into bicluster collection"
 	    	for i in self.db_files:
 	    		print i
-	    		self.insert_bicluster_info( i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
+	    		self.bicluster_info_collection = self.insert_bicluster_info( i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
+    		outfile = self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
+		print "Writing EGRIN2 MongoDB to %s" % 	os.getcwd() + "/" + outfile   		
+    		mongoDump( self.db, self.prefix )
 	    	return None
 
 
