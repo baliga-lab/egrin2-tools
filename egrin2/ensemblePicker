@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+
+"""Choose ensemble conditions"""
+
+__author__ = "Aaron Brooks"
+__copyright__ = "Copyright 2014, cMonkey2"
+__credits__ = ["Aaron Brooks"]
+__license__ = "GPL"
+__version__ = "1.0.1"
+__maintainer__ = "Aaron Brooks"
+__email__ = "brooksan@uw.edu"
+__status__ = "Development"
+
+import os
+import datetime
+import glob
+import sys
+import gzip
+import time
+from urllib2 import urlopen, URLError, HTTPError
+
+import pdb
+
+import numpy as np
+import pandas as pd
+
+import pymongo
+from pymongo import MongoClient
+import gridfs
+from Bio import SeqIO
+
+# ratios = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141130.MTB.all.ratios.csv"
+# blocks = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141202.MTB.EGRIN2.blocks.csv"
+# exclusion = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141202.MTB.EGRIN2.exclusion.blocks.csv"
+# inclusion = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141202.MTB.EGRIN2.inclusion.blocks.csv"
+# tfblocks = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/TF.blocks.csv"
+
+# ensemblePicker( ratios, blocks, exclusion, inclusion, tfblocks = None, nruns=500, exclusion_percentage=0.25 )
+
+class ensemblePicker:
+    	"""Pick conditions for an ensemble run, biasing towards inclusion of blocks of conditions in the inclusion blocks while making sure that conditions in exclusion blocks are excluded together in at least some percentage of runs"""
+	def __init__( self, ratios, blocks, exclusion, inclusion, tfblocks = None, nruns = None, exclusion_percentage = None ):
+		
+		self.ratios = pd.read_csv( ratios, index=0, sep="," )
+		self.blocks = pd.read_csv( blocks, sep="," )
+		self.exclusion = pd.read_csv( exclusion, sep="," )
+		self.inclusion = pd.read_csv( inclusion, sep="," )
+
+		if nruns == None:
+			self.nruns = 100
+		
+		if exclusion_percentage == None:
+			self.exclusion_percentage = 0.25

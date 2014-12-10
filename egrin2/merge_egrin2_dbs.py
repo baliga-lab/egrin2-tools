@@ -610,32 +610,35 @@ class sql2mongoDB:
 
 	def get_fimo_scans_single( self, db, e_dir, run_name, cluster, motif_num):
 		genome_collection = db.genome
-		# get all fimo scans in the dir
-		f = e_dir + run_name + "/fimo-outs/fimo-out-" + "%04d" % (cluster,) + ".bz2" 
-		#print motif_num
+		try:
+			# get all fimo scans in the dir
+			f = e_dir + run_name + "/fimo-outs/fimo-out-" + "%04d" % (cluster,) + ".bz2" 
+			#print motif_num
 
-		fimo = pd.read_csv( f, index_col=0, sep="\t", compression = "bz2" )
+			fimo = pd.read_csv( f, index_col=0, sep="\t", compression = "bz2" )
 
-		if motif_num in fimo.index:
-			fimo = fimo.loc[motif_num]
-			# change sequence_name to scaffoldId
-			fimo.rename(columns={'matched sequence': 'matched_sequence', 'sequence name': 'scaffoldId'}, inplace=True)
+			if motif_num in fimo.index:
+				fimo = fimo.loc[motif_num]
+				# change sequence_name to scaffoldId
+				fimo.rename(columns={'matched sequence': 'matched_sequence', 'sequence name': 'scaffoldId'}, inplace=True)
 
-			# rename sequence_names to scaffoldId
-			trans_d = {}
-			for i in np.unique(fimo.scaffoldId):
-				NCBI_RefSeq = "_".join(i.split('.')[-2].split("_")[::-1][0:2][::-1])
-				scaffoldId = genome_collection.find_one( { "NCBI_RefSeq": NCBI_RefSeq } )["scaffoldId"]
-				trans_d[i] = scaffoldId
+				# rename sequence_names to scaffoldId
+				trans_d = {}
+				for i in np.unique(fimo.scaffoldId):
+					NCBI_RefSeq = "_".join(i.split('.')[-2].split("_")[::-1][0:2][::-1])
+					scaffoldId = genome_collection.find_one( { "NCBI_RefSeq": NCBI_RefSeq } )["scaffoldId"]
+					trans_d[i] = scaffoldId
 
-			trans_v = [trans_d[i] for i in fimo.scaffoldId.values]
-			fimo.scaffoldId = trans_v
+				trans_v = [trans_d[i] for i in fimo.scaffoldId.values]
+				fimo.scaffoldId = trans_v
 
-			d_f = fimo.to_dict( outtype='records' )
+				d_f = fimo.to_dict( outtype='records' )
 
-	    		return d_f
-    		else:
-    			return None
+		    		return d_f
+	    		else:
+	    			return None
+		except Exception:
+			return None
 
 	def mongoDump( self, db, outfile ):
 		"""Write contents from MongoDB instance to binary file"""
@@ -673,7 +676,7 @@ class sql2mongoDB:
 	    		self.bicluster_info_collection = self.insert_bicluster_info( self.db, self.e_dir, i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
     		outfile = self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 		print "Writing EGRIN2 MongoDB to %s" % 	os.getcwd() + "/" + outfile   		
-    		mongoDump( self.db, self.prefix )
+    		self.mongoDump( self.dbname, outfile )
 	    	return None
 
 
