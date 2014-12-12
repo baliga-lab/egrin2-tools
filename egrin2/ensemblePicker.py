@@ -86,12 +86,11 @@ class ensemblePicker:
 		self.blocks = self.blocks.set_index(keys="block")
 		self.blocks = self.blocks[self.blocks.index != "block"]
 		self.blocks2col = self.blocks2col.set_index(keys="block")
+		self.blocks2col["r_in"] = 0
 		self.exclusion = pd.read_csv( exclusion, sep=",", converters = { "exclusion.blocks" : strip }, index_col = 0 )
 		self.exclusion["p"] = 1
 		self.exclusion["r_out"] = 0
 		self.inclusion = pd.read_csv( inclusion, sep=",", converters = { "inclusion.blocks" : strip }, index_col = 0 )
-		self.inclusion["p"] = 1
-		self.inclusion["r_in"] = 0
 		self.inclusion_matrix = pd.DataFrame( 0, index = self.blocks.index , columns = self.blocks.index )
 
 		# fill out inclusion matrix
@@ -113,51 +112,51 @@ class ensemblePicker:
 
 		self.run_composition = {}	
 
-	def chooseRandomBlocks( self, blocks, exclusion, n_rand_exclusion ):
+	def chooseRandomBlocks( self ):
 		# maximum block size
 		max_b_size = round( .10  * self.ratios.shape[1] )
 		names = []
 		n_cols = []
-		for i in range( 0, n_rand_exclusion ):
+		for i in range( 0, int( self.n_rand_exclusion ) ):
 			n_c = 0
 			c = []
 			while n_c < max_b_size:
 				# choose block
 				j = random.choice( range( 0, self.blocks.shape[0] ) )
-				c.append( self.blocks.iloc[ j ][ "blocks" ] ) 
+				c.append( self.blocks.iloc[ j ].name ) 
 				n_c = n_c + self.blocks.iloc[ j ][ "block.sample.num" ]
 			names.append( ":::".join(c) )
 			n_cols.append( n_c )
-		tmp_df = pd.DataFrame( zip( names, n_cols ), columns = [ "exclusion.blocks", "block.sample.num" ] )
+		tmp_df = pd.DataFrame( n_cols, index = names, columns = [ "block.sample.num" ] )
 		tmp_df[ "p" ] = 1
 		tmp_df[ "r_out" ] = 0
-		df = pd.concat( [ exclusion,tmp_df ], ignore_index=True )
-		return df
+		self.exclusion = pd.concat( [ self.exclusion, tmp_df ] )
+		return None
 		
-	def weightedReservoirSample( self, n_samples, sample_names, weights ):
+	def weightedReservoirSample( self, n_samples, sample_df ):
 		"""Choose a block loosely based on weighted reservoir sampling - the easy way"""
-		k = [np.power( random.random(), 1.0/weights[i] ) for i in sample_names ]
-		df = pd.DataFrame( zip( sample_names, k ), index = sample_names, columns = [ "sample_name", "key"] ).sort("key",ascending = False )
-		k.sort( reverse = True )
-		return( df.iloc[ 0 : n_samples ].index.values )
+		k = pd.DataFrame([np.power( random.random(), 1.0/sample_df.loc[i] ) for i in sample_df.index ], index = sample_df.index, columns = ["p"]).sort("p",ascending = False)
+		return( k.iloc[ 0 : n_samples ].index.values )
 
-	def updateWeights( self ):
+	def updateWeights( self, blocks ):
 		"""Update probability of picking blocks based on their current representation in the ensemble"""
+		#print "updating weights"
+		self.blocks.loc[ blocks, "r_in" ] = self.blocks.loc[ blocks, "r_in" ] + 1.0/self.nruns
 		self.blocks[ "p" ] = ( 1+10e-10 ) - self.blocks[ "r_in" ]
-		self.inclusion[ "p" ] = ( 1+10e-10 ) - self.inclusion[ "r_in" ]
-		self.exclusion[ "p" ] = np.power( ( 1+10e-10 ) - self.exclusion[ "r_out" ], abs( self.exclusion_percentage/100.0 - self.exclusion[ "r_out" ] ) / 1 )
 
 	def combinedWeights( self, excluded_diff, blocks ):
-		tmp_m = self.inclusion_matrix.loc[ excluded_diff, excluded_diff ]
-		tmp_m = tmp_m.loc[ set( blocks ), ].sum(0)
+		tmp_m = self.inclusion_matrix.loc[ blocks, excluded_diff ].sum(0)
 		tmp_m[ tmp_m==0] = 1
 		return tmp_m
 
-	def blocks2cols(self, blocks, excluded ):
-		"""Get col ids from blocks. Since a single condition can be assigned to multiple blocks, we need to make sure that conditions in a current exlcusion block did not 'sneak in' to the run"""
+	def translate_blocks(self, blocks, excluded ):
+		"""Get col ids from blocks. Since a single condition can be assigned to multiple blocks, we need to make sure that conditions in a current exclusion block did not 'sneak in' to the run"""
 		block_cols = self.blocks2col.loc[ blocks.split(":::") ] 
 		excluded_cols = self.blocks2col.loc[ excluded.split(":::") ] 
 		return set( block_cols.sample ).difference( set( excluded_cols.sample ) )
+
+	def count_cols(self, col):
+		self.blocks2col.loc[ col, "r_in"] = self.blocks2col.loc[ col, "r_in"] + 1.0/self.nruns
 
 	def pickCols_single( self, n ):
 		"""Pick columns for a cMonkey run using predefined blocks and based on their current representation in the ensemble"""
@@ -167,9 +166,10 @@ class ensemblePicker:
 			n_cols = round( self.avg_col_size + ( self.avg_col_size/4 )*random.gammavariate(1,2) )
 		
 		# first choose excluded blocks
-		excluded = self.weightedReservoirSample( 1, self.exclusion.index, self.exclusion["p"] )[0]
-		# update r_out
-		self.exclusion.loc[ excluded, "r_out" ] = 1.0/self.nruns + self.exclusion.loc[ excluded, "r_out" ] 
+		excluded = self.weightedReservoirSample( 1, self.exclusion["p"] )[0]
+		# update its weight
+		self.exclusion.loc[ excluded, "r_out" ] = self.exclusion.loc[ excluded, "r_out" ] + 1.0/self.nruns
+		self.exclusion[ "p" ] = np.power( ( 1+10e-10 ) - self.exclusion[ "r_out" ], abs( self.exclusion_percentage/100.0 - self.exclusion[ "r_out" ] ) / 1 )
 
 		excluded_diff = set( self.blocks.index ).difference( set( excluded.split( ":::" ) ) )
 
@@ -177,23 +177,26 @@ class ensemblePicker:
 		blocks = []
 		cols = []
 		while len(cols) < n_cols:
-			print blocks
+			#print blocks
 			if len(cols) == 0:
 				# this is the first condition
-				weights = self.blocks.loc[ excluded_diff, "p" ]
-				block_one = self.weightedReservoirSample( 1, excluded_diff, weights )[0] 
-				col_one = self.blocks2cols( block_one, excluded )
+				#weights = self.blocks.loc[ excluded_diff, "p" ]
+				block_one = self.weightedReservoirSample( 1, self.blocks.loc[ excluded_diff, "p" ] )[0] 
+				col_one = self. translate_blocks( block_one, excluded )
 				blocks.append( block_one )
-				[cols.append( i ) for i in col_one]
+				[cols.append( i ) for i in col_one if not (i in cols) ]
+				[self.count_cols(i) for i in col_one if not (i in cols)]
 				excluded_diff = excluded_diff.difference( set( [ block_one ] ) )
+				self.updateWeights( blocks )
 			else:
-				weights = self.blocks.loc[ excluded_diff, "p" ] * self.combinedWeights( excluded_diff, blocks )
-				block_one = self.weightedReservoirSample( 1, excluded_diff, weights )[0] 
-				col_one = self.blocks2cols( block_one, excluded )
+				#weights = self.blocks.loc[ excluded_diff, "p" ] * self.combinedWeights( excluded_diff, blocks )
+				block_one = self.weightedReservoirSample( 1, self.blocks.loc[ excluded_diff, "p" ] * self.combinedWeights( excluded_diff, blocks ) )[0] 
+				col_one = self. translate_blocks( block_one, excluded )
 				blocks.append( block_one )
-				[cols.append( i ) for i in col_one]
+				[cols.append( i ) for i in col_one if not (i in cols) ]
+				[self.count_cols(i) for i in col_one if not (i in cols)]
 				excluded_diff = excluded_diff.difference( set( [ block_one ] ) )
-				print len( excluded_diff )
+				self.updateWeights( blocks )
 
 		self.run_composition[n] = {
 		"blocks" : blocks,
@@ -203,10 +206,17 @@ class ensemblePicker:
 		return None
 
 
+	def report( file = None ):
 		
+		if file == None:
+			file ="./ensembleColReport_"
+
+
 
 	def pickCols_all( self ):
 		# get random blocks
-		self.exclusion = chooseRandomBlocks( self.blocks, self.exclusion, self.n_rand_exclusion )
-		tmp = []
+		for i in range(1, self.nruns+1):
+			print i
+			#self.chooseRandomBlocks()
+			self.pickCols_single( i )
 
