@@ -31,15 +31,18 @@ from pymongo import MongoClient
 import gridfs
 from Bio import SeqIO
 
+# eg. how to run
+
+# from egrin2.ensemblePicker import *
+
 # ratios = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141130.MTB.all.ratios.csv"
 # blocks = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141202.MTB.EGRIN2.blocks.csv"
 # exclusion = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141202.MTB.EGRIN2.exclusion.blocks.csv"
 # inclusion = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141202.MTB.EGRIN2.inclusion.blocks.csv"
 # tfblocks = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/TF.blocks.csv"
 
-# ensemblePicker( ratios, blocks, exclusion, inclusion, tfblocks = None, nruns=100, exclusion_percentage=0.25 )
-
-# tmp.blocks.block.value_counts()
+# tmp = ensemblePicker( ratios, blocks, exclusion, inclusion, tfblocks = None, nruns=500, exclusion_percentage=25 )
+# tmp.pickCols_all()
 
 class ensemblePicker:
     	"""Pick conditions for an ensemble run, biasing towards inclusion of blocks of conditions in the inclusion blocks while making sure that conditions in exclusion blocks are excluded together in at least some percentage of runs"""
