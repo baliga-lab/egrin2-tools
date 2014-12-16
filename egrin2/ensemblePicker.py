@@ -43,7 +43,7 @@ from Bio import SeqIO
 
 class ensemblePicker:
     	"""Pick conditions for an ensemble run, biasing towards inclusion of blocks of conditions in the inclusion blocks while making sure that conditions in exclusion blocks are excluded together in at least some percentage of runs"""
-	def __init__( self, ratios, blocks, exclusion, inclusion, avg_col_size = None, sd_col_size = None, inclusion_weight = None, tfblocks = None, nruns = None, exclusion_percentage = None, n_rand_exclusion = None ):
+	def __init__( self, ratios, blocks, exclusion, inclusion, avg_col_size = None, sd_col_size = None, inclusion_weight = None, tfblocks = None, nruns = None, exclusion_percentage = None, n_rand_exclusion = None, report_file = None, random_blocks = None ):
 		
 		if nruns == None:
 			self.nruns = 100
@@ -70,6 +70,12 @@ class ensemblePicker:
 		else:
 			self.sd_col_size = sd_col_size
 
+		if report_file == None:
+			self.report_file = None
+
+		if random_blocks == None:
+			self.random_blocks = True
+
 		def strip(text):
 		    try:
 		        return text.strip()
@@ -87,6 +93,7 @@ class ensemblePicker:
 		self.blocks = self.blocks[self.blocks.index != "block"]
 		self.blocks2col = self.blocks2col.set_index(keys="block")
 		self.blocks2col["r_in"] = 0
+
 		self.exclusion = pd.read_csv( exclusion, sep=",", converters = { "exclusion.blocks" : strip }, index_col = 0 )
 		self.exclusion["p"] = 1
 		self.exclusion["r_out"] = 0
@@ -103,7 +110,9 @@ class ensemblePicker:
 				self.inclusion_matrix.loc[ j, i ] = self.inclusion_weight
 
 		if n_rand_exclusion == None:
-			self.n_rand_exclusion = round( self.nruns / self.exclusion_percentage ) - self.exclusion.shape[0]
+			self.n_rand_exclusion = int( 1/ ( float( self.exclusion_percentage )/100.0 ) ) - self.exclusion.shape[0]
+			if self.n_rand_exclusion < 0:
+				self.n_rand_exclusion = 0
 		else:
 			self.n_rand_exclusion = n_rand_exclusion
 
@@ -158,6 +167,34 @@ class ensemblePicker:
 	def count_cols(self, col):
 		self.blocks2col.loc[ col, "r_in"] = self.blocks2col.loc[ col, "r_in"] + 1.0/self.nruns
 
+	def findBlockInclusionFreq( self ):
+		blocks = self.inclusion.index
+		block_stats = pd.DataFrame(0, index = blocks, columns = [ "freq_single", "freq_coinclusion", "max_coinclusion_all", "max_coinclusion_sub" ] )
+		for block in blocks:
+			block_ind = block.split(":::") 
+			co_freq = pd.DataFrame(0, index = block_ind, columns = self.run_composition.keys() )
+			for i in self.run_composition.iterkeys():
+				for j in block_ind:
+					if j in self.run_composition[i]["blocks"]:
+						co_freq.loc[ j, i ] = co_freq.loc[ j, i ] + 1
+			block_stats.loc[ block, "freq_single" ] = round( sum( co_freq.sum( 0 ) > 0 ) / float( co_freq.shape[1] ), 2 )
+			block_stats.loc[ block, "freq_coinclusion" ] = round( sum( co_freq.sum(1) )/float( ( co_freq.shape[0] * sum(co_freq.sum( 0 ) > 0) ) ), 2)
+			block_stats.loc[ block, "max_coinclusion_all" ] = round( sum( co_freq.sum( 0 ) == co_freq.shape[0] ) / float( co_freq.shape[1] ), 2 )
+			block_stats.loc[ block, "max_coinclusion_sub" ] = round( sum( co_freq.sum( 0 ) == co_freq.shape[0] ) / float( sum( co_freq.sum( 0 ) > 0 ) ), 2 )
+		self.inclusion = pd.merge( self.inclusion, block_stats, left_index=True, right_index=True)
+
+	def findColInclusionFreq( self ):
+		self.blocks2col["block"] = self.blocks2col.index
+		self.blocks2col = self.blocks2col.set_index("sample")
+		self.blocks2col = self.blocks2col.loc[ self.blocks2col.block != "block", ]
+		for i in self.run_composition.iterkeys():
+			self.blocks2col.loc[ self.run_composition[ i ]["cols"], "r_in" ] = self.blocks2col.loc[ self.run_composition[ i ]["cols"], "r_in" ] + float( 1 )/self.nruns
+
+	def findBlockFreq (self ):
+		self.blocks["r_in"] = 0
+		for i in self.run_composition.iterkeys():
+			self.blocks.loc[ self.run_composition[ i ]["blocks"], "r_in" ] = self.blocks.loc[ self.run_composition[ i ]["blocks"], "r_in" ] + float( 1 )/self.nruns
+
 	def pickCols_single( self, n ):
 		"""Pick columns for a cMonkey run using predefined blocks and based on their current representation in the ensemble"""
 		# what is max conditions for this run?
@@ -206,17 +243,40 @@ class ensemblePicker:
 		return None
 
 
-	def report( file = None ):
+	def report( self, file = None ):
 		
 		if file == None:
-			file ="./ensembleColReport_"
+			file ="./ensembleReport_"
 
+		print "Writing reports"
 
+		self.findBlockInclusionFreq()
+		self.findColInclusionFreq()
+		self.findBlockFreq()
+
+		run_df = pd.DataFrame( 0, index = range( 1,self.nruns+1 ), columns = [ "ncols", "excluded", "blocks", "cols" ] ) 
+
+		for i in self.run_composition.iterkeys():
+			run_df.loc[ i,"ncols" ] = len( self.run_composition[ i ][ "cols" ] )
+			run_df.loc[ i,"excluded" ] = self.run_composition[ i ][ "excluded" ] 
+			run_df.loc[ i,"blocks" ] = self.run_composition[ i ][ "blocks" ] 
+			run_df.loc[ i,"cols" ] = self.run_composition[ i ][ "cols" ] 
+
+		run_df.to_csv( path_or_buf = open ( file + "runs.csv", mode = "w"  ), cols = [ "ncols", "excluded", "blocks", "cols" ], index_label = "run_num" )	
+		self.exclusion.to_csv( path_or_buf = open ( file + "exclusionBlocks.csv", mode = "w"  ), cols = [ "block.sample.num", "r_out" ], header = [ 'block_sample_num', "excluded_freq" ], index_label = "exclusion_blocks" )
+		self.blocks.to_csv( path_or_buf = open ( file + "blocks.csv", mode = "w"  ), cols = [ "block.sample.num", "r_in" ], header = [ "block_sample_num", "ensemble_freq" ], index_label = "block" )
+		self.blocks2col.to_csv( path_or_buf = open ( file + "cols.csv", mode = "w"  ), cols = [ "block", "r_in" ], header = [ "block", "ensemble_freq" ], index_label = "sample" )
+		self.inclusion.to_csv( path_or_buf = open ( file + "inclusionBlocks.csv", mode = "w"  ), cols = [ "block.sample.num", 'freq_single', 'freq_coinclusion', 'max_coinclusion_all', 'max_coinclusion_sub' ], header = [ "block_sample_num", 'freq_single', 'freq_coinclusion', 'max_coinclusion_all', 'max_coinclusion_sub' ], index_label = "inclusion_blocks" )
 
 	def pickCols_all( self ):
 		# get random blocks
+		if self.random_blocks:
+			if self.n_rand_exclusion > 0:
+				self.chooseRandomBlocks()
 		for i in range(1, self.nruns+1):
-			print i
-			#self.chooseRandomBlocks()
+			if i%100 == 0:
+				print str( round( float( i )/ float( self.nruns ) *100 ) ) + "% done"
 			self.pickCols_single( i )
+		self.report( self.report_file )
+		print 'Done'
 
