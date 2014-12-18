@@ -112,12 +112,12 @@ class makeCorems:
 				return 0
 
 	def rowRow( self ):
-		"""Construct gene-gene co-occurence matrix"""
-		self.rBr = pd.DataFrame( 0, index = self.row2id.keys(), columns = self.row2id.keys() )
+		"""Construct row-row co-occurrence matrix (ie gene-gene co-occurence)"""
+		row_row_collection = self.db.row_row
 		counter = 1
-		for i in self.rBr.index:
+		for i in self.row2id.keys():
 			if counter%250 == 0:
-				print "%s percent done" % str( round( float( counter ) / len( self.rBr.index )*100, 1 ) )
+				print "%s percent done" % str( round( float( counter ) / len( self.row2id.keys )*100, 1 ) )
 			data_counts = self.getRowCo( i  )
 			self.rBr.loc[ i, data_counts.index ] = data_counts.values
 			counter = counter + 1
