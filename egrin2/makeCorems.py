@@ -35,7 +35,7 @@ from scipy.integrate import quad
 
 class makeCorems:
 
-	def __init__( self, dbname = None, dbfiles = None ):
+	def __init__( self, dbname = None, dbfiles = None, backbone_pval = None ):
 
 		# connect to database
 		# make sure mongodb is running
@@ -79,6 +79,11 @@ class makeCorems:
 			self.col2id[ i[ "egrin2_col_name" ] ] = i[ "col_id" ]
 			self.id2col[ i[ "col_id" ] ] = i[ "egrin2_col_name" ]
 
+		if backbone_pval == None:
+			self.backbone_pval = 0.05
+		else:
+			self.backbone_pval = backbone_pval
+
 	def mongoRestore( self, db, infile ):
 		"""Read contents of binary MongoDB dump into MongoDB instance"""
 		sys_command = "mongorestore --db " + db + " " + infile
@@ -97,19 +102,21 @@ class makeCorems:
 		data_counts = pd.Series( data ).value_counts()
 		return data_counts
 
-	def extractBackbone( self, row ):
+	def extractBackbone( self, data_counts ):
 		"""Extract the significant elements from rBr co-occurrence matrix"""
+		
 		def integrand( x, k ):
-			return ( 1-x )^( k-2 )
-  		# fcn to calculate degree,k
-  		def calc_k( i ):
-  			sum( i > 0 )
-		row_v = self.rBr.loc[ row, ]
-		for i in tmp:
-			if i > 0:
-				1-(k-1)*sci.integrate.quad( integrand, 0, i, args=( k ) ) 
+			 return np.power( 1.0-x , k-2.0 )
+
+		for i in data_counts.index:
+			k = len( data_counts )
+			pval = 1-(k-1)*quad( integrand, 0, data_counts[ i ], args=( k ) ) [0]
+			if pval <= 0.05:
+				data_counts[i] = pval
 			else:
-				return 0
+				data_counts[i] = 0
+		return data_counts
+
 
 	def rowRow( self ):
 		"""Construct row-row co-occurrence matrix (ie gene-gene co-occurence)"""
@@ -119,7 +126,12 @@ class makeCorems:
 			if counter%250 == 0:
 				print "%s percent done" % str( round( float( counter ) / len( self.row2id.keys )*100, 1 ) )
 			data_counts = self.getRowCo( i  )
-			self.rBr.loc[ i, data_counts.index ] = data_counts.values
+			# set self counts to 0 and normalize other counts
+			data_counts[ i ] = 0
+			data_counts = data_counts / sum( data_counts )
+			# only keep values > 0
+			data_counts = data_counts[ data_counts>0 ]
+
 			counter = counter + 1
 
 
