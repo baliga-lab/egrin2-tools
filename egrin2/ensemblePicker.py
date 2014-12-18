@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Choose ensemble conditions"""
+"""Select ensemble conditions given defined blocks of conditions to include together (inclusion blocks) or exclude together (exclusion blocks)"""
 
 __author__ = "Aaron Brooks"
 __copyright__ = "Copyright 2014, cMonkey2"

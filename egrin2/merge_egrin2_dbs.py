@@ -57,7 +57,10 @@ class sql2mongoDB:
 
 		if dbname == None:
 			self.dbname = "egrin2_db"
-		if dbname in client.database_names():
+		else:
+			self.dbname = dbname
+
+		if self.dbname in client.database_names():
 			print "WARNING: %s database already exists!!!" % self.dbname
 		else:
 			print "Initializing MongoDB database: %s" % self.dbname
@@ -648,6 +651,7 @@ class sql2mongoDB:
 	def mongoRestore( self, db, infile ):
 		"""Read contents of binary MongoDB dump into MongoDB instance"""
 		sys_command = "mongorestore --db " + db + " " + infile
+		os.system(sys_command)
 
 	def compile( self ):
 		"""Compile EGRIN2 ensemble"""
