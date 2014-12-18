@@ -105,7 +105,7 @@ class makeCorems:
 	def extractBackbone( self, data_counts ):
 		"""Extract the significant elements from rBr co-occurrence matrix"""
 		backbone_data_counts = data_counts.copy()
-		
+
 		def integrand( x, k ):
 			 return np.power( 1.0-x , k-2.0 )
 
@@ -120,20 +120,38 @@ class makeCorems:
 
 
 	def rowRow( self ):
-		"""Construct row-row co-occurrence matrix (ie gene-gene co-occurence)"""
+		"""Construct row-row co-occurrence matrix (ie gene-gene co-occurrence)"""
+
+		def structureRowRow ( key_row, sub_row, data_counts, data_counts_norm, backbone_data_counts ):
+			d = {
+			"row_ids": [ self.row2id[ i ], self.row2id[ j ] ], 
+			""
+			}
+
+
 		row_row_collection = self.db.row_row
 		counter = 1
+		
 		for i in self.row2id.keys():
 			if counter%250 == 0:
 				print "%s percent done" % str( round( float( counter ) / len( self.row2id.keys )*100, 1 ) )
+			# check if already exists in DB
 			data_counts = self.getRowCo( i )
 			# set self counts to 0 and normalize other counts
 			data_counts[ i ] = 0
-			data_counts = data_counts / sum( data_counts )
-			# only keep values > 0
 			data_counts = data_counts[ data_counts>0 ]
-			backbone_data_counts = self.extractBackbone( data_counts )
+			data_counts_norm = data_counts.copy()
+			data_counts_norm = data_counts_norm/ sum( data_counts_norm )
+			# only keep values > 0
+			backbone_data_counts = self.extractBackbone( data_counts_norm )
+			
+			to_write = [ structureRowRow( i, j, data_counts, data_counts_norm, backbone_data_counts ) for j in data_counts.index ]
+			col_info_collection.insert( d_f )
+
 			counter = counter + 1
+
+	def runCoremCscripts( self ):
+
 
 
 
