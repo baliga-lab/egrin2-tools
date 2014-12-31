@@ -56,7 +56,7 @@ class cMonkeyIniGen:
 			params[ "num_clusters" ] = random.randint(150, 550)
 		if "random_seed" not in params.keys():
 			params[ "random_seed" ] = 1
-			random.seed( random_seed )
+			random.seed(params[ "random_seed" ] )
 		if "log_subresults" not in params.keys():
 			params[ "log_subresults" ] = True
 		if "case_sensitive" not in params.keys():
@@ -108,9 +108,16 @@ class cMonkeyIniGen:
 		if "networks_schedule" not in params.keys():
 			params[ "networks_schedule" ] = "1,7"
 		if "networks_scaling_rvec" not in params.keys():
-			params[ "networks_scaling_rvec" ]  = "seq(1e-5, 0.5, length=num_iterations*3/4)"
-		if "networks_scaling_const" not in params.keys():
-			params[ "networks_scaling_const" ] = random.uniform(0.0, 1.0)
+			params[ "networks_scaling_rvec" ]  = "seq(1e-5, %s, length=num_iterations*3/4)" % ( random.uniform(0.0, 1.0) )
+		# if "networks_scaling_const" not in params.keys():
+		# 	params[ "networks_scaling_const" ] = random.uniform(0.0, 1.0)
+		#
+		# I don't know what the hell these do, but they were in Wei-ju's code!!!
+		#
+		if "meme_string_weight" not in params.keys():
+			params[ "meme_string_weight" ] = random.uniform(0.0, 1.0) * 0.5 + 0.2
+        		if "meme_operon_weight" not in params.keys():
+        			params[ "meme_operon_weight" ] = random.uniform(0.0, 1.0) * 0.5 + 0.2
 
 		# [Motifs]
 		if "sequence_types" not in params.keys():
@@ -118,7 +125,8 @@ class cMonkeyIniGen:
 		if "motifs_schedule" not in params.keys():
 			params[ "motifs_schedule" ] = "2,10"
 		if "motifs_scaling_rvec" not in params.keys():
-			params[ "motifs_scaling_rvec" ] = "c(rep(1e-5, 100), seq(1e-5, 1, length=num_iterations*3/4))"
+			params[ "motifs_scaling_rvec" ] = "c(rep(1e-5, 100), seq(1e-5, %s, length=num_iterations*3/4))" % ( random.uniform(0.0, 1.0) )
+
 
 		# [MEME]
 		BGORDER = [None, 0, 1, 2, 3, 4, 5]
@@ -137,13 +145,8 @@ class cMonkeyIniGen:
 			params[ "background_order" ] = BGORDER[ random.randint( 0, 6 ) ]
 		if "arg_mod" not in params.keys():
 			params[ "arg_mod" ] = "zoops"
-		#
-		# I don't know what the hell these do, but they were in Wei-ju's code!!!
-		#
-		if "meme_string_weight" not in params.keys():
-			params[ "meme_string_weight" ] = random.uniform(0.0, 1.0) * 0.5 + 0.2
-        		if "meme_operon_weight" not in params.keys():
-        			params[ "meme_operon_weight" ] = random.uniform(0.0, 1.0) * 0.5 + 0.2
+		
+        			
 
 		# [Weeder]
 		if "weeder_global_background" not in params.keys():
@@ -171,7 +174,7 @@ class cMonkeyIniGen:
 		if "setenrichment_schedule" not in params.keys():
 			params[ "setenrichment_schedule" ] = "1,7"
 		if "setenrichment_scaling_rvec" not in params.keys():
-			params[ "setenrichment_scaling_rvec" ] = "seq(1e-5, 1.5, length=num_iterations*3/4)"
+			params[ "setenrichment_scaling_rvec" ] = "seq(1e-5, %s, length=num_iterations*3/4)" % ( random.uniform(0.0, 1.0) )
 		if "set_types" not in params.keys():
 			# can be array!
 			params[ "set_types" ] = ""
@@ -182,93 +185,100 @@ class cMonkeyIniGen:
 			params[ "set_file" ] = ""
 		if "set_weight" not in params.keys():
 			# can be an array!
-			params[ "set_weight" ] = ""
+			counter = 0
+			if len( params[ "set_types" ].split( "," ) ) > 0:
+				for i in params[ "set_types" ].split( "," ):
+					if counter == 0:
+						params[ "set_weight" ] =  str( random.uniform(0.0, 1.0) )
+					else:
+						params[ "set_weight" ] =  params[ "set_weight" ] + "," + str( random.uniform(0.0, 1.0) )
+					counter = counter + 1
+			else:
+				params[ "set_weight" ] = ""
 
-		self.CMONKEY_INI_TEMPLATE =  """
-		[General]
-		normalize_ratios = %(normalize_ratios)s
-		num_iterations = %(num_iterations)s
-		start_iteration = %(start_iteration)s
-		output_dir = %(output_dir)s
-		cache_dir = %(cache_dir)s
-		tmp_dir = %(tmp_dir)s
-		dbfile_name = %(dbfile_name)s
-		use_multiprocessing = %(use_multiprocessing)s
-		checkpoint_interval = %(checkpoint_interval)s
-		num_cores = %(num_cores)s
-		stats_frequency = %(stats_frequency)s
-		result_frequency = %(result_frequency)s
-		debug_frequency = %(debug_frequency)s
-		postadjust = %(postadjust)s
-		add_fuzz = %(add_fuzz)s
-		num_clusters = %(num_clusters)s
-		random_seed = %(random_seed)s
-		log_subresults = %(log_subresults)s
-		case_sensitive = %(case_sensitive)s
-		rsat_base_url = %(rsat_base_url)s
-		organism_code = %(organism_code)s
-		use_operons = %(use_operons)s
-		use_string = %(use_string)s
-		checkratios = %(checkratios)s
+		self.CMONKEY_INI_TEMPLATE =  """[General]
+normalize_ratios = %(normalize_ratios)s
+num_iterations = %(num_iterations)s
+start_iteration = %(start_iteration)s
+output_dir = %(output_dir)s
+cache_dir = %(cache_dir)s
+tmp_dir = %(tmp_dir)s
+dbfile_name = %(dbfile_name)s
+use_multiprocessing = %(use_multiprocessing)s
+checkpoint_interval = %(checkpoint_interval)s
+num_cores = %(num_cores)s
+stats_frequency = %(stats_frequency)s
+result_frequency = %(result_frequency)s
+debug_frequency = %(debug_frequency)s
+postadjust = %(postadjust)s
+add_fuzz = %(add_fuzz)s
+num_clusters = %(num_clusters)s
+random_seed = %(random_seed)s
+log_subresults = %(log_subresults)s
+case_sensitive = %(case_sensitive)s
+rsat_base_url = %(rsat_base_url)s
+organism_code = %(organism_code)s
+use_operons = %(use_operons)s
+use_string = %(use_string)s
+checkratios = %(checkratios)s
 
-		[Membership]
-		probability_row_change = %(probability_row_change)s
-		probability_column_change = %(probability_column_change)s
-		max_changes_per_row = %(max_changes_per_row)s
-		max_changes_per_column = %(max_changes_per_column)s
-		min_cluster_rows_allowed = %(min_cluster_rows_allowed)s
-		max_cluster_rows_allowed = %(max_cluster_rows_allowed)s
-		clusters_per_row = %(clusters_per_row)s
-		clusters_per_column = %(clusters_per_column)s
+[Membership]
+probability_row_change = %(probability_row_change)s
+probability_column_change = %(probability_column_change)s
+max_changes_per_row = %(max_changes_per_row)s
+max_changes_per_column = %(max_changes_per_column)s
+min_cluster_rows_allowed = %(min_cluster_rows_allowed)s
+max_cluster_rows_allowed = %(max_cluster_rows_allowed)s
+clusters_per_row = %(clusters_per_row)s
+clusters_per_column = %(clusters_per_column)s
 
-		[Scoring]
-		quantile_normalize = %(quantile_normalize)s
+[Scoring]
+quantile_normalize = %(quantile_normalize)s
 
-		[Rows]
-		schedule = %(row_schedule)s
-		scaling_const = %(row_scaling_const)s
+[Rows]
+schedule = %(row_schedule)s
+scaling_const = %(row_scaling_const)s
 
-		[Columns]
-		schedule = %(col_schedule)s
+[Columns]
+schedule = %(col_schedule)s
 
-		[Networks]
-		schedule = %(networks_schedule)s
-		scaling_rvec = %(networks_scaling_rvec)s
-		scaling_const = %(networks_scaling_const)s
+[Networks]
+schedule = %(networks_schedule)s
+scaling_rvec = %(networks_scaling_rvec)s
+string_weight = %(meme_string_weight)s
+operon_weight = %(meme_operon_weight)s
 
-		[Motifs]
-		sequence_types = %(sequence_types)s
-		schedule = %(motifs_schedule)s
-		scaling_rvec = %(motifs_scaling_rvec)s
+[Motifs]
+sequence_types = %(sequence_types)s
+schedule = %(motifs_schedule)s
+scaling_rvec = %(motifs_scaling_rvec)s
 
-		[MEME]
-		global_background = %(meme_global_background)s
-		schedule = %(meme_schedule)s
-		nmotifs_rvec = %(meme_nmotifs_rvec)s
-		use_revcomp = %(use_revcomp)s
-		max_width = %(max_width)s
-		background_order = %(background_order)s
-		arg_mod = %(arg_mod)s
-		string_weight = %(meme_string_weight)s
-		operon_weight = %(meme_operon_weight)s
+[MEME]
+global_background = %(meme_global_background)s
+schedule = %(meme_schedule)s
+nmotifs_rvec = %(meme_nmotifs_rvec)s
+use_revcomp = %(use_revcomp)s
+max_width = %(max_width)s
+background_order = %(background_order)s
+arg_mod = %(arg_mod)s
 
-		[Weeder]
-		global_background = %(weeder_global_background)s
-		schedule = %(weeder_schedule)s
-		nmotifs_rvec = %(weeder_nmotifs_rvec)s
-		orgcode = %(orgcode)s
-		freqfile_dir = %(freqfile_dir)s
-		analysis = %(analysis)s
-		top = %(top)s
+[Weeder]
+global_background = %(weeder_global_background)s
+schedule = %(weeder_schedule)s
+nmotifs_rvec = %(weeder_nmotifs_rvec)s
+orgcode = %(orgcode)s
+freqfile_dir = %(freqfile_dir)s
+analysis = %(analysis)s
+top = %(top)s
 
-		[SequenceType-upstream]
-		search_distance = %(search_distance)s
-		scan_distance = %(scan_distance)s
+[SequenceType-upstream]
+search_distance = %(search_distance)s
+scan_distance = %(scan_distance)s
 
-		[SetEnrichment]
-		schedule = %(setenrichment_schedule)s
-		scaling_rvec= %(setenrichment_scaling_rvec)s
-		set_types = %(set_types)s""" % params
+[SetEnrichment]
+schedule = %(setenrichment_schedule)s
+scaling_rvec= %(setenrichment_scaling_rvec)s
+set_types = %(set_types)s\n""" % params
 
 		for i in range(0, len( params["set_types"].split( "," ) ) ):
 			if params["set_types"] != "":
@@ -279,6 +289,10 @@ class cMonkeyIniGen:
 				[SetEnrichment-%(set_types)s]
 				set_file = %(set_file)s
 				weight = %(set_weight)s
-				"""
+				""" % { "set_types" : set_types, "set_file": set_file, "set_weight": set_weight }
 				self.CMONKEY_INI_TEMPLATE = self.CMONKEY_INI_TEMPLATE + SETENRICHMENT_TEMPLATE
+
+	def writeIni( self, file ):
+		with open(file, 'w') as outfile:
+			outfile.write( self.CMONKEY_INI_TEMPLATE )
 

@@ -46,7 +46,7 @@ from Bio import SeqIO
 
 class ensemblePicker:
     	"""Pick conditions for an ensemble run, biasing towards inclusion of blocks of conditions in the inclusion blocks while making sure that conditions in exclusion blocks are excluded together in at least some percentage of runs"""
-	def __init__( self, ratios, blocks, exclusion, inclusion, avg_col_size = None, sd_col_size = None, inclusion_weight = None, tfblocks = None, nruns = None, exclusion_percentage = None, n_rand_exclusion = None, report_file = None, random_blocks = None ):
+	def __init__( self, ratios, blocks, exclusion, inclusion, avg_col_size = None, sd_col_size = None, inclusion_weight = None, tfblocks = None, nruns = None, exclusion_percentage = None, n_rand_exclusion = None, report_file = None, random_blocks = None, ratios_file = None ):
 		
 		if nruns == None:
 			self.nruns = 100
@@ -78,6 +78,9 @@ class ensemblePicker:
 
 		if random_blocks == None:
 			self.random_blocks = True
+
+		if ratios_file == None:
+			self.ratios_file = None
 
 		def strip(text):
 		    try:
@@ -245,6 +248,22 @@ class ensemblePicker:
 		}
 		return None
 
+	def writeRatios( self, file = None ):
+
+		print "Writing ratio files"
+
+		if file == None:
+			file = "./"
+
+		for i in self.run_composition.iterkeys( ):
+
+			if int( i )%100 == 0:
+				print str( round( float( i )/ float( self.nruns ) *100 ) ) + "% done"
+
+			cols = list( set( self.run_composition[ i ][ "cols" ] ) & set( self.ratios.columns ) )
+			to_write = self.ratios.loc[ :, cols ]
+			to_write.to_csv( os.path.join( file, "ratios-%03d.csv" % i ) )
+				
 
 	def report( self, file = None ):
 		
@@ -281,5 +300,6 @@ class ensemblePicker:
 				print str( round( float( i )/ float( self.nruns ) *100 ) ) + "% done"
 			self.pickCols_single( i )
 		self.report( self.report_file )
+		self.writeRatios( self.ratios_file )
 		print 'Done'
 
