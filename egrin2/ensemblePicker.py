@@ -64,23 +64,29 @@ class ensemblePicker:
 			self.inclusion_weight = inclusion_weight
 
 		if avg_col_size == None:
-			self.avg_col_size = 250
+			self.avg_col_size = 150
 		else:
 			self.avg_col_size = avg_col_size
 
 		if sd_col_size == None:
-			self.sd_col_size = 100
+			self.sd_col_size = 50
 		else:
 			self.sd_col_size = sd_col_size
 
 		if report_file == None:
 			self.report_file = None
+		else:
+			self.report_file = report_file
 
 		if random_blocks == None:
 			self.random_blocks = True
+		else:
+			self.random_blocks = random_blocks
 
 		if ratios_file == None:
 			self.ratios_file = None
+		else:
+			self.ratios_file = ratios_file
 
 		def strip(text):
 		    try:
@@ -204,9 +210,7 @@ class ensemblePicker:
 	def pickCols_single( self, n ):
 		"""Pick columns for a cMonkey run using predefined blocks and based on their current representation in the ensemble"""
 		# what is max conditions for this run?
-		n_cols = self.nruns+1
-		while n_cols > self.nruns:
-			n_cols = round( self.avg_col_size + ( self.avg_col_size/4 )*random.gammavariate(1,2) )
+		n_cols = round( self.avg_col_size + ( self.sd_col_size )*random.gammavariate(1,2) )
 		
 		# first choose excluded blocks
 		excluded = self.weightedReservoirSample( 1, self.exclusion["p"] )[0]
