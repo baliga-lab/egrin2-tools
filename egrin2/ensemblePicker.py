@@ -266,7 +266,7 @@ class ensemblePicker:
 
 			cols = list( set( self.run_composition[ i ][ "cols" ] ) & set( self.ratios.columns ) )
 			to_write = self.ratios.loc[ :, cols ]
-			to_write.to_csv( os.path.join( file, "ratios-%03d.csv" % i ) )
+			to_write.to_tsv( os.path.join( file, "ratios-%03d.tsv" % i ) )
 				
 
 	def report( self, file = None ):
