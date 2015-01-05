@@ -8,11 +8,11 @@ Example:
 
 With pre-defined condition blocks:
 
-python cMonkeyQSub.py --organism mtb --ratios 20141130.MTB.all.ratios.csv --targetdir mtb-ens-20141230 --numruns 20 --organism_code 83332 --blocks 20141202.MTB.EGRIN2.blocks.csv --inclusion 20141202.MTB.EGRIN2.inclusion.blocks.csv --exclusion 20141202.MTB.EGRIN2.exclusion.blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files 20140725.MTB.ChIPSeq.csv,20140725.MTB.DE.csv --csh
+python cMonkeyQSub.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir mtu-ens-20141230 --numruns 500 --blocks 20141202.MTB.EGRIN2.blocks.csv --inclusion 20141202.MTB.EGRIN2.inclusion.blocks.csv --exclusion 20141202.MTB.EGRIN2.exclusion.blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files 20140725.MTB.ChIPSeq.csv,20140725.MTB.DE.csv --csh
 
 Without pre-defined condition blocks:
 
-python cMonkeyQSub.py --organism mtb --ratios 20141130.MTB.all.ratios.csv --targetdir mtb-ens-20141230 --numruns 20 --organism_code 83332 --mincols 50 --num_cores 1 --csh
+python cMonkeyQSub.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir mtb-ens-20141230 --numruns 20 --mincols 50 --num_cores 1 --csh
 """
 import argparse
 import os
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     parser.add_argument('--ratios', required=True)
     parser.add_argument('--targetdir', required=True)
     parser.add_argument('--numruns', type=int, default=4)
-    parser.add_argument('--organism_code', default="")
+    parser.add_argument('--ncbi_code', default="")
     parser.add_argument('--mincols', type=int, default=8)
     parser.add_argument('--num_cores', type=int, default=1)
     parser.add_argument('--user', default=None)
@@ -108,7 +108,7 @@ if __name__ == '__main__':
       cols.pickCols_all()
 
     # write config files
-    config_params = { "organism_code": args.organism_code }
+    config_params = { }
 
     print "Writing ensemble config files"
     for i in range( 1, args.numruns+1 ):
