@@ -14,6 +14,16 @@ Without pre-defined condition blocks:
 
 python cMonkeyQSub.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir mtb-ens-20141230 --numruns 20 --mincols 50 --num_cores 1 --csh
 """
+
+__author__ = "Aaron Brooks, Wei-ju Wu"
+__copyright__ = "Copyright 2014, cMonkey2"
+__credits__ = ["Aaron Brooks", "Wei-ju Wu"]
+__license__ = "GPL"
+__version__ = "1.0.1"
+__maintainer__ = "Aaron Brooks"
+__email__ = "brooksan@uw.edu"
+__status__ = "Development"
+
 import argparse
 import os
 import itertools
