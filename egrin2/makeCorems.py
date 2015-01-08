@@ -141,15 +141,24 @@ class makeCorems:
 	def rowRow( self ):
 		"""Construct row-row co-occurrence matrix (ie gene-gene co-occurrence)"""
 
+		def addToD( d, ind1, ind2, val ):
+			if ind1 not in d.iterkeys():
+				d[ ind1 ] = {}
+			d[ ind1 ][ ind2 ] = val
+			return d
+
 		def structureRowRow ( key_row, sub_row, data_counts, data_counts_norm, backbone_pval, row_row_collection ):
 			try:
-				weight = row_row_collection.find_one( { "row_ids" : [ self.row2id[ sub_row ], self.row2id[ key_row ] ]  } )["weight"]
 				# check to see if this pair already exists and if current weight is greater
-				# if current weight is greater and backbone_pval is significant, update the weight in MongoDB
+				weight = self.rowrow_ref[ self.row2id[ sub_row ] ][ self.row2id[ key_row ] ]
+				
 				if ( data_counts_norm > weight ) & ( backbone_pval <= self.backbone_pval ):
+					# if current weight is greater and backbone_pval is significant, update the weight in MongoDB
 					row_row_collection.update({ "row_ids" : [ self.row2id[ sub_row ], self.row2id[ key_row ] ] }, { "$set":{ "weight" : data_counts_norm, "backbone_pval" : backbone_pval } } )
+					self.rowrow_ref = addToD( self.rowrow_ref, self.row2id[ sub_row ], self.row2id[ key_row ], data_counts_norm )
 				d = None
 			except Exception:
+				self.rowrow_ref = addToD( self.rowrow_ref, self.row2id[ sub_row ], self.row2id[ key_row ], data_counts_norm )
 				d = {
 				"row_ids": [ self.row2id[ key_row ], self.row2id[ sub_row ] ], 
 				"counts": data_counts,
@@ -161,8 +170,12 @@ class makeCorems:
 		row_row_collection = self.db.row_row
 		counter = 1
 		
+		# make a dictionary to keep track of rows in db and their weights
+		# was too slow using mongoDB lookups...
+		self.rowrow_ref = {}
+
 		for i in self.row2id.keys():
-			print i
+			#print i
 			if counter%250 == 0:
 				print "%s percent done" % str( round( float( counter ) / len( self.row2id.keys() ), 2 )*100 )
 			# check if already exists in DB
@@ -180,6 +193,8 @@ class makeCorems:
 			row_row_collection.insert( to_write )
 
 			counter = counter + 1
+
+		self.rowrow_ref = None
 
 	def writeEdgeList( self ):
 		return None
