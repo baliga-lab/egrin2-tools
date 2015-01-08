@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Generate corems using cMoneky ensemble MongoDB. Add them to an existing MongoDB"""
+"""Generate corems using cMonkey ensemble MongoDB. Add them to an existing MongoDB"""
 
 __author__ = "Aaron Brooks"
 __copyright__ = "Copyright 2014, cMonkey2"
@@ -112,29 +112,29 @@ class makeCorems:
 		for i in data_counts.index:
 			k = len( data_counts )
 			pval = 1-(k-1)*quad( integrand, 0, data_counts[ i ], args=( k ) ) [0]
-			if pval <= 0.05:
-				backbone_data_counts[i] = pval
-			else:
-				backbone_data_counts[i] = 0
+			backbone_data_counts[i] = pval
 		return backbone_data_counts
 
 
 	def rowRow( self ):
 		"""Construct row-row co-occurrence matrix (ie gene-gene co-occurrence)"""
 
-		def structureRowRow ( key_row, sub_row, data_counts, data_counts_norm, backbone_data_counts ):
+		def structureRowRow ( key_row, sub_row, data_counts, data_counts_norm, backbone_pval ):
 			d = {
-			"row_ids": [ self.row2id[ i ], self.row2id[ j ] ], 
-			""
+			"row_ids": [ self.row2id[ key_row ], self.row2id[ sub_row ] ], 
+			"counts": data_counts,
+			"weight": data_counts_norm,
+			"backbone_pval": backbone_pval
 			}
-
+			return d
 
 		row_row_collection = self.db.row_row
 		counter = 1
 		
 		for i in self.row2id.keys():
+			print i
 			if counter%250 == 0:
-				print "%s percent done" % str( round( float( counter ) / len( self.row2id.keys )*100, 1 ) )
+				print "%s percent done" % str( round( float( counter ) / len( self.row2id.keys() ), 2 )*100 )
 			# check if already exists in DB
 			data_counts = self.getRowCo( i )
 			# set self counts to 0 and normalize other counts
@@ -145,13 +145,13 @@ class makeCorems:
 			# only keep values > 0
 			backbone_data_counts = self.extractBackbone( data_counts_norm )
 			
-			to_write = [ structureRowRow( i, j, data_counts, data_counts_norm, backbone_data_counts ) for j in data_counts.index ]
-			col_info_collection.insert( d_f )
+			to_write = [ structureRowRow( i, j, data_counts[j], data_counts_norm[j], backbone_data_counts[j] ) for j in data_counts.index ]
+			row_row_collection.insert( to_write )
 
 			counter = counter + 1
 
 	def runCoremCscripts( self ):
-
+		return None
 
 
 
