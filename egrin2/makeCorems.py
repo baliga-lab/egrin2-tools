@@ -19,6 +19,7 @@ import gzip
 import time
 from urllib2 import urlopen, URLError, HTTPError
 from zipfile import ZipFile
+from itertools import combinations
 
 import pdb
 
@@ -35,7 +36,7 @@ from scipy.integrate import quad
 
 class makeCorems:
 
-	def __init__( self, dbname = None, dbfiles = None, backbone_pval = None ):
+	def __init__( self, dbname = None, dbfiles = None, backbone_pval = None, out_dir = None ):
 
 		# connect to database
 		# make sure mongodb is running
@@ -79,10 +80,32 @@ class makeCorems:
 			self.col2id[ i[ "egrin2_col_name" ] ] = i[ "col_id" ]
 			self.id2col[ i[ "col_id" ] ] = i[ "egrin2_col_name" ]
 
-		if backbone_pval == None:
+		if backbone_pval is None:
 			self.backbone_pval = 0.05
 		else:
 			self.backbone_pval = backbone_pval
+
+		if os.system( "which -s adjmat2wpairs" ) != 0:
+			print "WARNING!!! You need to compile adjmat2wpairs.cpp to adjmat2wpairs and add its location to your path to detect corems"
+
+		if os.system( "which -s compute_tanimoto" ) != 0:
+			print "WARNING!!! You need to compile compute_tanimoto.cpp to compute_tanimoto and add its location to your path to detect corems"
+
+		if os.system( "which -s cluster_communities" ) != 0:
+			print "WARNING!!! You need to compile cluster_communities.cpp to cluster_communities and add its location to your path to detect corems"
+
+		if os.system( "which -s getting_communities" ) != 0:
+			print "WARNING!!! You need to compile getting_communities.cpp to getting_communities and add its location to your path to detect corems"
+
+		if out_dir is None:
+			self.out_dir = "./corem_data/"
+			if not os.path.isdir( self.out_dir ):
+				os.makedirs( self.out_dir )
+		else:
+			self.out_dir = self.out_dir
+			if not os.path.isdir( self.out_dir ):
+				os.makedirs( self.out_dir )
+		print "Corem data will be output to:", self.out_dir
 
 	def mongoRestore( self, db, infile ):
 		"""Read contents of binary MongoDB dump into MongoDB instance"""
@@ -115,17 +138,24 @@ class makeCorems:
 			backbone_data_counts[i] = pval
 		return backbone_data_counts
 
-
 	def rowRow( self ):
 		"""Construct row-row co-occurrence matrix (ie gene-gene co-occurrence)"""
 
-		def structureRowRow ( key_row, sub_row, data_counts, data_counts_norm, backbone_pval ):
-			d = {
-			"row_ids": [ self.row2id[ key_row ], self.row2id[ sub_row ] ], 
-			"counts": data_counts,
-			"weight": data_counts_norm,
-			"backbone_pval": backbone_pval
-			}
+		def structureRowRow ( key_row, sub_row, data_counts, data_counts_norm, backbone_pval, row_row_collection ):
+			try:
+				weight = row_row_collection.find_one( { "row_ids" : [ self.row2id[ sub_row ], self.row2id[ key_row ] ]  } )["weight"]
+				# check to see if this pair already exists and if current weight is greater
+				# if current weight is greater and backbone_pval is significant, update the weight in MongoDB
+				if ( data_counts_norm > weight ) & ( backbone_pval <= self.backbone_pval ):
+					row_row_collection.update({ "row_ids" : [ self.row2id[ sub_row ], self.row2id[ key_row ] ] }, { "$set":{ "weight" : data_counts_norm, "backbone_pval" : backbone_pval } } )
+				d = None
+			except Exception:
+				d = {
+				"row_ids": [ self.row2id[ key_row ], self.row2id[ sub_row ] ], 
+				"counts": data_counts,
+				"weight": data_counts_norm,
+				"backbone_pval": backbone_pval
+				}
 			return d
 
 		row_row_collection = self.db.row_row
@@ -145,10 +175,14 @@ class makeCorems:
 			# only keep values > 0
 			backbone_data_counts = self.extractBackbone( data_counts_norm )
 			
-			to_write = [ structureRowRow( i, j, data_counts[j], data_counts_norm[j], backbone_data_counts[j] ) for j in data_counts.index ]
+			to_write = [ structureRowRow( i, j, data_counts[j], data_counts_norm[j], backbone_data_counts[j], row_row_collection ) for j in data_counts.index ]
+			to_write = filter( None, to_write)
 			row_row_collection.insert( to_write )
 
 			counter = counter + 1
+
+	def writeEdgeList( self ):
+		return None
 
 	def runCoremCscripts( self ):
 		return None
