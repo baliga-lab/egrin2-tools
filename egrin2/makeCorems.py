@@ -24,6 +24,7 @@ import subprocess
 import shutil
 import decimal
 from math import ceil
+import random
 
 import pdb
 
@@ -37,10 +38,11 @@ from pymongo import MongoClient
 from Bio import SeqIO
 from scipy.integrate import quad
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
 class makeCorems:
 
-	def __init__( self, dbname = None, dbfiles = None, backbone_pval = None, out_dir = None, n_subs = None, link_comm_score = None, link_comm_increment = None, link_common_density_score = None, corem_size_threshold = None ):
+	def __init__( self, dbname = None, dbfiles = None, backbone_pval = None, out_dir = None, n_subs = None, link_comm_score = None, link_comm_increment = None, link_comm_density_score = None, corem_size_threshold = None ):
 
 		# connect to database
 		# make sure mongodb is running
@@ -132,17 +134,19 @@ class makeCorems:
 		else:
 			self.link_comm_increment = link_comm_increment
 
-		if link_common_density_score is None:
+		if link_comm_density_score is None:
 			# score used to evaluate global density of communities (1,2,3,4,5) 
-			self.link_common_density_score = 5
+			self.link_comm_density_score = 5
 		else:
-			self.link_common_density_score = link_common_density_score
+			self.link_comm_density_score = link_comm_density_score
 
 		if corem_size_threshold is None:
 			# minimum size of corem, # edges
 			self.corem_size_threshold = 3
 		else: 
 			self.corem_size_threshold = corem_size_threshold
+
+		self.cutoff = None
 
 	def mongoRestore( self, db, infile ):
 		"""Read contents of binary MongoDB dump into MongoDB instance"""
@@ -346,33 +350,204 @@ class makeCorems:
 
 			# choose cutoff
 			density = pd.read_csv( os.path.join( os.path.abspath( self.out_dir ),"edgeList.density" ), sep = "\t", header = None )
+			
 			# map density score to column
 			score_map = { 1:2, 2:4, 5:6, 3:7, 4:8 }
-			# plot
-
-			plt.plot(density.loc[:,0], density.loc[:,2], 'r-')
 			
-			plt.axis([0, 1, 0, 2])
-			plt.show()
+			vals = density[score_map[ self.link_comm_density_score ]]
+			maxT = max( vals )
+			maxT_ind = round(density.iloc[ :,0 ][ vals.idxmax( ) ], 4)
+
+			# plot density scores
+
+			black = [ 2, 4, 7 ]
+			blue = [ 8, 6 ]
+			lty = [ '-', '--', '-.', ':' ]
 
 			fig, ax1 = plt.subplots()
-			t = np.arange(0.01, 10.0, 0.01)
-			s1 = np.exp(t)
-			ax1.plot(t, s1, 'b-')
-			ax1.set_xlabel('time (s)')
-			# Make the y-axis label and tick labels match the line color.
-			ax1.set_ylabel('exp', color='b')
-			for tl in ax1.get_yticklabels():
-			    tl.set_color('b')
+			l1 = ax1.plot( density.loc[ :,0 ], density.loc[ :,black[ 0 ] ], color = "black", ls = lty[ 0 ], marker = ".", ms = 10, lw = 2, label = "(1) Unweighted (all)" )
+			l2 = ax1.plot( density.loc[ :,0 ], density.loc[ :,black[ 1 ] ], color = "black", ls = lty[ 1 ], marker = ".", ms = 10, lw = 2, label = "(2) Unweighted (n>2)" )
+			l3 = ax1.plot( density.loc[ :,0 ], density.loc[ :,black[ 2 ] ], color = "black", ls = lty[ 2 ], marker = ".", ms = 10, lw = 2, label = "(3) Weighted (local)" )
+			if score_map[ self.link_comm_density_score ] in black:
+				yl = ax1.plot( density.loc[ :,0 ], density.loc[ :,score_map[ self.link_comm_density_score ] ], color = "red", ms = 10, ls = '-', marker = ".", lw = 2, label = "Your choice" )
+				ax1.axvline(maxT_ind, color='red', linestyle=':')
 
+			ax1.set_xlabel('Threshold')
+			# Make the y-axis label and tick labels match the line color.
+			ax1.set_ylabel('Similarity Score', color='black')
+			ax1.set_xlim( ( 0, 1 ) )
+			for tl in ax1.get_yticklabels():
+			    tl.set_color('black')
 
 			ax2 = ax1.twinx()
-			s2 = np.sin(2*np.pi*t)
-			ax2.plot(t, s2, 'r.')
-			ax2.set_ylabel('sin', color='r')
+			l4 = ax2.plot( density.loc[ :,0 ], density.loc[ :,blue[ 0 ] ], color = "blue", ls = lty[ 0 ], marker = ".", ms = 10, lw = 2, label =  "(4) Weighted (global)" )
+			l5 = ax2.plot( density.loc[ :,0 ], density.loc[ :,blue[ 1 ] ], color = "blue", ls = lty[ 1 ], marker = ".", ms = 10, lw = 2, label = "(5) Weighted (both)" )
+			if score_map[ self.link_comm_density_score ] in blue:
+				yl = ax2.plot( density.loc[ :,0 ], density.loc[ :,score_map[ self.link_comm_density_score ] ], color = "red", ls = '-', marker = ".", ms = 10, lw = 2, label = "Your choice" )
+				ax2.axvline(maxT_ind, color='red', linestyle=':')
+
+			ax2.set_ylabel('Similarity Score', color='blue')
 			for tl in ax2.get_yticklabels():
-			    tl.set_color('r')
-			plt.show()
+			    tl.set_color('blue')
+
+			#plt.plot( (maxT, maxT), (-100, 100), 'r--' )
+
+			plt.legend( handles = [ l1[0], l2[0], l3[0], l4[0], l5[0], yl[0] ], loc = 2)
+			plt.title('Corem community density at different similarity cutoffs')
+			plt.tight_layout()
+			pp = PdfPages( os.path.join( os.path.abspath( self.out_dir ),"density_stats.pdf" ) )
+
+			plt.savefig(pp, format='pdf')
+			pp.close()
+
+			print "Threshold density plots written to:", os.path.join( os.path.abspath( self.out_dir ),"density_stats.pdf" )
+			print "Threshold is", round( maxT, 5 ), "at cutoff =", maxT_ind
+
+			self.cutoff = maxT_ind
+
+			# end plot
+
+	def getCorems( self, cutoff = None ):
+		"""load clusters at selected density"""
+		if self.cutoff is None:
+			if cutoff is None:
+				return "Please provide a cutoff value"
+			else:
+				self.cutoff = cutoff
+
+		if self.cFail:
+			print "Cannot detect corems because one or more community detection C++ scrips are either (1) not compiled, (2) not in the $PATH variable, or (3) incorrectly named. Resolve previous warning."
+			return None
+
+		# get communities at selected cutoff
+		p = subprocess.Popen( [ "getting_communities", "edgeList", str( self.cutoff ), ], cwd= os.path.abspath( self.out_dir ), shell = True )
+		p.wait()
+
+		clusters = pd.read_csv( os.path.join( os.path.abspath( self.out_dir ),"edgeList.communities_" + str( self.cutoff ) ), sep = "\t",header = None )
+		clusters.columns  = ["Gene1","Gene2","Community_ID","Community_Density","Community_Weighted_Density"] 
+
+		# find and keep communities with > 3 sig edges
+		edgeCounts = clusters.Community_ID.value_counts( )
+		sig = edgeCounts[ edgeCounts >= 3 ].index.tolist( )
+		sigClusters = clusters[clusters[ "Community_ID" ].isin( sig ) ]
+
+		# keep communities with > 0 density
+		sigClusters = sigClusters[ sigClusters["Community_Density"]>0 ]
+
+		# sort by density
+		sigClusters = sigClusters.sort(['Community_Density','Community_Weighted_Density','Community_ID'],ascending=False)
+
+		# rename corems
+		clusterNameD = dict (zip( sigClusters.Community_ID.unique( ), range( 1,len( sigClusters.Community_ID.unique( ) )+1 ) ) )
+
+		sigClusters.Community_ID = [ clusterNameD[ i ] for i in sigClusters.Community_ID ]
+
+		sigClusters.to_csv( os.path.join( os.path.abspath( self.out_dir ),"edgeList.communities_" + str( self.cutoff ) + "_FINAL.txt" ), sep = "\t", index = False)
+
+		return sigClusters
+
+	def addCorems( self ):
+		"""Add corems to MongoDB. Will Only run if self.cutoff has been set by running C++ codes"""
+		pd.options.mode.chained_assignment = None
+
+		def coremStruct( corem, table ):
+			"""MongoDB corem template"""
+			if int( corem )%100 is 0:
+				print "%d percent" % ( round ( float( corem )/ len(table.Community_ID.unique( ) ), 5) * 100 )
+			sub_m = table.loc[ table.Community_ID==corem, : ] 
+			# translate names
+			sub_m.loc[ :,"Gene1" ] = [ str( self.row2id[ i ] ) for i in sub_m.Gene1 ]
+			sub_m.loc[ :,"Gene2" ] = [ str( self.row2id[ i ] ) for i in sub_m.Gene2 ]
+
+			rows = list( set( sub_m.Gene1.unique().tolist() + sub_m.Gene2.unique().tolist() ) )
+			rows.sort()
+			
+			edges = list( sub_m.Gene1  + "-" + sub_m.Gene2 )
+
+			d = {
+			"corem_id": corem,
+			"rows": rows,
+			"cols": [],
+			"gres": [],
+			"edges": edges,
+			"density": sub_m.Community_Density.unique()[0],
+			"weighted_density": sub_m.Community_Weighted_Density.unique()[0]
+			}
+
+			return d
+
+		if self.cutoff is None:
+			return "Please run C++ code to determine a cutoff."
+
+		corems = pd.read_csv(os.path.join( os.path.abspath( self.out_dir ),"edgeList.communities_" + str( self.cutoff ) + "_FINAL.txt" ), sep = "\t", header = False )
+
+		print "Adding basic corem information to MongoDB"
+		
+		to_write = [ coremStruct( i, corems )  for i in corems.Community_ID.unique() ]
+
+		self.db.corem.insert( to_write )
+
+	def rsd( self, vals ):
+		return abs( np.std( vals ) / np.mean( vals ) )
+
+	def conditionResampleInd( self, n_rows, col, n_resamples, keepP ):
+		"""Resample gene expression for a given number of genes in a particular condition using RSD"""
+
+		def resample( n_rows, row_vals ):
+			val_rsd = self.rsd( random.sample( row_vals, n_rows ) )
+			
+
+		n2keep = round( n_resamples*keepP )
+
+		# get ratios for col 
+		row_vals_normalized = [ i[ "normalized_expression" ] for i in self.db.gene_expression.find( { "col_id":col } ) if isinstance( i[ "normalized_expression" ], float) ]
+		row_vals_standardized = [ i[ "standardized_expression" ] for i in self.db.gene_expression.find( { "col_id":col } ) if isinstance( i[ "standardized_expression" ], float) ]
+
+		resample_array_normalized = [ self.rsd( random.sample( row_vals_normalized, n_rows ) ) for i in range( 0, n_resamples ) ]
+		resample_array_normalized.sort( )
+		resample_array_normalized = resample_array_normalized[ 0 : int( n2keep ) ]
+		
+		resample_array_standardized = [ self.rsd( random.sample( row_vals_standardized, n_rows ) ) for i in range( 0, n_resamples ) ]
+		resample_array_standardized.sort( )
+		resample_array_standardized = resample_array_standardized[ 0 : int( n2keep ) ]
+
+		# see if a record for this gene set size exists 
+		old_record = self.db.col_resample.find_one( { "n_rows": n_rows, "col_id": col } )
+		if  old_record is not None:
+			# entry already exists for this. add new resamples to it. 
+			resamples = n_resamples + old_record[ "resamples" ]
+			n2keep = round( resamples*keepP )
+			ran = resample_array_normalized + old_record[ "lowest_normalized" ]
+			ran.sort()
+			ran = ran[ 0: int( n2keep ) ]
+			ras = resample_array_standardized + old_record[ "lowest_standardized" ]
+			ras.sort()
+			ras = ras[ 0: int( n2keep ) ]
+			self.db.col_resample.update( { "n_rows": n_rows, "col_id": col }, { "$set": { "resamples": resamples, "lowest_normalized": ran, "lowest_standardized": ras } } )
+		else:
+			d = {
+			"n_rows": n_rows,
+			"col_id": col,
+			"resamples": n_resamples,
+			"lowest_normalized": row_vals_normalized,
+     			"lowest_standardized": resample_array_standardized
+			}
+			self.db.col_resample.insert( d )
+
+
+	def findCoremConditions( self ):
+		return None 
+
+
+
+
+
+
+
+
+
+
+			
 
 
 			
