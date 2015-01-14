@@ -243,7 +243,7 @@ class makeCorems:
 			backbone_data_counts = self.extractBackbone( data_counts_norm )
 			
 			to_write = [ structureRowRow( i, j, data_counts[j], data_counts_norm[j], backbone_data_counts[j], row_row_collection ) for j in data_counts.index ]
-			to_write = filter( None, to_write)
+			to_write = [ i for i in to_write if i is not None]
 
 			# write edgeList file
 			with open( os.path.abspath( os.path.join( self.out_dir,"edgeList" ) ), mode = "a+") as f:
@@ -490,7 +490,7 @@ class makeCorems:
 	def rsd( self, vals ):
 		return abs( np.std( vals ) / np.mean( vals ) )
 
-	def conditionResampleInd( self, n_rows, col, n_resamples, keepP ):
+	def colResampleInd( self, n_rows, col, n_resamples, keepP ):
 		"""Resample gene expression for a given number of genes in a particular condition using RSD"""
 
 		def resample( n_rows, row_vals ):
@@ -529,14 +529,149 @@ class makeCorems:
 			"n_rows": n_rows,
 			"col_id": col,
 			"resamples": n_resamples,
-			"lowest_normalized": row_vals_normalized,
+			"lowest_normalized": resample_array_normalized,
      			"lowest_standardized": resample_array_standardized
 			}
 			self.db.col_resample.insert( d )
+		return None
+
+	def checkDBresamples( self, col, n_rows, n_resamples ):
+			if self.db.col_resample.find_one( { "n_rows": n_rows, "col_id": col, "resamples": { "$gte": n_resamples } } ) is None:
+				return col
+
+	def checkRow( self, row ):
+		"""Check name format of rows. If necessary, translate."""
+		if row in self.row2id.keys():
+			return self.row2id[ row ] 
+		elif int( row ) in self.id2row.keys():
+			return int( row )
+		else:
+			print "ERROR: Cannot identify row name: %s" % row
+			return None
+
+	def checkCol( self, col ):
+		"""Check name format of rows. If necessary, translate."""
+		if col in self.col2id.keys():
+			return self.col2id[ col ] 
+		elif int( col ) in self.id2col.keys():
+			return int( col )
+		else:
+			print "ERROR: Cannot identify col name: %s" % col
+			return None
+
+	def rowsColPval( self, rows = None, cols = None, standardized = None, sig_cutoff = None ):
+
+		rows = [ self.checkRow( i ) for i in rows ]
+		rows = [ i for i in rows if i is not None]
+		if rows is None:
+			print "Please provide an appropriately named array of rows"
+			return None 
+		
+		cols = [ self.checkCol( i ) for i in cols ]
+		cols = [ i for i in cols if i is not None]
+		if cols is None:
+			print "Please provide an appropriately named array of cols"
+			return None
+
+		if standardized is None:
+			# compute RSD on standardized gene expression by default
+			# other option 'False' for normalized (not standardized expression)
+			standardized = True
+
+		if sig_cutoff is None:
+			# return only cols equal below sig_cutoff
+			sig_cutoff = 0.05
+
+		def computePval( rows, col, standardized ):
+			# compute actual RSD
+			if standardized:
+				 row_rsd =  self.rsd( [ i[ "standardized_expression" ] for i in self.db.gene_expression.find( { "col_id": col, "row_id": { "$in" : rows } } ) if isinstance( i[ "standardized_expression" ], float ) ] )
+			else:
+				row_rsd = self.rsd ( [ i[ "normalized_expression" ] for i in self.db.gene_expression.find( { "col_id": col, "row_id": { "$in" : rows } } ) if isinstance( i[ "normalized_expression" ], float ) ] ) 
+			# get random resamples for this col
+			random_rsd = self.db.col_resample.find_one( { "n_rows": len( rows ), "col_id": col } )
+
+			if random_rsd is None:
+				print "Could not find resample DB entry for %i rows" % ( len(rows) )
+				return None
+
+			if standardized:
+				empirical_pval = ( float ( sum( [ row_rsd >= i for i in random_rsd[ "lowest_standardized" ] ] ) ) / len( random_rsd[ "lowest_standardized" ] ) ) * ( float( len( random_rsd[ "lowest_standardized" ] ) ) / random_rsd[ "resamples" ] )
+			else:
+				empirical_pval = ( float ( sum( [ row_rsd >= i for i in random_rsd[ "lowest_normalized" ] ] ) ) / len( random_rsd[ "lowest_normalized" ] ) ) * ( float( len( random_rsd[ "lowest_normalized" ] ) ) / random_rsd[ "resamples" ] )
+
+			if empirical_pval >= ( float( len( random_rsd[ "lowest_normalized" ] ) ) / random_rsd[ "resamples" ] ):
+				#return ">= %f" % ( round( float( len( random_rsd[ "lowest_normalized" ] ) ) / random_rsd[ "resamples" ], 2 ) )
+				return ( round( float( len( random_rsd[ "lowest_normalized" ] ) ) / random_rsd[ "resamples" ], 2 ) )
+			elif empirical_pval == 0:
+				#return "< %f" % ( 1 / float( random_rsd[ "resamples" ] ) )
+				return ( 1 / float( random_rsd[ "resamples" ] ) )
+			else:
+				return empirical_pval
+
+		pvals = [ computePval( rows, i, standardized ) for i in cols ]
+
+		pval_series = pd.DataFrame( pvals, index = [ self.id2col[ i ] for i in cols ], columns = [ "pval" ] )
+
+		if sig_cutoff is not None:
+			pval_series = pval_series[ pval_series.loc[ :,"pval" ] <= sig_cutoff ]
+
+		return pval_series
+		
+	def colResampleGroup( self, rows = None, cols = None, n_resamples = None, sig_cutoff = None, standardized = None ):
+		"""Resample gene expression for a given set of genes in any number of conditions. Should be used instead of colReampleInd (it calls that function)"""
+
+		if n_resamples is None:
+			n_resamples = 20000
+
+		if standardized is None:
+			# compute RSD on standardized gene expression by default
+			# other option 'False' for normalized (not standardized expression)
+			standardized = True
+
+		if sig_cutoff is None:
+			# return only cols equal below sig_cutoff
+			sig_cutoff = 0.05
+
+		rows = [ self.checkRow( i ) for i in rows ]
+		rows = [ i for i in rows if i is not None]
+		if rows is None:
+			print "Please provide an appropriately named array of rows"
+			return None 
+		
+		cols = [ self.checkCol( i ) for i in cols ]
+		cols = [ i for i in cols if i is not None]
+		if cols is None:
+			print "Please provide an appropriately named array of cols"
+			return None
+		
+		# Determine what/how many resamples need to be added to db
+		toAdd = [ self.checkDBresamples( i, len( rows ), n_resamples ) for i in cols]
+		toAdd = [ i for i in toAdd if i is not None]
+
+		count = 1
+		if len( toAdd) > 0:
+			print "I need to perform %i random resample(s) of size %i to compute a pval. Please be patient. This may take a while..." % ( len(toAdd), n_resamples )
+			for i in toAdd:		
+				currentEntry = self.db.col_resample.find_one( { "n_rows": len( rows ), "col_id": i } )
+				if currentEntry is not None:
+					# only add enough resamples to reach requested value
+					self.colResampleInd( len( rows ), i, n_resamples - currentEntry[ "resamples" ], .1 )
+				else:
+					self.colResampleInd( len( rows ), i, n_resamples, .1 )
+				if ( round( float( count) / len(toAdd), 3 )*100 ) % 10  == 0:
+					print "%d percent" % ( ( float( count ) / len( toAdd ) ) * 100 )
+				count = count + 1
+			print "Done adding random resamples. Calculating pvals."
+
+		pvals = self.rowsColPval( rows, cols, standardized, sig_cutoff )
+
+		return pvals
+		
 
 
-	def findCoremConditions( self ):
-		return None 
+
+
 
 
 
