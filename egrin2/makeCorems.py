@@ -92,19 +92,19 @@ class makeCorems:
 			self.backbone_pval = backbone_pval
 
 		self.cFail = False
-		if os.system( "which adjmat2wpairs" ) != 0:
+		if subprocess.call( [ "which", "adjmat2wpairs" ],stdout=open( os.devnull, 'wb')) != 0:
 			print "WARNING!!! You need to compile adjmat2wpairs.cpp to adjmat2wpairs and add its location to your path to detect corems"
 			self.cFail = True
 
-		if os.system( "which compute_tanimoto" ) != 0:
+		if subprocess.call( [ "which", "compute_tanimoto" ],stdout=open( os.devnull, 'wb')) != 0:
 			print "WARNING!!! You need to compile compute_tanimoto.cpp to compute_tanimoto and add its location to your path to detect corems"
 			self.cFail = True
 
-		if os.system( "which cluster_communities" ) != 0:
+		if subprocess.call( [ "which", "cluster_communities" ],stdout=open( os.devnull, 'wb')) != 0:
 			print "WARNING!!! You need to compile cluster_communities.cpp to cluster_communities and add its location to your path to detect corems"
 			self.cFail = True
 
-		if os.system( "which getting_communities" ) != 0:
+		if subprocess.call( [ "which", "getting_communities" ],stdout=open( os.devnull, 'wb')) != 0:
 			print "WARNING!!! You need to compile getting_communities.cpp to getting_communities and add its location to your path to detect corems"
 			self.cFail = True
 
