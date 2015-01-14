@@ -358,49 +358,53 @@ class makeCorems:
 			maxT = max( vals )
 			maxT_ind = round(density.iloc[ :,0 ][ vals.idxmax( ) ], 4)
 
-			# plot density scores
+			try: 
+				# plot density scores
 
-			black = [ 2, 4, 7 ]
-			blue = [ 8, 6 ]
-			lty = [ '-', '--', '-.', ':' ]
+				black = [ 2, 4, 7 ]
+				blue = [ 8, 6 ]
+				lty = [ '-', '--', '-.', ':' ]
 
-			fig, ax1 = plt.subplots()
-			l1 = ax1.plot( density.loc[ :,0 ], density.loc[ :,black[ 0 ] ], color = "black", ls = lty[ 0 ], marker = ".", ms = 10, lw = 2, label = "(1) Unweighted (all)" )
-			l2 = ax1.plot( density.loc[ :,0 ], density.loc[ :,black[ 1 ] ], color = "black", ls = lty[ 1 ], marker = ".", ms = 10, lw = 2, label = "(2) Unweighted (n>2)" )
-			l3 = ax1.plot( density.loc[ :,0 ], density.loc[ :,black[ 2 ] ], color = "black", ls = lty[ 2 ], marker = ".", ms = 10, lw = 2, label = "(3) Weighted (local)" )
-			if score_map[ self.link_comm_density_score ] in black:
-				yl = ax1.plot( density.loc[ :,0 ], density.loc[ :,score_map[ self.link_comm_density_score ] ], color = "red", ms = 10, ls = '-', marker = ".", lw = 2, label = "Your choice" )
-				ax1.axvline(maxT_ind, color='red', linestyle=':')
+				fig, ax1 = plt.subplots()
+				l1 = ax1.plot( density.loc[ :,0 ], density.loc[ :,black[ 0 ] ], color = "black", ls = lty[ 0 ], marker = ".", ms = 10, lw = 2, label = "(1) Unweighted (all)" )
+				l2 = ax1.plot( density.loc[ :,0 ], density.loc[ :,black[ 1 ] ], color = "black", ls = lty[ 1 ], marker = ".", ms = 10, lw = 2, label = "(2) Unweighted (n>2)" )
+				l3 = ax1.plot( density.loc[ :,0 ], density.loc[ :,black[ 2 ] ], color = "black", ls = lty[ 2 ], marker = ".", ms = 10, lw = 2, label = "(3) Weighted (local)" )
+				if score_map[ self.link_comm_density_score ] in black:
+					yl = ax1.plot( density.loc[ :,0 ], density.loc[ :,score_map[ self.link_comm_density_score ] ], color = "red", ms = 10, ls = '-', marker = ".", lw = 2, label = "Your choice" )
+					ax1.axvline(maxT_ind, color='red', linestyle=':')
 
-			ax1.set_xlabel('Threshold')
-			# Make the y-axis label and tick labels match the line color.
-			ax1.set_ylabel('Similarity Score', color='black')
-			ax1.set_xlim( ( 0, 1 ) )
-			for tl in ax1.get_yticklabels():
-			    tl.set_color('black')
+				ax1.set_xlabel('Threshold')
+				# Make the y-axis label and tick labels match the line color.
+				ax1.set_ylabel('Similarity Score', color='black')
+				ax1.set_xlim( ( 0, 1 ) )
+				for tl in ax1.get_yticklabels():
+				    tl.set_color('black')
 
-			ax2 = ax1.twinx()
-			l4 = ax2.plot( density.loc[ :,0 ], density.loc[ :,blue[ 0 ] ], color = "blue", ls = lty[ 0 ], marker = ".", ms = 10, lw = 2, label =  "(4) Weighted (global)" )
-			l5 = ax2.plot( density.loc[ :,0 ], density.loc[ :,blue[ 1 ] ], color = "blue", ls = lty[ 1 ], marker = ".", ms = 10, lw = 2, label = "(5) Weighted (both)" )
-			if score_map[ self.link_comm_density_score ] in blue:
-				yl = ax2.plot( density.loc[ :,0 ], density.loc[ :,score_map[ self.link_comm_density_score ] ], color = "red", ls = '-', marker = ".", ms = 10, lw = 2, label = "Your choice" )
-				ax2.axvline(maxT_ind, color='red', linestyle=':')
+				ax2 = ax1.twinx()
+				l4 = ax2.plot( density.loc[ :,0 ], density.loc[ :,blue[ 0 ] ], color = "blue", ls = lty[ 0 ], marker = ".", ms = 10, lw = 2, label =  "(4) Weighted (global)" )
+				l5 = ax2.plot( density.loc[ :,0 ], density.loc[ :,blue[ 1 ] ], color = "blue", ls = lty[ 1 ], marker = ".", ms = 10, lw = 2, label = "(5) Weighted (both)" )
+				if score_map[ self.link_comm_density_score ] in blue:
+					yl = ax2.plot( density.loc[ :,0 ], density.loc[ :,score_map[ self.link_comm_density_score ] ], color = "red", ls = '-', marker = ".", ms = 10, lw = 2, label = "Your choice" )
+					ax2.axvline(maxT_ind, color='red', linestyle=':')
 
-			ax2.set_ylabel('Similarity Score', color='blue')
-			for tl in ax2.get_yticklabels():
-			    tl.set_color('blue')
+				ax2.set_ylabel('Similarity Score', color='blue')
+				for tl in ax2.get_yticklabels():
+				    tl.set_color('blue')
 
-			#plt.plot( (maxT, maxT), (-100, 100), 'r--' )
+				#plt.plot( (maxT, maxT), (-100, 100), 'r--' )
 
-			plt.legend( handles = [ l1[0], l2[0], l3[0], l4[0], l5[0], yl[0] ], loc = 2)
-			plt.title('Corem community density at different similarity cutoffs')
-			plt.tight_layout()
-			pp = PdfPages( os.path.join( os.path.abspath( self.out_dir ),"density_stats.pdf" ) )
+				plt.legend( handles = [ l1[0], l2[0], l3[0], l4[0], l5[0], yl[0] ], loc = 2)
+				plt.title('Corem community density at different similarity cutoffs')
+				plt.tight_layout()
+				pp = PdfPages( os.path.join( os.path.abspath( self.out_dir ),"density_stats.pdf" ) )
 
-			plt.savefig(pp, format='pdf')
-			pp.close()
+				plt.savefig(pp, format='pdf')
+				pp.close()
 
-			print "Threshold density plots written to:", os.path.join( os.path.abspath( self.out_dir ),"density_stats.pdf" )
+				print "Threshold density plots written to:", os.path.join( os.path.abspath( self.out_dir ),"density_stats.pdf" )
+			except Exception:
+				print "Could not produce density plot. Check matplotlib."
+				
 			print "Threshold is", round( maxT, 5 ), "at cutoff =", maxT_ind
 
 			self.cutoff = maxT_ind
@@ -561,6 +565,18 @@ class makeCorems:
 
 	def rowsColPval( self, rows = None, cols = None, standardized = None, sig_cutoff = None ):
 
+		def empirical_pval( i, random_rsd, resamples ):
+			for x in range( 0, len( i ) ):
+				val = ( float ( sum( [ i.values[ 0 ] >= y for y in random_rsd[ i.index[0] ] ] ) ) / len( random_rsd[ i.index[0] ] ) ) * ( float( len( random_rsd[ i.index[0] ] ) ) / resamples[ i.index[0] ] )
+				if val >= ( float( len( random_rsd[ i.index[0] ] ) ) / resamples[ i.index[0] ] ):
+					#return ">= %f" % ( round( float( len( random_rsd[ "lowest_normalized" ] ) ) / random_rsd[ "resamples" ], 2 ) )
+					return round( float( len( random_rsd[ i.index[0] ] ) ) / resamples[ i.index[0] ], 2 )
+				elif val == 0:
+					#return "< %f" % ( 1 / float( random_rsd[ "resamples" ] ) )
+					return ( 1 / float( resamples[ i.index[0] ] ) )
+				else:
+					return val
+
 		rows = [ self.checkRow( i ) for i in rows ]
 		rows = [ i for i in rows if i is not None]
 		if rows is None:
@@ -582,41 +598,33 @@ class makeCorems:
 			# return only cols equal below sig_cutoff
 			sig_cutoff = 0.05
 
-		def computePval( rows, col, standardized ):
-			# compute actual RSD
-			if standardized:
-				 row_rsd =  self.rsd( [ i[ "standardized_expression" ] for i in self.db.gene_expression.find( { "col_id": col, "row_id": { "$in" : rows } } ) if isinstance( i[ "standardized_expression" ], float ) ] )
-			else:
-				row_rsd = self.rsd ( [ i[ "normalized_expression" ] for i in self.db.gene_expression.find( { "col_id": col, "row_id": { "$in" : rows } } ) if isinstance( i[ "normalized_expression" ], float ) ] ) 
+		exp_df = pd.DataFrame( )
+	
+		# compute actual RSD
+		if standardized:
+			 exp_df =  exp_df.append( [ pd.Series( [ i[ "col_id" ], i[ "standardized_expression" ] ], index = [ "col_id", "value" ] ) for i in self.db.gene_expression.find( { "col_id": { "$in" : cols }, "row_id": { "$in" : rows } } ) if isinstance( i[ "standardized_expression" ], float ) ], ignore_index = True )
+			 # get random resamples for this col
+			 random_rsd = { i[ "col_id" ]: i[ "lowest_standardized" ] for i in self.db.col_resample.find( { "n_rows": len( rows ), "col_id": { "$in" : cols } } ) }
+			 resamples = { i[ "col_id" ]: i[ "resamples" ] for i in self.db.col_resample.find( { "n_rows": len( rows ), "col_id": { "$in" : cols } } ) }
+		else:
+			exp_df =  exp_df.append( [ pd.Series( [ i[ "col_id" ], i[ "normalized_expression" ] ], index = [ "col_id", "value" ] ) for i in self.db.gene_expression.find( { "col_id": { "$in" : cols }, "row_id": { "$in" : rows } } ) if isinstance( i[ "normalized_expression" ], float ) ], ignore_index = True )
 			# get random resamples for this col
-			random_rsd = self.db.col_resample.find_one( { "n_rows": len( rows ), "col_id": col } )
+			random_rsd = { i[ "col_id" ]: i[ "lowest_normalized" ] for i in self.db.col_resample.find( { "n_rows": len( rows ), "col_id": { "$in" : cols } } ) }
+			resamples = { i[ "col_id" ]: i[ "resamples" ] for i in self.db.col_resample.find( { "n_rows": len( rows ), "col_id": { "$in" : cols } } ) }
 
-			if random_rsd is None:
-				print "Could not find resample DB entry for %i rows" % ( len(rows) )
-				return None
+		if random_rsd is None:
+			print "Could not find resample DB entry for %i rows" % ( len(rows) )
+			return None
 
-			if standardized:
-				empirical_pval = ( float ( sum( [ row_rsd >= i for i in random_rsd[ "lowest_standardized" ] ] ) ) / len( random_rsd[ "lowest_standardized" ] ) ) * ( float( len( random_rsd[ "lowest_standardized" ] ) ) / random_rsd[ "resamples" ] )
-			else:
-				empirical_pval = ( float ( sum( [ row_rsd >= i for i in random_rsd[ "lowest_normalized" ] ] ) ) / len( random_rsd[ "lowest_normalized" ] ) ) * ( float( len( random_rsd[ "lowest_normalized" ] ) ) / random_rsd[ "resamples" ] )
+		exp_df_rsd = exp_df.groupby("col_id").aggregate(self.rsd)
 
-			if empirical_pval >= ( float( len( random_rsd[ "lowest_normalized" ] ) ) / random_rsd[ "resamples" ] ):
-				#return ">= %f" % ( round( float( len( random_rsd[ "lowest_normalized" ] ) ) / random_rsd[ "resamples" ], 2 ) )
-				return ( round( float( len( random_rsd[ "lowest_normalized" ] ) ) / random_rsd[ "resamples" ], 2 ) )
-			elif empirical_pval == 0:
-				#return "< %f" % ( 1 / float( random_rsd[ "resamples" ] ) )
-				return ( 1 / float( random_rsd[ "resamples" ] ) )
-			else:
-				return empirical_pval
-
-		pvals = [ computePval( rows, i, standardized ) for i in cols ]
-
-		pval_series = pd.DataFrame( pvals, index = [ self.id2col[ i ] for i in cols ], columns = [ "pval" ] )
+		pvals = exp_df_rsd.groupby(level=0).aggregate(empirical_pval, random_rsd, resamples )
+		pvals.columns = ["pval"]
 
 		if sig_cutoff is not None:
-			pval_series = pval_series[ pval_series.loc[ :,"pval" ] <= sig_cutoff ]
+			pvals = pvals[ pvals.loc[ :,"pval" ] <= sig_cutoff ]
 
-		return pval_series
+		return pvals
 		
 	def colResampleGroup( self, rows = None, cols = None, n_resamples = None, sig_cutoff = None, standardized = None ):
 		"""Resample gene expression for a given set of genes in any number of conditions. Should be used instead of colReampleInd (it calls that function)"""
@@ -659,7 +667,7 @@ class makeCorems:
 					self.colResampleInd( len( rows ), i, n_resamples - currentEntry[ "resamples" ], .1 )
 				else:
 					self.colResampleInd( len( rows ), i, n_resamples, .1 )
-				if ( round( ( float( count) / len(toAdd) ) * 100, 2 ) % 10  == 0:
+				if round( ( float( count) / len(toAdd) ) * 100, 2 ) % 10  == 0:
 					print "%d percent" % ( round( ( float( count ) / len( toAdd ) ) * 100, 2 ) )
 				count = count + 1
 			print "Done adding random resamples."
