@@ -659,10 +659,12 @@ class makeCorems:
 					self.colResampleInd( len( rows ), i, n_resamples - currentEntry[ "resamples" ], .1 )
 				else:
 					self.colResampleInd( len( rows ), i, n_resamples, .1 )
-				if ( round( float( count) / len(toAdd), 3 )*100 ) % 10  == 0:
-					print "%d percent" % ( ( float( count ) / len( toAdd ) ) * 100 )
+				if ( round( ( float( count) / len(toAdd) ) * 100, 2 ) % 10  == 0:
+					print "%d percent" % ( round( ( float( count ) / len( toAdd ) ) * 100, 2 ) )
 				count = count + 1
-			print "Done adding random resamples. Calculating pvals."
+			print "Done adding random resamples."
+
+		print "Calculating pvals"
 
 		pvals = self.rowsColPval( rows, cols, standardized, sig_cutoff )
 
