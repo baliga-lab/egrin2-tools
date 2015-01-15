@@ -402,9 +402,10 @@ class makeCorems:
 				pp.close()
 
 				print "Threshold density plots written to:", os.path.join( os.path.abspath( self.out_dir ),"density_stats.pdf" )
+			
 			except Exception:
 				print "Could not produce density plot. Check matplotlib."
-				
+
 			print "Threshold is", round( maxT, 5 ), "at cutoff =", maxT_ind
 
 			self.cutoff = maxT_ind
@@ -424,7 +425,7 @@ class makeCorems:
 			return None
 
 		# get communities at selected cutoff
-		p = subprocess.Popen( [ "getting_communities", "edgeList", str( self.cutoff ), ], cwd= os.path.abspath( self.out_dir ), shell = True )
+		p = subprocess.Popen( [ "getting_communities", "edgeList", str( self.cutoff ), ], cwd= os.path.abspath( self.out_dir ) )
 		p.wait()
 
 		clusters = pd.read_csv( os.path.join( os.path.abspath( self.out_dir ),"edgeList.communities_" + str( self.cutoff ) ), sep = "\t",header = None )
@@ -449,47 +450,6 @@ class makeCorems:
 		sigClusters.to_csv( os.path.join( os.path.abspath( self.out_dir ),"edgeList.communities_" + str( self.cutoff ) + "_FINAL.txt" ), sep = "\t", index = False)
 
 		return sigClusters
-
-	def addCorems( self ):
-		"""Add corems to MongoDB. Will Only run if self.cutoff has been set by running C++ codes"""
-		pd.options.mode.chained_assignment = None
-
-		def coremStruct( corem, table ):
-			"""MongoDB corem template"""
-			if int( corem )%100 is 0:
-				print "%d percent" % ( round ( float( corem )/ len(table.Community_ID.unique( ) ), 5) * 100 )
-			sub_m = table.loc[ table.Community_ID==corem, : ] 
-			# translate names
-			sub_m.loc[ :,"Gene1" ] = [ str( self.row2id[ i ] ) for i in sub_m.Gene1 ]
-			sub_m.loc[ :,"Gene2" ] = [ str( self.row2id[ i ] ) for i in sub_m.Gene2 ]
-
-			rows = list( set( sub_m.Gene1.unique().tolist() + sub_m.Gene2.unique().tolist() ) )
-			rows.sort()
-			
-			edges = list( sub_m.Gene1  + "-" + sub_m.Gene2 )
-
-			d = {
-			"corem_id": corem,
-			"rows": rows,
-			"cols": [],
-			"gres": [],
-			"edges": edges,
-			"density": sub_m.Community_Density.unique()[0],
-			"weighted_density": sub_m.Community_Weighted_Density.unique()[0]
-			}
-
-			return d
-
-		if self.cutoff is None:
-			return "Please run C++ code to determine a cutoff."
-
-		corems = pd.read_csv(os.path.join( os.path.abspath( self.out_dir ),"edgeList.communities_" + str( self.cutoff ) + "_FINAL.txt" ), sep = "\t", header = False )
-
-		print "Adding basic corem information to MongoDB"
-		
-		to_write = [ coremStruct( i, corems )  for i in corems.Community_ID.unique() ]
-
-		self.db.corem.insert( to_write )
 
 	def rsd( self, vals ):
 		return abs( np.std( vals ) / np.mean( vals ) )
@@ -677,6 +637,49 @@ class makeCorems:
 		pvals = self.rowsColPval( rows, cols, standardized, sig_cutoff )
 
 		return pvals
+
+	def addCorems( self ):
+		"""Add corems to MongoDB. Will Only run if self.cutoff has been set by running C++ codes"""
+		pd.options.mode.chained_assignment = None
+
+		def coremStruct( corem, table ):
+			"""MongoDB corem template"""
+			if int( corem )%100 is 0:
+				print "%d percent" % ( round ( float( corem )/ len(table.Community_ID.unique( ) ), 5) * 100 )
+			sub_m = table.loc[ table.Community_ID==corem, : ] 
+			# translate names
+			sub_m.loc[ :,"Gene1" ] = [ str( self.row2id[ i ] ) for i in sub_m.Gene1 ]
+			sub_m.loc[ :,"Gene2" ] = [ str( self.row2id[ i ] ) for i in sub_m.Gene2 ]
+
+			rows = list( set( sub_m.Gene1.unique().tolist() + sub_m.Gene2.unique().tolist() ) )
+			rows.sort()
+			
+			# get sig columns
+
+			edges = list( sub_m.Gene1  + "-" + sub_m.Gene2 )
+
+			d = {
+			"corem_id": corem,
+			"rows": rows,
+			"cols": [],
+			"gres": [],
+			"edges": edges,
+			"density": sub_m.Community_Density.unique()[0],
+			"weighted_density": sub_m.Community_Weighted_Density.unique()[0]
+			}
+
+			return d
+
+		if self.cutoff is None:
+			return "Please run C++ code to determine a cutoff."
+
+		corems = pd.read_csv(os.path.join( os.path.abspath( self.out_dir ),"edgeList.communities_" + str( self.cutoff ) + "_FINAL.txt" ), sep = "\t", header = False )
+
+		print "Adding basic corem information to MongoDB"
+		
+		to_write = [ coremStruct( i, corems )  for i in corems.Community_ID.unique() ]
+
+		self.db.corem.insert( to_write )
 		
 
 
