@@ -621,7 +621,7 @@ class makeCorems:
 
 		count = 1
 		if len( toAdd) > 0:
-			if len ( to Add ) > 1:
+			if len ( toAdd ) > 1:
 				print "I need to perform %i random resample(s) of size %i to compute pvals. Please be patient. This may take a while..." % ( len(toAdd), n_resamples )
 			for i in toAdd:		
 				currentEntry = self.db.col_resample.find_one( { "n_rows": len( rows ), "col_id": i } )
@@ -633,7 +633,8 @@ class makeCorems:
 				if round( ( float( count) / len(toAdd) ) * 100, 2 ) % 10  == 0:
 					print "%d percent" % ( round( ( float( count ) / len( toAdd ) ) * 100, 2 ) )
 				count = count + 1
-			print "Done adding random resamples."
+			if len ( toAdd ) > 1:
+				print "Done adding random resamples."
 
 		print "Calculating pvals"
 
