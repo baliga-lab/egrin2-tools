@@ -39,6 +39,7 @@ from Bio import SeqIO
 from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from joblib import Parallel, delayed
 
 class makeCorems:
 
@@ -620,7 +621,8 @@ class makeCorems:
 
 		count = 1
 		if len( toAdd) > 0:
-			print "I need to perform %i random resample(s) of size %i to compute pvals. Please be patient. This may take a while..." % ( len(toAdd), n_resamples )
+			if len ( to Add ) > 1:
+				print "I need to perform %i random resample(s) of size %i to compute pvals. Please be patient. This may take a while..." % ( len(toAdd), n_resamples )
 			for i in toAdd:		
 				currentEntry = self.db.col_resample.find_one( { "n_rows": len( rows ), "col_id": i } )
 				if currentEntry is not None:
@@ -645,8 +647,11 @@ class makeCorems:
 
 		def coremStruct( corem, table ):
 			"""MongoDB corem template"""
-			if int( corem )%100 is 0:
-				print "%d percent" % ( round ( float( corem )/ len(table.Community_ID.unique( ) ), 5) * 100 )
+			# if int( corem )%100 is 0:
+			# 	print "%d percent" % ( round ( float( corem )/ len(table.Community_ID.unique( ) ), 5) * 100 )
+
+			print "%i of %i corems completed" % ( corem, len(table.Community_ID.unique( ) )
+			
 			sub_m = table.loc[ table.Community_ID==corem, : ] 
 			# translate names
 			sub_m.loc[ :,"Gene1" ] = [ str( self.row2id[ i ] ) for i in sub_m.Gene1 ]
@@ -655,7 +660,10 @@ class makeCorems:
 			rows = list( set( sub_m.Gene1.unique().tolist() + sub_m.Gene2.unique().tolist() ) )
 			rows.sort()
 			
-			# get sig columns
+			# get sig cols
+			#cols = self.colResampleGroup( rows = rows, cols = range( 0, len( self.id2col ) ) )
+			cols = Parallel( n_jobs=8 )( delayed( self.colResampleGroup )( rows = rows, cols = i ) for i in range( 0, len( self.id2col ) ) )
+			cols = dict( zip( cols.index,[ i[ 0 ] for i in cols.values.tolist( ) ] ) )
 
 			edges = list( sub_m.Gene1  + "-" + sub_m.Gene2 )
 
