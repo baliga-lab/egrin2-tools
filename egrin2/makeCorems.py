@@ -449,7 +449,7 @@ class makeCorems:
 
 		sigClusters.to_csv( os.path.join( os.path.abspath( self.out_dir ),"edgeList.communities_" + str( self.cutoff ) + "_FINAL.txt" ), sep = "\t", index = False)
 
-		return sigClusters
+		return None
 
 	def rsd( self, vals ):
 		return abs( np.std( vals ) / np.mean( vals ) )
@@ -580,6 +580,7 @@ class makeCorems:
 
 		pvals = exp_df_rsd.groupby(level=0).aggregate(empirical_pval, random_rsd, resamples )
 		pvals.columns = ["pval"]
+		pvals.index = [ self.id2col[ i ] for i in pvals.index.values]
 
 		if sig_cutoff is not None:
 			pvals = pvals[ pvals.loc[ :,"pval" ] <= sig_cutoff ]
@@ -619,7 +620,7 @@ class makeCorems:
 
 		count = 1
 		if len( toAdd) > 0:
-			print "I need to perform %i random resample(s) of size %i to compute a pval. Please be patient. This may take a while..." % ( len(toAdd), n_resamples )
+			print "I need to perform %i random resample(s) of size %i to compute pvals. Please be patient. This may take a while..." % ( len(toAdd), n_resamples )
 			for i in toAdd:		
 				currentEntry = self.db.col_resample.find_one( { "n_rows": len( rows ), "col_id": i } )
 				if currentEntry is not None:
