@@ -131,8 +131,15 @@ def colResampleInd( host, n_rows, cols, n_resamples = 20000, keepP = 0.1, port =
 	return None
 
 if __name__ == '__main__':
-	cols = range(0,400)
+
+	host = "localhost"
+	port = 27017
+	db = "egrin2_db"
+
+	client = MongoClient( host = host, port=port )
+	
+	cols = range( 0,client[ db ][ "col_info" ].count( ) )
+
 	tmp = Parallel(n_jobs=4)( delayed( colResampleInd )( "localhost", i, cols, n_resamples = 10) for i in range( 3,10 ) )
 
-	colResampleInd( host, n_rows, cols, n_resamples = 20000, keepP = 0.1, port = 27017, db = "egrin2_db" )
-	
+	print "Done"	
