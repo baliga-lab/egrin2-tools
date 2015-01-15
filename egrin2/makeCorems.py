@@ -27,10 +27,8 @@ from math import ceil
 import random
 
 import pdb
-
 import numpy as np
 import pandas as pd
-
 
 import sqlite3
 import pymongo
@@ -39,11 +37,11 @@ from Bio import SeqIO
 from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from joblib import Parallel, delayed
+from multiprocessing import Pool
 
 class makeCorems:
 
-	def __init__( self, dbname = None, dbfiles = None, backbone_pval = None, out_dir = None, n_subs = None, link_comm_score = None, link_comm_increment = None, link_comm_density_score = None, corem_size_threshold = None ):
+	def __init__( self, dbname = None, dbfiles = None, backbone_pval = None, out_dir = None, n_subs = None, link_comm_score = None, link_comm_increment = None, link_comm_density_score = None, corem_size_threshold = None, n_processes = None ):
 
 		# connect to database
 		# make sure mongodb is running
@@ -148,6 +146,11 @@ class makeCorems:
 			self.corem_size_threshold = corem_size_threshold
 
 		self.cutoff = None
+
+		if n_processes is None:
+			self.n_processes = 4
+		else:
+			self.n_processes = n_processes
 
 	def mongoRestore( self, db, infile ):
 		"""Read contents of binary MongoDB dump into MongoDB instance"""
@@ -621,8 +624,7 @@ class makeCorems:
 
 		count = 1
 		if len( toAdd) > 0:
-			if len ( toAdd ) > 1:
-				print "I need to perform %i random resample(s) of size %i to compute pvals. Please be patient. This may take a while..." % ( len(toAdd), n_resamples )
+			print "I need to perform %i random resample(s) of size %i to compute pvals. Please be patient. This may take a while..." % ( len(toAdd), n_resamples )
 			for i in toAdd:		
 				currentEntry = self.db.col_resample.find_one( { "n_rows": len( rows ), "col_id": i } )
 				if currentEntry is not None:
@@ -633,14 +635,22 @@ class makeCorems:
 				if round( ( float( count) / len(toAdd) ) * 100, 2 ) % 10  == 0:
 					print "%d percent" % ( round( ( float( count ) / len( toAdd ) ) * 100, 2 ) )
 				count = count + 1
-			if len ( toAdd ) > 1:
-				print "Done adding random resamples."
+			print "Done adding random resamples."
 
 		print "Calculating pvals"
 
 		pvals = self.rowsColPval( rows, cols, standardized, sig_cutoff )
 
 		return pvals
+
+	def chunks(seq, num):
+		avg = len( seq ) / float( num )
+		out = []
+		last = 0.0
+		while last < len( seq ):
+			out.append( seq[ int( last ):int( last + avg ) ] )
+			last += avg
+		return out
 
 	def addCorems( self ):
 		"""Add corems to MongoDB. Will Only run if self.cutoff has been set by running C++ codes"""
@@ -663,15 +673,22 @@ class makeCorems:
 			
 			# get sig cols
 			#cols = self.colResampleGroup( rows = rows, cols = range( 0, len( self.id2col ) ) )
-			cols = Parallel( n_jobs=8 )( delayed( self.colResampleGroup )( rows = rows, cols = i ) for i in range( 0, len( self.id2col ) ) )
-			cols = dict( zip( cols.index,[ i[ 0 ] for i in cols.values.tolist( ) ] ) )
+			def how_many(chunk):
+				return self.colResampleGroup( rows = rows, cols = chunk )
+ 			col_df = pd.DataFrame( )
+			pool = Pool( processes = self.n_processes )
+			chunks = chunks( range( 0,len( self.id2col ) ), self.n_processes)
+			result = pool.map( how_many, chunks )
+			pool.close()
+			col_df = col_df.append( result )
+			cols = dict( zip( col_df.index,[ i[ 0 ] for i in col_df.values ] ) )
 
 			edges = list( sub_m.Gene1  + "-" + sub_m.Gene2 )
 
 			d = {
 			"corem_id": corem,
 			"rows": rows,
-			"cols": [],
+			"cols": cols,
 			"gres": [],
 			"edges": edges,
 			"density": sub_m.Community_Density.unique()[0],

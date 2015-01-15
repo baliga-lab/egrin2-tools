@@ -591,9 +591,9 @@ class sql2mongoDB:
 		"scaffoldId": scaffoldId,
 		"start": data[2],
 		"pvalue": data[3],
-		"flank_left": data[4],
-		"seq": data[5],
-		"flank_right": data[6]
+		#"flank_left": data[4],
+		"seq": data[5]
+		#"flank_right": data[6]
 		}
 		return d
 
@@ -632,7 +632,7 @@ class sql2mongoDB:
 					scaffoldId = genome_collection.find_one( { "NCBI_RefSeq": NCBI_RefSeq } )["scaffoldId"]
 					trans_d[i] = scaffoldId
 
-				trans_v = [trans_d[i] for i in fimo.scaffoldId.values]
+				trans_v = [ trans_d[ i ] for i in fimo.scaffoldId.values ]
 				fimo.scaffoldId = trans_v
 
 				d_f = fimo.to_dict( outtype='records' )
