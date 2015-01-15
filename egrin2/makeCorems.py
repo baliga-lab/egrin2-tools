@@ -674,7 +674,8 @@ class makeCorems:
 			# get sig cols
 			#cols = self.colResampleGroup( rows = rows, cols = range( 0, len( self.id2col ) ) )
 			def how_many(chunk):
-				return self.colResampleGroup( rows = rows, cols = chunk )
+				return colResampleGroup( self, rows = rows, cols = chunk )
+ 			
  			col_df = pd.DataFrame( )
 			pool = Pool( processes = self.n_processes )
 			chunks = self.chunks( range( 0,len( self.id2col ) ), self.n_processes)
