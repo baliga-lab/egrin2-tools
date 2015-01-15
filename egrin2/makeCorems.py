@@ -677,7 +677,7 @@ class makeCorems:
 				return self.colResampleGroup( rows = rows, cols = chunk )
  			col_df = pd.DataFrame( )
 			pool = Pool( processes = self.n_processes )
-			chunks = chunks( range( 0,len( self.id2col ) ), self.n_processes)
+			chunks = self.chunks( range( 0,len( self.id2col ) ), self.n_processes)
 			result = pool.map( how_many, chunks )
 			pool.close()
 			col_df = col_df.append( result )
