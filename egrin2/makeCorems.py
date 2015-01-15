@@ -643,7 +643,7 @@ class makeCorems:
 
 		return pvals
 
-	def chunks(seq, num):
+	def chunks( self, seq, num ):
 		avg = len( seq ) / float( num )
 		out = []
 		last = 0.0
