@@ -651,7 +651,7 @@ class makeCorems:
 			# if int( corem )%100 is 0:
 			# 	print "%d percent" % ( round ( float( corem )/ len(table.Community_ID.unique( ) ), 5) * 100 )
 
-			print "%i of %i corems completed" % ( corem, len(table.Community_ID.unique( ) )
+			print "%i of %i corems completed" % ( corem, len(table.Community_ID.unique( ) ) )
 			
 			sub_m = table.loc[ table.Community_ID==corem, : ] 
 			# translate names
