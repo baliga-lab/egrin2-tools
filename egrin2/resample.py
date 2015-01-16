@@ -139,8 +139,9 @@ if __name__ == '__main__':
 	client = MongoClient( host = host, port=port )
 	
 	cols = range( 0,client[ db ][ "col_info" ].count( ) )
-	row_sizes = range( 0,client[ db ][ "col_info" ].count( ) )
+	corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
+	corem_sizes.sort( )
 
-	tmp = Parallel(n_jobs=4)( delayed( colResampleInd )( "localhost", i, cols, n_resamples = 10) for i in row_sizes )
+	tmp = Parallel(n_jobs=8)( delayed( colResampleInd )( "localhost", i, cols, n_resamples = 10) for i in corem_sizes )
 
 	print "Done"	
