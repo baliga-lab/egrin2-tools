@@ -41,14 +41,20 @@ from multiprocessing import Pool
 
 class makeCorems:
 
-	def __init__( self, dbname = None, dbfiles = None, backbone_pval = None, out_dir = None, n_subs = None, link_comm_score = None, link_comm_increment = None, link_comm_density_score = None, corem_size_threshold = None, n_processes = None ):
+	def __init__( self, host = None, port = None, dbname = None, dbfiles = None, backbone_pval = None, out_dir = None, n_subs = None, link_comm_score = None, link_comm_increment = None, link_comm_density_score = None, corem_size_threshold = None, n_processes = None ):
 
 		# connect to database
 		# make sure mongodb is running
-		retvalue = os.system("nohup mongod --port 27017 --quiet &")
+		# retvalue = os.system("nohup mongod --port 27017 --quiet &")
 		
+		if host is None:
+			host = "localhost"
+
+		if port is None:
+			port = 27017
+
 		try:
-			client = MongoClient('mongodb://localhost:27017/') 
+			client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' ) 
 			print "Connected to MongoDB"
 		except pymongo.errors.ConnectionFailure, e:
 			print "Could not connect to MongoDB: %s" % e
@@ -454,15 +460,6 @@ class makeCorems:
 		sigClusters.to_csv( os.path.join( os.path.abspath( self.out_dir ),"edgeList.communities_" + str( self.cutoff ) + "_FINAL.txt" ), sep = "\t", index = False)
 
 		return None
-
-	def chunks( self, seq, num ):
-		avg = len( seq ) / float( num )
-		out = []
-		last = 0.0
-		while last < len( seq ):
-			out.append( seq[ int( last ):int( last + avg ) ] )
-			last += avg
-		return out
 
 	def addCorems( self ):
 		"""Add corems to MongoDB. Will Only run if self.cutoff has been set by running C++ codes"""

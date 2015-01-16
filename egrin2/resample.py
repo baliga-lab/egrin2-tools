@@ -12,7 +12,6 @@ __email__ = "brooksan@uw.edu"
 __status__ = "Development"
 
 import random
-from multiprocessing import Pool
 
 # $ hg clone ssh://hg@bitbucket.org/djcbeach/monary ./monary
 # $ cd ./monary && python setup.py install
@@ -22,10 +21,6 @@ from pymongo import MongoClient
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-
-def multiSample(number):
-	"""Returns how many documents in the collection"""
-	colResampleInd( rows = rows, cols = [server_number])
  
 def rsd( vals ):
 	return abs( np.std( vals ) / np.mean( vals ) )
@@ -85,7 +80,7 @@ def colResampleInd( host, n_rows, cols, n_resamples = 20000, keepP = 0.1, port =
 
 	# toAdd
 	if len( toAdd ) > 0:
-		print "Adding new document to MongoDB"
+		print "Computing resamples for new MongoDB documents"
 		with Monary( 'mongodb://'+host+':'+str(port)+'/' ) as mon:
 			mon.connect()
 			columns = ["col_id", "normalized_expression", "standardized_expression"]
@@ -102,11 +97,12 @@ def colResampleInd( host, n_rows, cols, n_resamples = 20000, keepP = 0.1, port =
 		df = df.groupby("col_id")
 		df_rsd = pd.concat( [ df.aggregate( resample, n_rows ) for i in range( 0, n_resamples ) ] )
 		df_rsd = df_rsd.groupby( df_rsd.index )
+		print "Adding new documents to MongoDB"
 		tmp = [ choose_n( int( i ), df_rsd.get_group( i ), n2keep, True, client, db, n_rows, n_resamples ) for i in df_rsd.groups.keys() ]
 
 	# toUpdate
 	if len( toUpdate ) > 0:
-		print "Updating existing MongoDB documents"
+		print "Computing resamples for updated MongoDB documents"
 		with Monary( 'mongodb://'+host+':'+str(port)+'/' ) as mon:
 			mon.connect()
 			columns = ["col_id", "normalized_expression", "standardized_expression"]
@@ -125,6 +121,7 @@ def colResampleInd( host, n_rows, cols, n_resamples = 20000, keepP = 0.1, port =
 		if resamples > 0:
 			df_rsd = pd.concat( [ df.aggregate( resample, n_rows ) for i in range( 0, resamples ) ] )
 			df_rsd = df_rsd.groupby( df_rsd.index )
+			print "Updating MongoDB documents"
 			tmp = [ choose_n( int( i ), df_rsd.get_group( i ), n2keep, False, client, db, n_rows, resamples ) for i in df_rsd.groups.keys() ]
 	client.close()
 
