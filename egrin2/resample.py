@@ -63,7 +63,7 @@ def choose_n( col, vals, n, add, client, db, n_rows, n_resamples ):
 def colResampleInd( host, n_rows, cols, n_resamples = 20000, keepP = 0.1, port = 27017, db = "egrin2_db" ):
 	"""Resample gene expression for a given number of genes in a particular condition using RSD"""
 
-	print n_rows
+	print "Adding resample document for gene set size %i " % ( n_rows )
 
 	# make connection
 	client = MongoClient( host = host, port=port )
@@ -139,7 +139,8 @@ if __name__ == '__main__':
 	client = MongoClient( host = host, port=port )
 	
 	cols = range( 0,client[ db ][ "col_info" ].count( ) )
+	row_sizes = range( 0,client[ db ][ "col_info" ].count( ) )
 
-	tmp = Parallel(n_jobs=4)( delayed( colResampleInd )( "localhost", i, cols, n_resamples = 10) for i in range( 3,10 ) )
+	tmp = Parallel(n_jobs=4)( delayed( colResampleInd )( "localhost", i, cols, n_resamples = 10) for i in row_sizes )
 
 	print "Done"	
