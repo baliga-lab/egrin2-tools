@@ -8,7 +8,7 @@ Utilities and scripts for generating, assembling, and querying EGRIN**2.0** ense
 
 ## Documentation
 
-Documentation is available on the [wiki](https://github.com/baliga-lab/cmonkey2/wiki). [Developers](https://groups.google.com/d/forum/cmonkey-dev) and [users](https://groups.google.com/d/forum/cmonkey-users) may also refer to the cMonkey2 discussion groups for additional information. 
+Documentation is available on the [wiki](https://github.com/scalefreegan/egrin2-tools/wiki). [Developers](https://groups.google.com/d/forum/cmonkey-dev) and [users](https://groups.google.com/d/forum/cmonkey-users) may also refer to the cMonkey2 discussion groups for additional information. 
 
 ## System requirements
 
