@@ -1,3 +1,16 @@
+#!/usr/bin/env python
+
+"""Tools for querying EGRIN2.0 MongoDB."""
+
+__author__ = "Aaron Brooks"
+__copyright__ = "Copyright 2014, cMonkey2"
+__credits__ = ["Aaron Brooks"]
+__license__ = "GPL"
+__version__ = "0.0.1"
+__maintainer__ = "Aaron Brooks"
+__email__ = "brooksan@uw.edu"
+__status__ = "Development"
+
 def checkDBresamples( self, col, n_rows, n_resamples ):
 		if self.db.col_resample.find_one( { "n_rows": n_rows, "col_id": col, "resamples": { "$gte": n_resamples } } ) is None:
 			return col
