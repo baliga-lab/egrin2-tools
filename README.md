@@ -1,6 +1,6 @@
 ![cMonkey2 Logo](https://github.com/baliga-lab/cmonkey2/blob/master/graphics/cmonkey2_logo_80px.png "cMonkey2 Logo")
 
-## EGRIN**2.0**-tools - Utilities and scripts for generating EGRIN**2.0** ensembles from [cMonkey2-python biclustering algorithm](https://github.com/baliga-lab/cmonkey2/)
+## EGRIN**2.0**-tools - Utilities and scripts for generating EGRIN**2.0** ensembles from [cMonkey2 biclustering algorithm](https://github.com/baliga-lab/cmonkey2/)
 
 ### Description
 
@@ -12,35 +12,27 @@ A complete set of documentation for installation and running of cMonkey is on th
 
 ### System requirements
 
-* Developed and tested with Python 2.7.2
-* scipy >= 0.9.0
-* numpy >= 1.6.0
-* biopython >= 1.63
-* MySQLdb >= 1.2.3
-* BeautifulSoup >= 3.2.0
-* R >= 2.14.1
-* rpy2 >= 2.2.1
-* MEME 4.3.0 or >= 4.8.1
-* csh (for running MEME)
-for the human setup, Weeder 1.4.2 is needed
+* Developed and tested with Python 2.7.6
+* biopython >= 1.65
+* joblib >= 0.7.1
+* matplotlib >= 1.3.1
+* monary >= 0.2.3
+* numpy >= 1.8.2
+* pandas >= 0.15.2
+* scipy >= 0.13.3
+* sqlite3 >= 2.6.0
 
 for running the unit tests (optional):
 
 * python-xmlrunner 
 
-for running the monitoring application (optional):
-
-* CherryPy 3
-* Jinja2
-* python-routes
-
 ### Running the Unit Tests
 
     ./run_tests.sh
+    
+### Choose blocks of conditions for running a cMonkey2 ensemble
 
-### Running cmonkey2
-
-** Usage
+### Processing a cMonkey2 ensemble
 
 The tools are intended to be run in the following order
 
@@ -62,16 +54,13 @@ can see all available options with
 
     ./cmonkey.py --help
 
-### Test Run with Halobacterium Salinarum
+### Test with 5 run *E. coli* ensemble
 
 There is a startup script for cMonkey to run the current integrated
 system
 
     ./cmonkey.py --organism hal --ratios example_data/hal/halo_ratios5.tsv
 
-### Start the python based monitoring application
-
-    python cmviewer/main.py
 
 
 
