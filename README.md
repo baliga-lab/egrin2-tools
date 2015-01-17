@@ -1,10 +1,10 @@
 ![cMonkey2 Logo](https://github.com/baliga-lab/cmonkey2/blob/master/graphics/cmonkey2_logo_80px.png "cMonkey2 Logo")
 
-## cMonkey<sub>2</sub> - Python port of the [cMonkey biclustering algorithm](http://cmonkey.systemsbiology.net)
+## EGRIN<sub>2</sub>-tools - Utilities and scripts for generating EGRIN<sub>2</sub> ensembles using [cMonkey2-python biclustering algorithm](https://github.com/baliga-lab/cmonkey2/)
 
 ### Description
 
-This is the Python implementation of the cMonkey algorithm based on the original R implementation by David J. Reiss, Institute for Systems Biology.
+This is a collection of software tools to perform cMonkey ensemble runs and support analysis of the results.
 
 ### Documentation
 
@@ -40,6 +40,16 @@ for running the monitoring application (optional):
 
 ### Running cmonkey2
 
+** Usage
+
+The tools are intended to be run in the following order
+
+1. Ensemble generation (egrin2/ensemble.py)
+2. Run ensemble on cluster
+3. Tomtom job generation
+4. Run tomtom on cluster
+5. Run corems
+
 In general, you should be able to run cmonkey2 on microbial gene
 expressions with
 
@@ -65,19 +75,5 @@ system
 
 
 
-* EGRIN2 toolchain
 
-** Description
 
-This is a collection of software tools to perform cmonkey ensemble runs and support
-the analysis of the results.
-
-** Usage
-
-The tools are intended to be run in the following order
-
-1. Ensemble generation (egrin2/ensemble.py)
-2. Run ensemble on cluster
-3. Tomtom job generation
-4. Run tomtom on cluster
-5. Run corems
