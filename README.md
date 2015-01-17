@@ -4,7 +4,7 @@
 
 ### Description
 
-This is a collection of software tools to perform cMonkey ensemble runs and support analysis of the results.
+This is a collection of tools to perform cMonkey ensemble runs and support analysis of the results.
 
 ### Documentation
 
