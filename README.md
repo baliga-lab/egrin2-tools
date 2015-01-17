@@ -1,6 +1,6 @@
 ![cMonkey2 Logo](https://github.com/baliga-lab/cmonkey2/blob/master/graphics/cmonkey2_logo_80px.png "cMonkey2 Logo")
 
-## EGRIN<sub>2</sub>-tools - Utilities and scripts for generating EGRIN<sub>2</sub> ensembles using [cMonkey2-python biclustering algorithm](https://github.com/baliga-lab/cmonkey2/)
+## EGRIN<sup>2</sup>-tools - Utilities and scripts for generating EGRIN<sub>2</sub> ensembles using [cMonkey2-python biclustering algorithm](https://github.com/baliga-lab/cmonkey2/)
 
 ### Description
 
