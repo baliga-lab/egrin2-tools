@@ -35,7 +35,7 @@ Documentation is available on the [wiki](https://github.com/scalefreegan/egrin2-
 5. Run corems
 6. 
 
-### 5 run *E. coli* ensemble
+### Example: 5 run *E. coli* ensemble
 
 There is a startup script for cMonkey to run the current integrated
 system
