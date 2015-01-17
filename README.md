@@ -1,16 +1,16 @@
 ![cMonkey2 Logo](https://github.com/scalefreegan/egrin2-tools/blob/master/egrin2_logo_80px.png "EGRIN2.0 Logo")
 
-## EGRIN**2.0**-tools - Utilities and scripts for generating EGRIN**2.0** ensembles from [cMonkey2 biclustering algorithm](https://github.com/baliga-lab/cmonkey2/)
+# EGRIN**2.0**-tools - Utilities and scripts for generating EGRIN**2.0** ensembles from [cMonkey2 biclustering algorithm](https://github.com/baliga-lab/cmonkey2/)
 
-### Description
+## Description
 
 This is a collection of tools to perform cMonkey ensemble runs and support analysis of the results.
 
-### Documentation
+## Documentation
 
 Documentation is available on the [wiki](https://github.com/baliga-lab/cmonkey2/wiki). [Developers](https://groups.google.com/d/forum/cmonkey-dev) and [users](https://groups.google.com/d/forum/cmonkey-users) may also refer to the cMonkey2 discussion groups for additional information. 
 
-### System requirements
+## System requirements
 
 * Developed and tested with Python 2.7.6
 * biopython >= 1.65
@@ -22,11 +22,11 @@ Documentation is available on the [wiki](https://github.com/baliga-lab/cmonkey2/
 * scipy >= 0.13.3
 * sqlite3 >= 2.6.0
 
-### Build
+## Build
 
-## Choose blocks of conditions for running a cMonkey2 ensemble
+### Choose blocks of conditions for running a cMonkey2 ensemble
 
-### Assemble
+## Assemble
 
 1. Ensemble generation (egrin2/ensemble.py)
 2. Run ensemble on cluster
@@ -35,7 +35,7 @@ Documentation is available on the [wiki](https://github.com/baliga-lab/cmonkey2/
 5. Run corems
 6. 
 
-## 5 run *E. coli* ensemble
+### 5 run *E. coli* ensemble
 
 There is a startup script for cMonkey to run the current integrated
 system
@@ -43,7 +43,7 @@ system
     ./cmonkey.py --organism hal --ratios example_data/hal/halo_ratios5.tsv
 
 
-### Query
+## Query
 
 
 
