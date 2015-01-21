@@ -8,7 +8,7 @@ Example:
 
 With pre-defined condition blocks:
 
-python cMonkeyQSub.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir mtu-ens-20141230 --numruns 500 --blocks 20141202.MTB.EGRIN2.blocks.csv --inclusion 20141202.MTB.EGRIN2.inclusion.blocks.csv --exclusion 20141202.MTB.EGRIN2.exclusion.blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files 20140725.MTB.ChIPSeq.csv,20140725.MTB.DE.csv --csh
+python cMonkeyQSub.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir mtu-ens-20140120 --numruns 500 --blocks 20141202.MTB.EGRIN2.blocks.csv --inclusion 20141202.MTB.EGRIN2.inclusion.blocks.csv --exclusion 20141202.MTB.EGRIN2.exclusion.blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files 20140725.MTB.ChIPSeq.csv,20140725.MTB.DE.csv --csh
 
 Without pre-defined condition blocks:
 
@@ -28,9 +28,10 @@ import argparse
 import os
 import itertools
 
-import cmonkey.datamatrix as dm
-from egrin2.cMonkeyIniGen import *
-from egrin2.ensemblePicker import * 
+#import cmonkey.datamatrix as dm
+# need to be in python path!!!
+from cMonkeyIniGen import *
+from ensemblePicker import * 
 
 DESCRIPTION = """ensemble.py - prepare cluster runs"""
 
@@ -106,6 +107,9 @@ if __name__ == '__main__':
     else:
         header = QSUB_TEMPLATE_HEADER
         template = QSUB_TEMPLATE
+
+    if not os.path.exists(args.targetdir):
+      os.makedirs(args.targetdir)
 
     # write ratios files
     print "Choosing ensemble conditions"
