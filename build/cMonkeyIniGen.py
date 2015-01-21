@@ -66,8 +66,8 @@ schedule = %(col_schedule)s
 [Networks]
 schedule = %(networks_schedule)s
 scaling_rvec = %(networks_scaling_rvec)s
-string_weight = %(meme_string_weight)s
-operon_weight = %(meme_operon_weight)s
+string_weight = %(string_weight)s
+operon_weight = %(operon_weight)s
 
 [Motifs]
 sequence_types = %(sequence_types)s
@@ -144,7 +144,7 @@ class cMonkeyIniGen:
 		if "add_fuzz" not in params.keys():
 			params[ "add_fuzz" ] = "rows"
 		if "num_clusters" not in params.keys():
-			params[ "num_clusters" ] = random.randint(150, 550)
+			params[ "num_clusters" ] = random.randint(350, 550)
 		if "random_seed" not in params.keys():
 			params[ "random_seed" ] = 1
 			random.seed(params[ "random_seed" ] )
@@ -191,7 +191,7 @@ class cMonkeyIniGen:
 		if "row_schedule" not in params.keys():
 			params[ "row_schedule" ] = "1,2"
 		if "row_scaling_const" not in params.keys():
-			params[ "row_scaling_const" ] = random.uniform(0.0, 3.0)
+			params[ "row_scaling_const" ] = random.uniform(0.5, 3.0)
 
 		# [Columns]
 		if "col_schedule" not in params.keys():
@@ -201,16 +201,16 @@ class cMonkeyIniGen:
 		if "networks_schedule" not in params.keys():
 			params[ "networks_schedule" ] = "1,7"
 		if "networks_scaling_rvec" not in params.keys():
-			params[ "networks_scaling_rvec" ]  = "seq(1e-5, %s, length=num_iterations*3/4)" % ( random.uniform(0.0, 1.0) )
+			params[ "networks_scaling_rvec" ]  = "seq(1e-5, %s, length=num_iterations*3/4)" % ( random.uniform(0.1, 1.0) )
 		# if "networks_scaling_const" not in params.keys():
 		# 	params[ "networks_scaling_const" ] = random.uniform(0.0, 1.0)
 		#
 		# I don't know what the hell these do, but they were in Wei-ju's code!!!
 		#
-		if "meme_string_weight" not in params.keys():
-			params[ "meme_string_weight" ] = random.uniform(0.0, 1.0) * 0.5 + 0.2
-        		if "meme_operon_weight" not in params.keys():
-        			params[ "meme_operon_weight" ] = random.uniform(0.0, 1.0) * 0.5 + 0.2
+		if "string_weight" not in params.keys():
+			params[ "string_weight" ] = random.uniform(0.0, 1.0) * 0.5 + 0.2
+        		if "operon_weight" not in params.keys():
+        			params[ "operon_weight" ] = random.uniform(0.0, 1.0) * 0.5 + 0.2
 
 		# [Motifs]
 		if "sequence_types" not in params.keys():
@@ -267,7 +267,7 @@ class cMonkeyIniGen:
 		if "setenrichment_schedule" not in params.keys():
 			params[ "setenrichment_schedule" ] = "1,7"
 		if "setenrichment_scaling_rvec" not in params.keys():
-			params[ "setenrichment_scaling_rvec" ] = "seq(1e-5, %s, length=num_iterations*3/4)" % ( random.uniform(0.0, 1.0) )
+			params[ "setenrichment_scaling_rvec" ] = "seq(1e-5, %s, length=num_iterations*3/4)" % ( random.uniform(0.1, 1.0) )
 		if "set_types" not in params.keys():
 			# can be array!
 			params[ "set_types" ] = ""
@@ -282,9 +282,9 @@ class cMonkeyIniGen:
 			if len( params[ "set_types" ].split( "," ) ) > 0:
 				for i in params[ "set_types" ].split( "," ):
 					if counter == 0:
-						params[ "set_weight" ] =  str( random.uniform(0.0, 1.0) )
+						params[ "set_weight" ] =  str( random.uniform(0.1, 1.0) )
 					else:
-						params[ "set_weight" ] =  params[ "set_weight" ] + "," + str( random.uniform(0.0, 1.0) )
+						params[ "set_weight" ] =  params[ "set_weight" ] + "," + str( random.uniform(0.1, 1.0) )
 					counter = counter + 1
 			else:
 				params[ "set_weight" ] = ""
