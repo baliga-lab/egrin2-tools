@@ -29,7 +29,7 @@ def rsd( vals ):
 def resample( row_vals, n_rows ):
 		return rsd( random.sample( row_vals, n_rows ) )
 
-def choose_n( col, vals, n, add, client, db, n_rows, n_resamples ):
+def choose_n( col, vals, n, add, client, db, n_rows, n_resamples, old_records, keepP ):
 	normalized = vals.loc[:,"normalized_expression"].copy()
 	normalized.sort()
 	standardized = vals.loc[:,"standardized_expression"].copy()
@@ -48,12 +48,13 @@ def choose_n( col, vals, n, add, client, db, n_rows, n_resamples ):
 		#update
 		resamples = n_resamples + old_records[ col ][ "resamples" ]
 		n2keep = round( resamples*keepP )
-		ran = normalized + old_records[ col ][ "lowest_normalized" ]
+		#print normalized, "\n", "break",  old_records[ col ][ "lowest_normalized" ]
+		ran = normalized.tolist() + old_records[ col ][ "lowest_normalized" ]
 		ran.sort()
-		ran = ran.iloc[ 0: int( n2keep ) ].tolist()
-		ras = standardized + old_records[ col ][ "lowest_standardized" ]
+		ran = ran[ 0: int( n2keep ) ]
+		ras = standardized.tolist() + old_records[ col ][ "lowest_standardized" ]
 		ras.sort()
-		ras = ras.iloc[ 0: int( n2keep ) ].tolist()
+		ras = ras[ 0: int( n2keep ) ]
 		client[ db ][ "col_resample" ].update( { "n_rows": n_rows, "col_id": col }, { "$set": { "resamples": resamples, "lowest_normalized": ran, "lowest_standardized": ras } } )
 
 def colResampleInd( host, n_rows, cols, n_resamples = 20000, keepP = 0.1, port = 27017, db = "egrin2_db" ):
@@ -62,7 +63,7 @@ def colResampleInd( host, n_rows, cols, n_resamples = 20000, keepP = 0.1, port =
 	print "Adding resample document for gene set size %i " % ( n_rows )
 
 	# make connection
-	client = MongoClient( host = host, port=port )
+	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 
 	# see if a record for this gene set size exists 
 	old_records = { i[ "col_id" ] : i for i in client[ db ][ "col_resample" ].find( { "n_rows": n_rows, "col_id": { "$in": cols } } ) }
@@ -82,26 +83,24 @@ def colResampleInd( host, n_rows, cols, n_resamples = 20000, keepP = 0.1, port =
 	# toAdd
 	if len( toAdd ) > 0:
 		print "Computing resamples for new MongoDB documents"
-		client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' ) 
 		df = pd.DataFrame( list( client[db].gene_expression.find( { "col_id": { "$in": toAdd } }, { "col_id":1, "normalized_expression":1, "standardized_expression":1 } ) ) )
 		df = df.groupby("col_id")
 		df_rsd = pd.concat( [ df.aggregate( resample, n_rows ) for i in range( 0, n_resamples ) ] )
 		df_rsd = df_rsd.groupby( df_rsd.index )
 		print "Adding new documents to MongoDB"
-		tmp = [ choose_n( int( i ), df_rsd.get_group( i ), n2keep, True, client, db, n_rows, n_resamples ) for i in df_rsd.groups.keys() ]
+		tmp = [ choose_n( int( i ), df_rsd.get_group( i ), n2keep, True, client, db, n_rows, n_resamples, old_records, keepP ) for i in df_rsd.groups.keys() ]
 
 	# toUpdate
 	if len( toUpdate ) > 0:
 		print "Computing resamples for updated MongoDB documents"
-		client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' ) 
-		df = pd.DataFrame( list( client[db].gene_expression.find( { "col_id": { "$in": toAdd } }, { "col_id":1, "normalized_expression":1, "standardized_expression":1 } ) ) )
+		df = pd.DataFrame( list( client[db].gene_expression.find( { "col_id": { "$in": toUpdate } }, { "col_id":1, "normalized_expression":1, "standardized_expression":1 } ) ) )
 		df = df.groupby("col_id")
 		resamples = n_resamples - np.min( [ i[ "resamples" ] for i in old_records.values( ) ] )
 		if resamples > 0:
 			df_rsd = pd.concat( [ df.aggregate( resample, n_rows ) for i in range( 0, resamples ) ] )
 			df_rsd = df_rsd.groupby( df_rsd.index )
 			print "Updating MongoDB documents"
-			tmp = [ choose_n( int( i ), df_rsd.get_group( i ), n2keep, False, client, db, n_rows, resamples ) for i in df_rsd.groups.keys() ]
+			tmp = [ choose_n( int( i ), df_rsd.get_group( i ), n2keep, False, client, db, n_rows, resamples, old_records, keepP ) for i in df_rsd.groups.keys() ]
 	client.close()
 
 	return None

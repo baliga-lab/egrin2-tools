@@ -478,6 +478,7 @@ class makeCorems:
 			sub_m.loc[ :,"Gene2" ] = [ str( self.row2id[ i ] ) for i in sub_m.Gene2 ]
 
 			rows = list( set( sub_m.Gene1.unique().tolist() + sub_m.Gene2.unique().tolist() ) )
+			rows = [ int( i ) for i in rows ]
 			rows.sort()
 
 			edges = list( sub_m.Gene1  + "-" + sub_m.Gene2 )

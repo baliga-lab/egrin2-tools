@@ -23,6 +23,8 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 
+from resample import *
+
 def rsd( vals ):
 	return abs( np.std( vals ) / np.mean( vals ) )
 
@@ -34,13 +36,16 @@ def check_colResamples( col, n_rows, n_resamples, host = "localhost", port = 270
 		return col
 	client.close()
 
-def row2id( row, host = "localhost", port = 27017, db = "egrin2_db",  verbose = False ):
+def row2id( row, host = "localhost", port = 27017, db = "egrin2_db",  verbose = False, return_field = "row_id" ):
 	"""Check name format of rows. If necessary, translate."""
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 	query = list( client[db].row_info.find( { "$or": [ { "row_id": row }, { "egrin2_row_name": row }, { "GI": row }, { "accession": row }, { "name": row }, { "sysName": row } ] } ) )
 	client.close()
 	if len( query ) == 1: 
-		row = query[ 0 ][ "row_id" ]
+		try:
+			row = query[ 0 ][ return_field ]
+		except Exception:
+			row = query[ 0 ][ "row_id" ]
 		return row
 	elif len( query ) > 0:
 		print "ERROR: Multiple genes match the row name: %s" % row
@@ -86,7 +91,7 @@ def col2name( col, host = "localhost", port = 27017, db = "egrin2_db",  verbose 
 		print "ERROR: Cannot identify row name: %s" % col
 		return None
 
-def rowsColPval( rows = None, cols = None, host = "localhost", port = 27017, db = "egrin2_db", standardized = None, sig_cutoff = None, sort = True ):
+def colResamplePval( rows = None, cols = None, n_resamples = None, host = "localhost", port = 27017, db = "egrin2_db", standardized = None, sig_cutoff = None, sort = True, add_override = False, n_jobs = 4, keepP = 0.1 ):
 
 	def empirical_pval( i, random_rsd, resamples ):
 		for x in range( 0, len( i ) ):
@@ -100,15 +105,19 @@ def rowsColPval( rows = None, cols = None, host = "localhost", port = 27017, db 
 			else:
 				return val
 
+	rows_o = rows
 	rows = [ row2id( i, host, port, db ) for i in rows ]
 	rows = [ i for i in rows if i is not None]
-	if rows is None:
+	rows = list( set( rows ) )
+	if len( rows ) == 0:
 		print "Please provide an appropriately named array of rows"
 		return None 
 	
+	cols_o = cols
 	cols = [ col2id( i, host, port, db ) for i in cols ]
 	cols = [ i for i in cols if i is not None]
-	if cols is None:
+	rows = list( set( rows ) )
+	if len( rows ) == 0:
 		print "Please provide an appropriately named array of cols"
 		return None
 
@@ -121,14 +130,35 @@ def rowsColPval( rows = None, cols = None, host = "localhost", port = 27017, db 
 		# return only cols equal below sig_cutoff
 		sig_cutoff = 0.05
 
+	if n_resamples is None:
+		# return only cols equal below sig_cutoff
+		n_resamples = 1000
+
+	# Determine what/how many resamples need to be added to db
+	toAdd = [ check_colResamples( i, len( rows ), n_resamples, host, port , db ) for i in cols]
+	toAdd = [ i for i in toAdd if i is not None]
+
+	count = 1
+	if len( toAdd) > 0:
+		if add_override:
+			print "I need to perform %i random resample(s) of size %i to compute pvals. Please be patient. This may take a while..." % ( len(toAdd), n_resamples )
+			tmp = colResampleInd( host = host, n_rows = len(rows), cols = toAdd, n_resamples = n_resamples, keepP = keepP, port = port, db = db )
+			print "Done adding random resamples."
+		else:
+			print "I would need to perform %i random resample(s) of size %i to compute pvals. Since this would require significant computational power (and time), I have only returned results where resample data has been pre-calculated. Consult resample.py to run these jobs on multiple cores (much faster) or change 'add_override' flag of this function to 'True' to build the resample now." % ( len(toAdd), n_resamples )
+			cols = [i for i in cols if i not in toAdd]
+
+	print "Calculating pvals"
+
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 	exp_df = pd.DataFrame( list( client[ db ].gene_expression.find( { "col_id": { "$in" : cols }, "row_id": { "$in" : rows } }, { "_id":0, "col_id":1, "normalized_expression":1, "standardized_expression":1 } ) ) )
 	random_rsd = pd.DataFrame( list( client[ db ].col_resample.find( { "n_rows": len( rows ), "col_id": { "$in" : cols } }, { "_id":0 } ) ) )
-	random_rsd.index = random_rsd["col_id"]
-
-	if random_rsd is None:
-		print "Could not find resample DB entry for %i rows" % ( len(rows) )
+	
+	if random_rsd.shape[0] == 0:
+		print "Could not find resample DB entry for %i rows in cols %s" % ( len(rows_o), cols_o )
 		return None
+	else:
+		random_rsd.index = random_rsd["col_id"]
 
 	exp_df_rsd = exp_df.groupby("col_id").aggregate(rsd)
 
@@ -142,7 +172,7 @@ def rowsColPval( rows = None, cols = None, host = "localhost", port = 27017, db 
 		random_rsd = random_rsd.loc[ :,"lowest_normalized" ].to_dict()
 		
 
-	pvals = exp_df_rsd.groupby(level=0).aggregate(empirical_pval, random_rsd, resamples )
+	pvals = exp_df_rsd.groupby( level=0 ).aggregate(empirical_pval, random_rsd, resamples )
 	pvals.columns = ["pval"]
 	pvals.index = [ col2name( i ) for i in pvals.index.values]
 
@@ -155,59 +185,89 @@ def rowsColPval( rows = None, cols = None, host = "localhost", port = 27017, db 
 	pvals = pvals.to_frame()
 	pvals.columns = [ "pval" ] 
 
+	if pvals.shape[ 0 ] == 0:
+		print "No cols pass the significance cutoff of %f" % sig_cutoff
+
 	return pvals
+
+def rows2corem( rows = [ 0, 1 ], host = "localhost", port = 27017, db = "egrin2_db",  verbose = False, return_field = [ "corem_id" ], logic = "and" ):
+	"""Find corems in which row(s) co-occur."""
 	
-def colResampleGroup( self, rows = None, cols = None, n_resamples = None, host = "localhost", port = 27017, db = "egrin2_db", sig_cutoff = None, standardized = None ):
-	"""Resample gene expression for a given set of genes in any number of conditions. Should be used instead of colReampleInd (it calls that function)"""
+	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 
-	if n_resamples is None:
-		n_resamples = 20000
-
-	if standardized is None:
-		# compute RSD on standardized gene expression by default
-		# other option 'False' for normalized (not standardized expression)
-		standardized = True
-
-	if sig_cutoff is None:
-		# return only cols equal below sig_cutoff
-		sig_cutoff = 0.05
-
+	rows_o = rows
 	rows = [ row2id( i, host, port, db ) for i in rows ]
 	rows = [ i for i in rows if i is not None]
-	if rows is None:
-		print "Please provide an appropriately named array of rows"
+	rows = list( set( rows ) )
+	if len( rows ) == 0:
+		print "Cannot translate row names: %s" % rows_o
 		return None 
+
+	if logic in [ "and","or","nor" ]:
+		q = { "$"+logic: [ { "rows" : i } for i in rows ] }
+		query = pd.DataFrame( list( client[db].corem.find( q ) ) )
+	else:
+		print "I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'."
 	
-	cols = [ col2id( i, host, port, db ) for i in cols ]
-	cols = [ i for i in cols if i is not None]
-	if cols is None:
-		print "Please provide an appropriately named array of cols"
+	client.close()
+
+	if query.shape[0] > 0: 
+		if return_field == "all":
+			return query
+		else:
+			try:
+				return query.loc[ :, return_field ]
+			except Exception:
+				return query
+	else:
+		print "Could not find any corems matching your criteria"
+		return None
+
+def x2bicluster( x = [ 0,1 ], x_type = "rows", host = "localhost", port = 27017, db = "egrin2_db",  verbose = False, return_field = [ "cluster" ], logic = "and" ):
+
+	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+
+	if x_type == "rows":
+		x_o = x
+		x = [ row2id( i, host, port, db ) for i in x ]
+		x = [ i for i in x if i is not None]
+		x = list( set( x ) )
+		if len( x ) == 0:
+			print "Cannot translate row names: %s" % x_o
+			return None
+
+	if x_type == "cols":
+		x_o = x
+		x = [ col2id( i, host, port, db ) for i in x ]
+		x = [ i for i in x if i is not None]
+		x = list( set( x ) )
+		if len( x ) == 0:
+			print "Cannot translate col names: %s" % x_o
+			return None  
+
+	if logic in [ "and","or","nor" ]:
+		q = { "$"+logic: [ { x_type : i } for i in x ] }
+		query = pd.DataFrame( list( client[db].bicluster_info.find( q ) ) )
+	else:
+		print "I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'."
+	
+	client.close()
+
+	if query.shape[0] > 0: 
+		if return_field == "all":
+			return query
+		else:
+			try:
+				return query.loc[ :, return_field ]
+			except Exception:
+				return query
+	else:
+		print "Could not find any biclusters matching your criteria"
 		return None
 	
-	# Determine what/how many resamples need to be added to db
-	toAdd = [ check_colResamples( i, len( rows ), n_resamples, host, port , db ) for i in cols]
-	toAdd = [ i for i in toAdd if i is not None]
-
-	count = 1
-	if len( toAdd) > 0:
-		print "I need to perform %i random resample(s) of size %i to compute pvals. Please be patient. This may take a while..." % ( len(toAdd), n_resamples )
-		for i in toAdd:		
-			currentEntry = self.db.col_resample.find_one( { "n_rows": len( rows ), "col_id": i } )
-			if currentEntry is not None:
-				# only add enough resamples to reach requested value
-				self.colResampleInd( len( rows ), i, n_resamples - currentEntry[ "resamples" ], .1 )
-			else:
-				self.colResampleInd( len( rows ), i, n_resamples, .1 )
-			if round( ( float( count) / len(toAdd) ) * 100, 2 ) % 10  == 0:
-				print "%d percent" % ( round( ( float( count ) / len( toAdd ) ) * 100, 2 ) )
-			count = count + 1
-		print "Done adding random resamples."
-
-	print "Calculating pvals"
-
-	pvals = self.rowsColPval( rows, cols, standardized, sig_cutoff )
-
-	return pvals
+	
+	
+	
 
 if __name__ == '__main__':
 

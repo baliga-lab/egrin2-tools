@@ -680,6 +680,8 @@ class sql2mongoDB:
 	    	for i in self.db_files:
 	    		print i
 	    		self.bicluster_info_collection = self.insert_bicluster_info( self.db, self.e_dir, i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
+    		print "Indexing bicluster collection"
+    			
     		outfile = self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 		print "Writing EGRIN2 MongoDB to %s" % 	os.getcwd() + "/" + outfile   		
     		self.mongoDump( self.dbname, outfile )

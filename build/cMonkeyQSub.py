@@ -115,6 +115,9 @@ if __name__ == '__main__':
     print "Choosing ensemble conditions"
     if args.blocks is None:
       # if inclusion/exlcusion blocks are not defined, simply choose at random
+      #
+      # I don't think this is right! - needs to be fixed
+      #
       dm.prepare_ensemble_matrix( args.ratios, args.targetdir, args.numfiles,
                                  args.mincols )
     else:
