@@ -48,7 +48,7 @@ def row2id( row, host = "localhost", port = 27017, db = "egrin2_db",  verbose = 
 			row = query[ 0 ][ "row_id" ]
 		return row
 	elif len( query ) > 0:
-		print "ERROR: Multiple genes match the row name: %s" % row
+		print "ERROR: Multiple rows match the row name: %s" % row
 		if verbose:
 			print query
 		return None
@@ -57,21 +57,24 @@ def row2id( row, host = "localhost", port = 27017, db = "egrin2_db",  verbose = 
 		return None
 	
 
-def col2id( col, host = "localhost", port = 27017, db = "egrin2_db",  verbose = False ):
+def col2id( col, host = "localhost", port = 27017, db = "egrin2_db",  verbose = False, return_field = "row_id" ):
 	"""Check name format of rows. If necessary, translate."""
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 	query = list( client[db].col_info.find( { "$or": [ { "col_id": col }, { "egrin2_col_name": col } ] } ) )
 	client.close()
 	if len( query ) == 1: 
-		col = query[ 0 ][ "col_id" ]
+		try:
+			col = query[ 0 ][ return_field ]
+		except Exception:
+			col = query[ 0 ][ "col_id" ]
 		return col
 	elif len( query ) > 0:
-		print "ERROR: Multiple genes match the row name: %s" % col
+		print "ERROR: Multiple cols match the col name: %s" % col
 		if verbose:
 			print query
 		return None
 	else:
-		print "ERROR: Cannot identify row name: %s" % col
+		print "ERROR: Cannot identify col name: %s" % col
 		return None
 
 def col2name( col, host = "localhost", port = 27017, db = "egrin2_db",  verbose = False ):
@@ -229,8 +232,9 @@ def x2bicluster( x = [ 0,1 ], x_type = "rows", logic = "and", count = True, host
 
 	Available x_type(s):
 
-	'rows': search for row (genes) in biclusters. x should be a list of rows.
-	'columns': search for columns (conditions) in biclusters. x should be a list of columns.
+	'rows': search for row (genes) in biclusters. x should be a list of rows, eg ["carA","carB"] or [275, 276]
+	'columns': search for columns (conditions) in biclusters. x should be a list of columns, eg ["dinI_U_N0025", "dinP_U_N0025"] or [0,1]
+	'motif.gre': search for GREs in biclusters. x should be a list of GRE IDs, eg [4, 19]
 	''
 
 	"""
@@ -254,7 +258,7 @@ def x2bicluster( x = [ 0,1 ], x_type = "rows", logic = "and", count = True, host
 			print "Cannot translate col names: %s" % x_o
 			return None  
 
-	if x_type in [ "rows", "columns" ] and logic in [ "and","or","nor" ]:
+	if x_type in [ "rows", "columns", "motif.gre" ] and logic in [ "and","or","nor" ]:
 		q = { "$"+logic: [ { x_type : i } for i in x ] }
 		if count:
 			query =client[db].bicluster_info.find( q ).count()
@@ -277,6 +281,8 @@ def x2bicluster( x = [ 0,1 ], x_type = "rows", logic = "and", count = True, host
 	else:
 		print "Could not find any biclusters matching your criteria"
 		return None
+
+
 	
 	
 	

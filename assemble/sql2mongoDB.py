@@ -46,18 +46,25 @@ from Bio import SeqIO
 
 class sql2mongoDB:
     
-	def __init__( self, e_dir = None, prefix = None, gene_info = None, ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None , db_run_override = None, genome_file = None, row_annot = None, row_annot_match_col = None ):
+	def __init__( self, host = None, port = None, e_dir = None, prefix = None, gene_info = None, ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None , db_run_override = None, genome_file = None, row_annot = None, row_annot_match_col = None ):
 		
 		# connect to database
 		# make sure mongodb is running
-		retvalue = os.system("nohup mongod --port 27017 --quiet &")
+		# retvalue = os.system("nohup mongod --port 27017 --quiet &")
+
+		if host is None:
+			host = "localhost"
+
+		if port is None:
+			port = 27017
+
 		try:
-			client = MongoClient('mongodb://localhost:27017/') 
+			client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' ) 
 			print "Connected to MongoDB"
 		except pymongo.errors.ConnectionFailure, e:
 			print "Could not connect to MongoDB: %s" % e
 
-		if dbname == None:
+		if dbname is None:
 			self.dbname = "egrin2_db"
 		else:
 			self.dbname = dbname
@@ -105,7 +112,7 @@ class sql2mongoDB:
     		self.row_annot_match_col = row_annot_match_col
 
     		if len(self.db_files) < 1:
-	    		print "I cannot find any cMonkey SQLite databases in the current directory: %s" % os.getcwd()
+	    		print "I cannot find any cMonkey SQLite databases in the current directory: %s\nMake sure 'e_dir' variable points to the location of your cMonkey-2 ensemble results." % os.getcwd()
 
     		return None
 
@@ -306,7 +313,7 @@ class sql2mongoDB:
 		# write to mongoDB collection 
 		row_info_collection = self.db.row_info
 		# Check whether documents are already present in the collection before insertion
-		d = row_table.to_dict( outtype='records' )
+		d = row_table.to_dict( orient='records' )
 	    	d_f = filter( None, [ self.check4existence( row_info_collection, i ) for i in d ] )
 
 	    	print "%s new records to write" % len( d_f )
@@ -566,8 +573,7 @@ class sql2mongoDB:
 		"seqtype": motif_data[0],
 		"evalue": motif_data[1],
 		"meme_motif_site": [self.get_meme_motif_site_single( cursor, iteration, run_name, cluster, motif_num, i, row_info_collection ) for i in meme_site],
-		"pwm": [self.get_pwm_single( cursor, iteration, run_name, cluster, motif_num, i, row_info_collection ) for i in rows],
-		"fimo": self.get_fimo_scans_single( db, e_dir, run_name, cluster, motif_num )
+		"pwm": [self.get_pwm_single( cursor, iteration, run_name, cluster, motif_num, i, row_info_collection ) for i in rows]
 		}
 		return d
 
@@ -592,10 +598,12 @@ class sql2mongoDB:
 		"reverse": data[1],
 		"scaffoldId": scaffoldId,
 		"start": data[2],
+		# do not store this info
+		# anb 01/22/2015
+		# "flank_left": data[4],
+		# "seq": data[5],
+		# "flank_right": data[6]
 		"pvalue": data[3],
-		"flank_left": data[4],
-		"seq": data[5],
-		"flank_right": data[6]
 		}
 		return d
 
@@ -613,37 +621,50 @@ class sql2mongoDB:
 		}
 		return d
 
-	def get_fimo_scans_single( self, db, e_dir, run_name, cluster, motif_num):
-		genome_collection = db.genome
-		try:
-			# get all fimo scans in the dir
-			f = e_dir + run_name + "/fimo-outs/fimo-out-" + "%04d" % (cluster,) + ".bz2" 
-			#print motif_num
+	def tmp_fcn( self, i, e_dir ):
+		print i.cluster, i.run_id, e_dir
+		return None
 
-			fimo = pd.read_csv( f, index_col=0, sep="\t", compression = "bz2" )
+	def assemble_fimo( self ):
 
-			if motif_num in fimo.index:
-				fimo = fimo.loc[motif_num]
+		def get_fimo_scans_single( i, db, e_dir, run2id ):
+			cluster = i.cluster
+			run_name =run2id[ run2id[ "run_id" ]==0 ][ "run_name" ][ 0 ]
+			try:
+				# get all fimo scans in the dir
+				f = e_dir + run_name + "/fimo-outs/fimo-out-" + "%04d" % (cluster,) + ".bz2" 
+				#print motif_num
+
+				fimo = pd.read_csv( f, sep="\t", compression = "bz2" )
 				# change sequence_name to scaffoldId
-				fimo.rename(columns={'matched sequence': 'matched_sequence', 'sequence name': 'scaffoldId'}, inplace=True)
+				fimo.rename(columns={'matched sequence': 'matched_sequence', 'sequence name': 'scaffoldId', "#pattern name": "motif_num"}, inplace=True)
 
-				# rename sequence_names to scaffoldId
 				trans_d = {}
 				for i in np.unique(fimo.scaffoldId):
 					NCBI_RefSeq = "_".join(i.split('.')[-2].split("_")[::-1][0:2][::-1])
-					scaffoldId = genome_collection.find_one( { "NCBI_RefSeq": NCBI_RefSeq } )["scaffoldId"]
+					scaffoldId = db.genome.find_one( { "NCBI_RefSeq": NCBI_RefSeq } )["scaffoldId"]
 					trans_d[i] = scaffoldId
 
 				trans_v = [trans_d[i] for i in fimo.scaffoldId.values]
 				fimo.scaffoldId = trans_v
+				fimo["run_id"] = run2id.loc[run_name].run_id
+				fimo["cluster"] = cluster
 
-				d_f = fimo.to_dict( outtype='records' )
+				# only keep specific columns
+				fimo = fimo.loc[ : , [ 'scaffoldId', 'start', 'stop', 'strand', 'score', 'p-value', 'in_coding_rgn', 'run_id', 'cluster', 'motif_num' ] ]
 
-		    		return d_f
-	    		else:
-	    			return None
-		except Exception:
-			return None
+				d_f = fimo.to_dict( orient='records' )
+
+				db.fimo.insert( d_f )
+
+		    		return None
+			except Exception:
+				return None
+
+		# get all biclusters
+		bcs = pd.DataFrame( list( self.db.bicluster_info.find( {}, { "cluster" : 1, "run_id": 1 } ) ) )
+		tmp = bcs.apply( get_fimo_scans_single, axis=1, db = self.db, e_dir = self.e_dir, run2id = self.run2id  )
+		return None
 
 	def mongoDump( self, db, outfile ):
 		"""Write contents from MongoDB instance to binary file"""
@@ -660,29 +681,51 @@ class sql2mongoDB:
 		# print "Compiling EGRIN2 ensemble..."  
 		self.db_files = self.checkRuns( self.db_files, self.db_run_override, self.db )
 	    	self.run2id = self.get_run2id( self.db_files, self.db )
+	    	
 	    	print "Downloading genome information for NCBI taxonomy ID:", self.ncbi_code
 		self.genome_collection = self.loadGenome( self.ncbi_code, self.genome_file )
 	    	self.expression = self.loadRatios( self.ratios_raw)
+	    	
 	    	print "Standardizing gene expression..."
 	    	self.expression_standardized = self.standardizeRatios( self.expression)
+	    	
 	    	print "Inserting into row_info collection"
 	    	self.row2id = self.get_row2id( self.expression_standardized, self.db )
 	    	self.row_info_collection = self.insert_row_info( self.ncbi_code, self.row2id, self.row_annot, self.row_annot_match_col )
+	    	
 	    	print "Inserting into col_info collection"
 	    	self.col2id = self.get_col2id( self.expression_standardized, self.db )
 	    	self.col_info_collection = self.insert_col_info( self.col2id, self.col_annot )
+	    	
 	    	print "Inserting gene expression into database"
 	    	self.gene_expression_collection = self.insert_gene_expression( self.db, self.row2id, self.col2id, self.expression, self.expression_standardized )
+	    	
 	    	print "Inserting into ensemble_info collection"
 	    	self.ensemble_info_collection = self.insert_ensemble_info( self.db_files, self.db, self.run2id, self.row2id, self.col2id )
 	    	self.motif2gre = self.loadGREMap( self.gre2motif )
+	    	
 	    	print "Inserting into bicluster collection"
 	    	for i in self.db_files:
 	    		print i
 	    		self.bicluster_info_collection = self.insert_bicluster_info( self.db, self.e_dir, i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
-    		print "Indexing bicluster collection"
-    			
+		
+		print "Indexing bicluster collection"
+		self.bicluster_info_collection.ensure_index( "rows" )
+		self.bicluster_info_collection.ensure_index( "columns" )
+		self.bicluster_info_collection.ensure_index( "motif.gre_id" ) 
+		
+		print "Inserting into fimo collection. This might take awhile..."
+		self.assemble_fimo( )
+		
+		print "Indexing fimo collection"
+		self.bicluster_info_collection.ensure_index( "run_id" )
+		self.bicluster_info_collection.ensure_index( "cluster" )
+		self.bicluster_info_collection.ensure_index( "motif_num" )
+		self.bicluster_info_collection.ensure_index( "start" ) 
+		self.bicluster_info_collection.ensure_index( "stop" ) 
+
     		outfile = self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
+		
 		print "Writing EGRIN2 MongoDB to %s" % 	os.getcwd() + "/" + outfile   		
     		self.mongoDump( self.dbname, outfile )
 	    	return None

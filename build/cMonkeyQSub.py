@@ -51,7 +51,7 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -M %s@systemsbiology.org
 #$ -cwd
 #$ -pe serial %d
-#$ -l mem_free=32G
+#$ -l mem_free=8G
 
 python cmonkey.py --organism %s --ratios %s --config %s --out %s
 
@@ -75,7 +75,7 @@ QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -M %s@systemsbiology.org
 #$ -cwd
 #$ -pe serial %d
-#$ -l mem_free=32G
+#$ -l mem_free=8G
 
 python cmonkey.py --organism %s --ratios %s --config %s --out %s --minmize_io
 
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     parser.add_argument('--numruns', type=int, default=4)
     parser.add_argument('--ncbi_code', default="")
     parser.add_argument('--mincols', type=int, default=8)
-    parser.add_argument('--num_cores', type=int, default=1)
+    parser.add_argument('--num_cores', type=int, default=4)
     parser.add_argument('--user', default=None)
     parser.add_argument('--csh', action='store_true')
     parser.add_argument('--blocks', default=None)
