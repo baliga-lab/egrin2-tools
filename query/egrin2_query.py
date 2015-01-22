@@ -223,8 +223,17 @@ def rows2corem( rows = [ 0, 1 ], host = "localhost", port = 27017, db = "egrin2_
 		print "Could not find any corems matching your criteria"
 		return None
 
-def x2bicluster( x = [ 0,1 ], x_type = "rows", host = "localhost", port = 27017, db = "egrin2_db",  verbose = False, return_field = [ "cluster" ], logic = "and" ):
+def x2bicluster( x = [ 0,1 ], x_type = "rows", logic = "and", count = True, host = "localhost", port = 27017, db = "egrin2_db",  verbose = False, return_field = [ "cluster" ] ):
+	"""
+	Determine how often 'x' occurs in biclusters. Usually just retrieve the counts. Retrieve additional bicluster info by setting count to False
 
+	Available x_type(s):
+
+	'rows': search for row (genes) in biclusters. x should be a list of rows.
+	'columns': search for columns (conditions) in biclusters. x should be a list of columns.
+	''
+
+	"""
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 
 	if x_type == "rows":
@@ -236,7 +245,7 @@ def x2bicluster( x = [ 0,1 ], x_type = "rows", host = "localhost", port = 27017,
 			print "Cannot translate row names: %s" % x_o
 			return None
 
-	if x_type == "cols":
+	if x_type == "columns":
 		x_o = x
 		x = [ col2id( i, host, port, db ) for i in x ]
 		x = [ i for i in x if i is not None]
@@ -245,9 +254,13 @@ def x2bicluster( x = [ 0,1 ], x_type = "rows", host = "localhost", port = 27017,
 			print "Cannot translate col names: %s" % x_o
 			return None  
 
-	if logic in [ "and","or","nor" ]:
+	if x_type in [ "rows", "columns" ] and logic in [ "and","or","nor" ]:
 		q = { "$"+logic: [ { x_type : i } for i in x ] }
-		query = pd.DataFrame( list( client[db].bicluster_info.find( q ) ) )
+		if count:
+			query =client[db].bicluster_info.find( q ).count()
+			return query
+		else:
+			query = pd.DataFrame( list( client[db].bicluster_info.find( q ) ) )
 	else:
 		print "I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'."
 	

@@ -53,7 +53,7 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -pe serial %d
 #$ -l mem_free=32G
 
-python cmonkey.py --organism %s --ratios %s --config %s --out %s --minmize_io
+python cmonkey.py --organism %s --ratios %s --config %s --out %s
 
 bzip2 -f %s/*.pkl
 """
@@ -167,7 +167,7 @@ if __name__ == '__main__':
         outfile.write(template % (login, args.numruns, login,
                                   args.num_cores,
                                   args.organism,
-                                  os.path.join(args.targetdir, "ratios-$BATCHNUM.csv"),
+                                  os.path.join(args.targetdir, "ratios-$BATCHNUM.tsv"),
                                   os.path.join(args.targetdir, "config-$BATCHNUM.ini"),
                                   "%s-out-$BATCHNUM" % (args.organism),
                                   "%s-out-$BATCHNUM" % (args.organism) ) )
