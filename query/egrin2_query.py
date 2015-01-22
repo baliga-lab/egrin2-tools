@@ -4,7 +4,7 @@
 
 __author__ = "Aaron Brooks"
 __copyright__ = "Copyright 2014, cMonkey2"
-__credits__ = ["Aaron Brooks"]
+__credits__ = ["Aaron Brooks", "David Reiss"]
 __license__ = "GPL"
 __version__ = "0.0.1"
 __maintainer__ = "Aaron Brooks"
