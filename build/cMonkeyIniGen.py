@@ -131,7 +131,7 @@ class cMonkeyIniGen:
 			params[ "use_multiprocessing" ] = True
 		if "checkpoint_interval" not in params.keys():
 			params[ "checkpoint_interval" ] = 99999
-		if "num_core" not in params.keys():
+		if "num_cores" not in params.keys():
 			params[ "num_cores" ] = 1
 		if "stats_frequency" not in params.keys():
 			params[ "stats_frequency" ] = 10
@@ -222,7 +222,7 @@ class cMonkeyIniGen:
 
 
 		# [MEME]
-		BGORDER = [None, 0, 1, 2, 3, 4, 5]
+		BGORDER = [ 0, 1, 2, 3, 4, 5]
 
 		if "meme_global_background" not in params.keys():
 			params[ "meme_global_background" ] = True

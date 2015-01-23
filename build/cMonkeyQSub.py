@@ -130,7 +130,7 @@ if __name__ == '__main__':
       cols.pickCols_all()
 
     # write config files
-    config_params = { }
+    config_params = { "num_cores": args.num_cores }
 
     print "Writing ensemble config files"
     for i in range( 1, args.numruns+1 ):
