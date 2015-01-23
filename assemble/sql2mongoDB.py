@@ -629,7 +629,7 @@ class sql2mongoDB:
 
 		def get_fimo_scans_single( i, db, e_dir, run2id ):
 			cluster = i.cluster
-			run_name =run2id[ run2id[ "run_id" ]==0 ][ "run_name" ][ 0 ]
+			run_name =run2id[ run2id[ "run_id" ]==i.run_id ][ "run_name" ][ 0 ]
 			try:
 				# get all fimo scans in the dir
 				f = e_dir + run_name + "/fimo-outs/fimo-out-" + "%04d" % (cluster,) + ".bz2" 
