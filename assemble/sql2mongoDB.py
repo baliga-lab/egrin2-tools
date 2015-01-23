@@ -46,7 +46,7 @@ from Bio import SeqIO
 
 class sql2mongoDB:
     
-	def __init__( self, host = None, port = None, e_dir = None, prefix = None, gene_info = None, ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None , db_run_override = None, genome_file = None, row_annot = None, row_annot_match_col = None ):
+	def __init__( self, organism = None, host = None, port = None, e_dir = None, targetdir = None,prefix = None,ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None , db_run_override = None, genome_file = None, row_annot = None, row_annot_match_col = None ):
 		
 		# connect to database
 		# make sure mongodb is running
@@ -58,6 +58,12 @@ class sql2mongoDB:
 		if port is None:
 			port = 27017
 
+		if organism is None:
+			print "Requires an organism code, e.g. eco for E. coli"
+			return None
+		else:
+			self.organism = organism
+
 		try:
 			client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' ) 
 			print "Connected to MongoDB"
@@ -65,7 +71,7 @@ class sql2mongoDB:
 			print "Could not connect to MongoDB: %s" % e
 
 		if dbname is None:
-			self.dbname = "egrin2_db"
+			self.dbname = self.organism + "_db"
 		else:
 			self.dbname = dbname
 
@@ -77,13 +83,17 @@ class sql2mongoDB:
 
 		# get db files in directory
 		if prefix is None:
-			self.prefix = 'eco-out-'
+			self.prefix = organism+'-out-'
 		else:
 			self.prefix = prefix
 		if e_dir is None:
 			self.e_dir = './'
 		else:
 			self.e_dir = e_dir
+		if targetdir is None:
+			self.targetdir = './'
+		else:
+			self.targetdir = targetdir
 		if gre2motif == None:
 			# default file name?
 			self.gre2motif = self.e_dir + "out.mot_metaclustering.txt.I45.txt"
@@ -668,6 +678,7 @@ class sql2mongoDB:
 
 	def mongoDump( self, db, outfile ):
 		"""Write contents from MongoDB instance to binary file"""
+		outfile = os.path.abspath( os.path.join( self.targetdir,outfile ) )
 		sys_command = "mongodump --db " + db + " --out " + outfile
 		os.system(sys_command)
 

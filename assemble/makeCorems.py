@@ -41,7 +41,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 class makeCorems:
 
-	def __init__( self, host = None, port = None, dbname = None, dbfiles = None, backbone_pval = None, out_dir = None, n_subs = None, link_comm_score = None, link_comm_increment = None, link_comm_density_score = None, corem_size_threshold = None, n_processes = None ):
+	def __init__( self, organism = None, host = None, port = None, dbname = None, dbfiles = None, backbone_pval = None, out_dir = None, n_subs = None, link_comm_score = None, link_comm_increment = None, link_comm_density_score = None, corem_size_threshold = None ):
 
 		# connect to database
 		# make sure mongodb is running
@@ -53,6 +53,10 @@ class makeCorems:
 		if port is None:
 			port = 27017
 
+		if organism is None:
+			print "Requires an organism code, e.g. eco for E. coli"
+			return None
+
 		try:
 			client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' ) 
 			print "Connected to MongoDB"
@@ -60,8 +64,8 @@ class makeCorems:
 			print "Could not connect to MongoDB: %s" % e
 			return None
 
-		if dbname == None:
-			self.dbname = "egrin2_db"
+		if dbname is None:
+			self.dbname = self.organism + "_db"
 		else:
 			self.dbname = dbname
 
@@ -152,11 +156,6 @@ class makeCorems:
 			self.corem_size_threshold = corem_size_threshold
 
 		self.cutoff = None
-
-		if n_processes is None:
-			self.n_processes = 4
-		else:
-			self.n_processes = n_processes
 
 	def mongoRestore( self, db, infile ):
 		"""Read contents of binary MongoDB dump into MongoDB instance"""

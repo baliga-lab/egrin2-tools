@@ -33,7 +33,7 @@ import itertools
 from cMonkeyIniGen import *
 from ensemblePicker import * 
 
-DESCRIPTION = """ensemble.py - prepare cluster runs"""
+DESCRIPTION = """cMonkeyQSub.py - prepare cluster runs"""
 
 # Templates for Bourne Shell
 QSUB_TEMPLATE_HEADER = """#!/bin/bash
