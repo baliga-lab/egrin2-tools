@@ -48,10 +48,12 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -q baliga
 #$ -P Bal_%s
 #$ -t 1-%d
+#$ -tc %d
+#$ -l hostname="baliga2|baliga3"
 #$ -M %s@systemsbiology.org
 #$ -cwd
 #$ -pe serial %d
-#$ -l mem_free=8G
+#$ -l mem_free=10G
 
 python cmonkey.py --organism %s --ratios %s --config %s --out %s
 
@@ -72,12 +74,14 @@ QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -q baliga
 #$ -P Bal_%s
 #$ -t 1-%d
+#$ -tc %d
+#$ -l hostname="baliga2|baliga3"
 #$ -M %s@systemsbiology.org
 #$ -cwd
 #$ -pe serial %d
-#$ -l mem_free=8G
+#$ -l mem_free=10G
 
-python cmonkey.py --organism %s --ratios %s --config %s --out %s --minmize_io
+python cmonkey.py --organism %s --ratios %s --config %s --out %s --minimize_io
 
 bzip2 -f %s/*.pkl
 """
@@ -90,7 +94,8 @@ if __name__ == '__main__':
     parser.add_argument('--numruns', type=int, default=4)
     parser.add_argument('--ncbi_code', default="")
     parser.add_argument('--mincols', type=int, default=8)
-    parser.add_argument('--num_cores', type=int, default=4)
+    parser.add_argument('--num_cores', type=int, default=8)
+    parser.add_argument('--max_tasks', type=int, default=20)
     parser.add_argument('--user', default=None)
     parser.add_argument('--csh', action='store_true')
     parser.add_argument('--blocks', default=None)
@@ -166,6 +171,7 @@ if __name__ == '__main__':
         outfile.write(header)
         outfile.write(template % (login, args.numruns, login,
                                   args.num_cores,
+                                  args.max_tasks,
                                   args.organism,
                                   os.path.join(args.targetdir, "ratios-$BATCHNUM.tsv"),
                                   os.path.join(args.targetdir, "config-$BATCHNUM.ini"),
