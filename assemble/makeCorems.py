@@ -124,7 +124,7 @@ class makeCorems:
 			if not os.path.isdir( self.out_dir ):
 				os.makedirs( self.out_dir )
 		else:
-			self.out_dir = os.path.abspath( os.path.join( self.out_dir,"corem_data" )
+			self.out_dir = os.path.abspath( os.path.join( out_dir,"corem_data" )
 			if not os.path.isdir( self.out_dir ):
 				os.makedirs( self.out_dir )
 		print "Corem data will be output to:", self.out_dir
