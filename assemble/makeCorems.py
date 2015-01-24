@@ -132,6 +132,8 @@ class makeCorems:
 		if n_subs is None:
 			# number of subprocesses to spawn
 			self.n_subs = 4
+		else:
+			self.n_subs = n_subs
 
 		if link_comm_score is None:
 			# use link similarity def of (0) Ahn or (1) Kalinka
