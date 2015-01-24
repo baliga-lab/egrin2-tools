@@ -56,6 +56,8 @@ class makeCorems:
 		if organism is None:
 			print "Requires an organism code, e.g. eco for E. coli"
 			return None
+		else:
+			self.organism = organism
 
 		try:
 			client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' ) 
