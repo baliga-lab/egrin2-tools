@@ -62,6 +62,7 @@ if __name__ == '__main__':
 	sql2mongo.compile()
 
 	# Make corems
+	corems = makeCorems( organism = args.organism, host = args.host, port = args.port, dbname = args.db, dbfiles = None, backbone_pval = args.backbone_pval, out_dir = args.targetdir, n_subs = args.cores, link_comm_score = args.link_comm_score, link_comm_increment = args.link_comm_increment, link_comm_density_score = args.link_comm_density_score, corem_size_threshold = args.corem_size_threshold )
 	corems.rowRow()
 	corems.runCoremCscripts()
 	corems.addCorems()
