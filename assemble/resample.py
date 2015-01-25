@@ -57,7 +57,7 @@ def choose_n( col, vals, n, add, client, db, n_rows, n_resamples, old_records, k
 		ras = ras[ 0: int( n2keep ) ]
 		client[ db ][ "col_resample" ].update( { "n_rows": n_rows, "col_id": col }, { "$set": { "resamples": resamples, "lowest_normalized": ran, "lowest_standardized": ras } } )
 
-def colResampleInd( host, n_rows, cols, n_resamples = 20000, keepP = 0.1, port = 27017, db = "egrin2_db" ):
+def colResampleInd( host, db, n_rows, cols, n_resamples = 20000, keepP = 0.1, port = 27017):
 	"""Resample gene expression for a given number of genes in a particular condition using RSD"""
 
 	print "Adding resample document for gene set size %i " % ( n_rows )
