@@ -73,7 +73,7 @@ if __name__ == '__main__':
 	cols = range( 0,client[ db ][ "col_info" ].count( ) )
 	corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
 	corem_sizes.sort( )
-	tmp = Parallel(n_jobs=args.cores )( delayed( colResampleInd )( host, i, cols, n_resamples = args.n_resamples) for i in corem_sizes )
+	tmp = Parallel(n_jobs=args.cores )( delayed( colResampleInd )( args.host, i, cols, n_resamples = args.n_resamples) for i in corem_sizes )
 
 	print "Done"	
 
