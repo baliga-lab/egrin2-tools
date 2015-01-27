@@ -38,20 +38,26 @@ from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
+from egrin2_query import *
+
 
 class makeCorems:
 
-	def __init__( self, organism = None, host = None, port = None, dbname = None, dbfiles = None, backbone_pval = None, out_dir = None, n_subs = None, link_comm_score = None, link_comm_increment = None, link_comm_density_score = None, corem_size_threshold = None ):
+	def __init__( self, organism = None, host = None, port = None, db = None, dbfiles = None, backbone_pval = None, out_dir = None, n_subs = None, link_comm_score = None, link_comm_increment = None, link_comm_density_score = None, corem_size_threshold = None, n_resamples = None ):
 
 		# connect to database
 		# make sure mongodb is running
 		# retvalue = os.system("nohup mongod --port 27017 --quiet &")
 		
 		if host is None:
-			host = "localhost"
+			self.host = "localhost"
+		else:
+			self.host = host
 
 		if port is None:
-			port = 27017
+			self.port = 27017
+		else:
+			self.port = port
 
 		if organism is None:
 			print "Requires an organism code, e.g. eco for E. coli"
@@ -60,30 +66,30 @@ class makeCorems:
 			self.organism = organism
 
 		try:
-			client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' ) 
+			client = MongoClient( 'mongodb://'+self.host+':'+str(self.port)+'/' ) 
 			print "Connected to MongoDB"
 		except pymongo.errors.ConnectionFailure, e:
 			print "Could not connect to MongoDB: %s" % e
 			return None
 
-		if dbname is None:
-			self.dbname = self.organism + "_db"
+		if db is None:
+			self.db = self.organism + "_db"
 		else:
-			self.dbname = dbname
+			self.db= db
 
-		if self.dbname in client.database_names():
-			print "Found ensemble database: %s" % self.dbname
+		if self.db in client.database_names():
+			print "Found ensemble database: %s" % self.db
 		else:
-			print "Could not locate a MongoDB database with name: %s\nAttempting to perform DB import at: %s" % ( self.dbname, dbfiles )
+			print "Could not locate a MongoDB database with name: %s\nAttempting to perform DB import at: %s" % ( self.db, dbfiles )
 			if dbfiles != None:
 				try:
-					self.mongoRestore( self.dbname, dbfiles )
+					self.mongoRestore( self.db, dbfiles )
 				except Exception:
 					return None
 			else:
 				return None
 		
-		self.db = client[self.dbname]
+		self.db = client[self.db]
 		
 		self.row2id = {}
 		self.id2row = {}
@@ -160,6 +166,11 @@ class makeCorems:
 			self.corem_size_threshold = corem_size_threshold
 
 		self.cutoff = None
+
+		if n_resamples is None:
+			self.n_resamples = 10000
+		else:
+			self.n_resamples = n_resamples
 
 	def mongoRestore( self, db, infile ):
 		"""Read contents of binary MongoDB dump into MongoDB instance"""
@@ -509,6 +520,26 @@ class makeCorems:
 
 		self.db.corem.insert( to_write )
 		
+	def finishCorems( self ):
+		"""Finish adding corem info (cols) after resampling. Assumes corem docs already exist"""
+		# get all the corems
+		corems = pd.DataFrame( list( self.db["corem"].find( { }, { "_id":1, "rows": 1 } ) ) )
+		# get all of the conditions
+		cols = pd.DataFrame( list( self.db["col_info"].find( { }, { "_id":0, "col_id": 1 } ) ) ).col_id.tolist()
+
+		def computeANDwriteCol( x ):
+			print x._id
+			pvals = colResamplePval( rows = x.rows, cols = cols, n_resamples = self.n_resamples, host = self.host, port = self.port, db = self.db.name, standardized = True, sig_cutoff = 0.05, sort = True, add_override = False, n_jobs = 4, keepP = 0.05 )
+			pvals.index = [ self.col2id[ i ] for i in pvals.index.tolist() ]
+			pvals[ "col_id" ] = pvals.index
+			d = pvals.to_dict( orient='records' )
+			self.db.corem.update( { "_id": x._id }, { "$set": { "cols": d } } )
+			return None
+
+	
+		corem_col_pvals = [  computeANDwriteCol( corems.iloc[ i ] ) for i in range( corems.shape[ 0 ] ) ]
+
+		return None
 
 
 

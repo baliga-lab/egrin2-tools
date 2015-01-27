@@ -22,13 +22,15 @@ from pymongo import MongoClient
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
+from scipy.stats import hypergeom
+from statsmodels.sandbox.stats.multicomp import multipletests
 
 from resample import *
 
 def rsd( vals ):
 	return abs( np.std( vals ) / np.mean( vals ) )
 
-def check_colResamples( col, n_rows, n_resamples, host = "localhost", port = 27017, db = "egrin2_db",  ):
+def check_colResamples( col, n_rows, n_resamples, host, port, db,  ):
 	# connect to db
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' ) 
 	if client[db].col_resample.find_one( { "n_rows": n_rows, "col_id": col, "resamples": { "$gte": n_resamples } } ) is None:
@@ -36,7 +38,7 @@ def check_colResamples( col, n_rows, n_resamples, host = "localhost", port = 270
 		return col
 	client.close()
 
-def row2id( row, host = "localhost", port = 27017, db = "egrin2_db",  verbose = False, return_field = "row_id" ):
+def row2id( row, host, port, db,  verbose = False, return_field = "row_id" ):
 	"""Check name format of rows. If necessary, translate."""
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 	query = list( client[db].row_info.find( { "$or": [ { "row_id": row }, { "egrin2_row_name": row }, { "GI": row }, { "accession": row }, { "name": row }, { "sysName": row } ] } ) )
@@ -57,7 +59,7 @@ def row2id( row, host = "localhost", port = 27017, db = "egrin2_db",  verbose = 
 		return None
 	
 
-def col2id( col, host = "localhost", port = 27017, db = "egrin2_db",  verbose = False, return_field = "row_id" ):
+def col2id( col, host, port, db,  verbose = False, return_field = "row_id" ):
 	"""Check name format of rows. If necessary, translate."""
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 	query = list( client[db].col_info.find( { "$or": [ { "col_id": col }, { "egrin2_col_name": col } ] } ) )
@@ -77,7 +79,7 @@ def col2id( col, host = "localhost", port = 27017, db = "egrin2_db",  verbose = 
 		print "ERROR: Cannot identify col name: %s" % col
 		return None
 
-def col2name( col, host = "localhost", port = 27017, db = "egrin2_db",  verbose = False ):
+def col2name( col, host, port, db,  verbose = False ):
 	"""Check name format of rows. If necessary, translate."""
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 	query = list( client[db].col_info.find( { "$or": [ { "col_id": col }, { "egrin2_col_name": col } ] } ) )
@@ -177,7 +179,7 @@ def colResamplePval( rows = None, cols = None, n_resamples = None, host = "local
 
 	pvals = exp_df_rsd.groupby( level=0 ).aggregate(empirical_pval, random_rsd, resamples )
 	pvals.columns = ["pval"]
-	pvals.index = [ col2name( i ) for i in pvals.index.values]
+	pvals.index = [ col2name( i, host, port, db ) for i in pvals.index.values]
 
 	if sig_cutoff is not None:
 		pvals = pvals[ pvals <= sig_cutoff ]
