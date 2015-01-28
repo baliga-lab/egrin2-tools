@@ -24,6 +24,7 @@ import pandas as pd
 from joblib import Parallel, delayed
 from scipy.stats import hypergeom
 from statsmodels.sandbox.stats.multicomp import multipletests
+import itertools
 
 from resample import *
 
@@ -57,6 +58,15 @@ def row2id( row, host, port, db,  verbose = False, return_field = "row_id" ):
 	else:
 		print "ERROR: Cannot identify row name: %s" % row
 		return None
+
+def row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id" ):
+	"""Check name format of rows. If necessary, translate."""
+	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+	query = pd.DataFrame( list( client[db].row_info.find( { "$or": [ { "row_id": { "$in": rows } }, { "egrin2_row_name": { "$in": rows } }, { "GI": { "$in": rows } }, { "accession": {"$in": rows } }, { "name": { "$in": rows } }, { "sysName": { "$in": rows }  } ] }, { return_field: 1 } ) ) ).loc[ :, return_field ].tolist()
+	client.close()
+	if len( rows ) > len( query ): 
+		print "WARNING: Returning fewer rows than originally supplied"
+	return query
 	
 
 def col2id( col, host, port, db,  verbose = False, return_field = "row_id" ):
@@ -96,7 +106,7 @@ def col2name( col, host, port, db,  verbose = False ):
 		print "ERROR: Cannot identify row name: %s" % col
 		return None
 
-def colResamplePval( rows = None, cols = None, n_resamples = None, host = "localhost", port = 27017, db = "egrin2_db", standardized = None, sig_cutoff = None, sort = True, add_override = False, n_jobs = 4, keepP = 0.1 ):
+def colResamplePval( rows = None, cols = None, n_resamples = None, host = "localhost", port = 27017, db = "", standardized = None, sig_cutoff = None, sort = True, add_override = False, n_jobs = 4, keepP = 0.1, verbose = True ):
 
 	def empirical_pval( i, random_rsd, resamples ):
 		for x in range( 0, len( i ) ):
@@ -153,7 +163,8 @@ def colResamplePval( rows = None, cols = None, n_resamples = None, host = "local
 			print "I would need to perform %i random resample(s) of size %i to compute pvals. Since this would require significant computational power (and time), I have only returned results where resample data has been pre-calculated. Consult resample.py to run these jobs on multiple cores (much faster) or change 'add_override' flag of this function to 'True' to build the resample now." % ( len(toAdd), n_resamples )
 			cols = [i for i in cols if i not in toAdd]
 
-	print "Calculating pvals"
+	if verbose:
+		print "Calculating pvals"
 
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 	exp_df = pd.DataFrame( list( client[ db ].gene_expression.find( { "col_id": { "$in" : cols }, "row_id": { "$in" : rows } }, { "_id":0, "col_id":1, "normalized_expression":1, "standardized_expression":1 } ) ) )
@@ -195,7 +206,7 @@ def colResamplePval( rows = None, cols = None, n_resamples = None, host = "local
 
 	return pvals
 
-def rows2corem( rows = [ 0, 1 ], host = "localhost", port = 27017, db = "egrin2_db",  verbose = False, return_field = [ "corem_id" ], logic = "and" ):
+def rows2corem( rows = [ 0, 1 ], host = "localhost", port = 27017, db = "",  verbose = False, return_field = [ "corem_id" ], logic = "and" ):
 	"""Find corems in which row(s) co-occur."""
 	
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
@@ -228,21 +239,26 @@ def rows2corem( rows = [ 0, 1 ], host = "localhost", port = 27017, db = "egrin2_
 		print "Could not find any corems matching your criteria"
 		return None
 
-def x2bicluster( x = [ 0,1 ], x_type = "rows", logic = "and", count = True, host = "localhost", port = 27017, db = "egrin2_db",  verbose = False, return_field = [ "cluster" ] ):
+def x2bicluster( x = [ 0,1 ], x_type = None, logic = "and", count = True, host = "localhost", port = 27017, db = "",  verbose = False, return_field = [ "cluster" ] ):
 	"""
 	Determine how often 'x' occurs in biclusters. Usually just retrieve the counts. Retrieve additional bicluster info by setting count to False
 
 	Available x_type(s):
 
-	'rows': search for row (genes) in biclusters. x should be a list of rows, eg ["carA","carB"] or [275, 276]
-	'columns': search for columns (conditions) in biclusters. x should be a list of columns, eg ["dinI_U_N0025", "dinP_U_N0025"] or [0,1]
-	'motif.gre': search for GREs in biclusters. x should be a list of GRE IDs, eg [4, 19]
+	'rows' or 'genes': search for row (genes) in biclusters. x should be a list of rows, eg ["carA","carB"] or [275, 276]
+	'columns' or 'conditions': search for columns (conditions) in biclusters. x should be a list of columns, eg ["dinI_U_N0025", "dinP_U_N0025"] or [0,1]
+	'gre': search for GREs in biclusters. x should be a list of GRE IDs, eg [4, 19]
 	''
 
 	"""
+
+	if x_type is None:
+		print "Please supply a type for your query. Types include: 'rows' (genes), 'columns' (conditions), 'gres' "
+
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 
-	if x_type == "rows":
+	if x_type == "rows" or "row" or "gene" or "genes":
+		x_type = "rows"
 		x_o = x
 		x = [ row2id( i, host, port, db ) for i in x ]
 		x = [ i for i in x if i is not None]
@@ -251,7 +267,8 @@ def x2bicluster( x = [ 0,1 ], x_type = "rows", logic = "and", count = True, host
 			print "Cannot translate row names: %s" % x_o
 			return None
 
-	if x_type == "columns":
+	if x_type == "columns" or "column" or "condition" or "conditions":
+		x_type = "columns"
 		x_o = x
 		x = [ col2id( i, host, port, db ) for i in x ]
 		x = [ i for i in x if i is not None]
@@ -260,7 +277,10 @@ def x2bicluster( x = [ 0,1 ], x_type = "rows", logic = "and", count = True, host
 			print "Cannot translate col names: %s" % x_o
 			return None  
 
-	if x_type in [ "rows", "columns", "motif.gre" ] and logic in [ "and","or","nor" ]:
+	if x_type == "motif" or "gre" or "motc" or "motif.gre" or "motfs" or "gres" or "motcs":
+		x_type = "motif.gre_id"
+
+	if x_type in [ "rows", "columns", "motif.gre_id" ] and logic in [ "and","or","nor" ]:
 		q = { "$"+logic: [ { x_type : i } for i in x ] }
 		if count:
 			query =client[db].bicluster_info.find( q ).count()
@@ -283,6 +303,70 @@ def x2bicluster( x = [ 0,1 ], x_type = "rows", logic = "and", count = True, host
 	else:
 		print "Could not find any biclusters matching your criteria"
 		return None
+
+def bicluster2x( bicluster_ids = [ ], x_type = None, host = "localhost", port = 27017, db = "",  verbose = False ):
+	"""
+	Determine how often 'x' occurs in biclusters. Usually just retrieve the counts. 
+
+	Available x_type(s):
+
+	'rows' or 'genes': search for row (genes) in biclusters. x should be a list of rows, eg ["carA","carB"] or [275, 276]
+	'columns' or 'conditions': search for columns (conditions) in biclusters. x should be a list of columns, eg ["dinI_U_N0025", "dinP_U_N0025"] or [0,1]
+	'gre': search for GREs in biclusters. x should be a list of GRE IDs, eg [4, 19]
+	''
+
+	"""
+	if x_type is None:
+		print "Please supply a type for your query. Types include: 'rows' (genes), 'columns' (conditions), 'gres' "
+
+	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+
+	if x_type == "rows" or "row" or "gene" or "genes":
+		x_type = "rows"
+
+	if x_type == "columns" or "column" or "condition" or "conditions":
+		x_type = "columns"
+
+	if x_type == "motif" or "gre" or "motc" or "motif.gre" or "motfs" or "gres" or "motcs":
+		x_type = "motif.gre_id"
+
+	if x_type in [ "rows", "columns", "motif.gre_id" ] and logic in [ "and","or","nor" ]:
+		q = { "_id": { "$in": bicluster_ids } }
+		o = { x_type: 1 }
+		query = pd.DataFrame( list( client[db].bicluster_info.find( q, o ) ) )
+	else:
+		print "I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'."
+	
+	client.close()
+
+	if query.shape[0] > 0: 
+		if x_type == "rows":
+			in_db = pd.DataFrame( list( client[db].row_info.find( { }, { "_id" : 0, "row_id": 1 } ) ) ).row_id.tolist()
+			rows = pd.Series( list( itertools.chain( *query.rows.tolist() ) ) ).value_counts().to_frame( "counts" )
+			# filter out rows that aren't in the database - i.e. not annotated in MicrobesOnline
+			common_rows = list(set(rows.index).intersection(set(in_db)))
+			rows = rows.loc[common_rows]
+
+			rows[ "pval" ] = 
+			t_rows = [ row2id( i, host, port, db,  verbose = False, return_field = "egrin2_row_name" ) for i in rows.index ]
+			rows.index = 
+		
+		if return_field == "all":
+			return query
+		else:
+			try:
+				return query.loc[ :, return_field ]
+			except Exception:
+				return query
+	else:
+		print "Could not find any biclusters matching your criteria"
+		return None
+
+	return None
+
+def agglom( x, x_type, out_type, path ):
+	return None
+
 
 
 	

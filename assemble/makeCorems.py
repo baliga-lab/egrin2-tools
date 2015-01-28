@@ -528,8 +528,8 @@ class makeCorems:
 		cols = pd.DataFrame( list( self.db["col_info"].find( { }, { "_id":0, "col_id": 1 } ) ) ).col_id.tolist()
 
 		def computeANDwriteCol( x ):
-			print x._id
-			pvals = colResamplePval( rows = x.rows, cols = cols, n_resamples = self.n_resamples, host = self.host, port = self.port, db = self.db.name, standardized = True, sig_cutoff = 0.05, sort = True, add_override = False, n_jobs = 4, keepP = 0.05 )
+			#print x._id
+			pvals = colResamplePval( rows = x.rows, cols = cols, n_resamples = self.n_resamples, host = self.host, port = self.port, db = self.db.name, standardized = True, sig_cutoff = 0.05, sort = True, add_override = False, n_jobs = 4, keepP = 0.05, verbose = False )
 			pvals.index = [ self.col2id[ i ] for i in pvals.index.tolist() ]
 			pvals[ "col_id" ] = pvals.index
 			d = pvals.to_dict( orient='records' )
