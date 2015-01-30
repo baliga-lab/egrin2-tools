@@ -47,7 +47,7 @@ from Bio import SeqIO
 
 class sql2mongoDB:
     
-	def __init__( self, organism = None, host = None, port = None, e_dir = None, targetdir = None,prefix = None,ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None , db_run_override = None, genome_file = None, row_annot = None, row_annot_match_col = None ):
+	def __init__( self, organism = None, host = None, port = None, e_dir = None, targetdir = None, prefix = None,ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None , db_run_override = None, genome_file = None, row_annot = None, row_annot_match_col = None ):
 		
 		# connect to database
 		# make sure mongodb is running
@@ -681,12 +681,12 @@ class sql2mongoDB:
 	def mongoDump( self, db, outfile ):
 		"""Write contents from MongoDB instance to binary file"""
 		outfile = os.path.abspath( os.path.join( self.targetdir,outfile ) )
-		sys_command = "mongodump --db " + db + " --out " + outfile
+		sys_command = "mongodump --db " + db + " --out " + outfile + "--host " + self.host + "--port " +self.port 
 		os.system(sys_command)
 
 	def mongoRestore( self, db, infile ):
 		"""Read contents of binary MongoDB dump into MongoDB instance"""
-		sys_command = "mongorestore --db " + db + " " + infile
+		sys_command = "mongorestore --db " + db + " " + infile + "--host " + self.host + "--port " +self.port 
 		os.system(sys_command)
 
 	def compile( self ):
@@ -731,12 +731,12 @@ class sql2mongoDB:
 		self.assemble_fimo( )
 		
 		print "Indexing fimo collection"
-		self.db.fimo.ensure_index( { "scaffoldId":1, "start":1, "stop":1, "p-value":1, "cluster_id":1 } ) 
+		self.db.fimo.ensure_index( [ ( "scaffoldId", pymongo.ASCENDING ), ( "start", pymongo.ASCENDING ), ( "stop", pymongo.ASCENDING ),( "p-value", pymongo.ASCENDING ), ( "cluster_id", pymongo.ASCENDING ) ] ) 
 
 
-    		outfile = self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
+    		outfile =  self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 		
-		print "Writing EGRIN2 MongoDB to %s" % 	os.getcwd() + "/" + outfile   		
+		print "Writing EGRIN2 MongoDB to %s" % self.targetdir + outfile   		
     		self.mongoDump( self.dbname, outfile )
 	    	return None
 
