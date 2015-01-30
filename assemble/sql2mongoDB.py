@@ -32,6 +32,7 @@ import pandas as pd
 import sqlite3
 import pymongo
 from pymongo import MongoClient
+from bson.objectid import ObjectId
 import gridfs
 from Bio import SeqIO
 
@@ -640,6 +641,7 @@ class sql2mongoDB:
 		def get_fimo_scans_single( i, db, e_dir, run2id ):
 			cluster = i.cluster
 			run_name =run2id[ run2id[ "run_id" ]==i.run_id ][ "run_name" ][ 0 ]
+			cluster_id = i._id
 			try:
 				# get all fimo scans in the dir
 				f = e_dir + run_name + "/fimo-outs/fimo-out-" + "%04d" % (cluster,) + ".bz2" 
@@ -657,11 +659,11 @@ class sql2mongoDB:
 
 				trans_v = [trans_d[i] for i in fimo.scaffoldId.values]
 				fimo.scaffoldId = trans_v
-				fimo["run_id"] = run2id.loc[run_name].run_id
-				fimo["cluster"] = cluster
+				fimo["cluster_id"] = cluster_id
+				#fimo["cluster"] = cluster
 
 				# only keep specific columns
-				fimo = fimo.loc[ : , [ 'scaffoldId', 'start', 'stop', 'strand', 'score', 'p-value', 'in_coding_rgn', 'run_id', 'cluster', 'motif_num' ] ]
+				fimo = fimo.loc[ : , [ 'scaffoldId', 'start', 'stop', 'strand', 'score', 'p-value', 'in_coding_rgn', 'cluster_id' ] ]
 
 				d_f = fimo.to_dict( orient='records' )
 
@@ -729,11 +731,8 @@ class sql2mongoDB:
 		self.assemble_fimo( )
 		
 		print "Indexing fimo collection"
-		self.bicluster_info_collection.ensure_index( "run_id" )
-		self.bicluster_info_collection.ensure_index( "cluster" )
-		self.bicluster_info_collection.ensure_index( "motif_num" )
-		self.bicluster_info_collection.ensure_index( "start" ) 
-		self.bicluster_info_collection.ensure_index( "stop" ) 
+		self.db.fimo.ensure_index( { "scaffoldId":1, "start":1, "stop":1, "p-value":1, "cluster_id":1 } ) 
+
 
     		outfile = self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 		
@@ -741,5 +740,7 @@ class sql2mongoDB:
     		self.mongoDump( self.dbname, outfile )
 	    	return None
 
+if __name__ == '__main__':
+	self = sql2mongoDB( ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz",  col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz", ncbi_code = "511145", e_dir = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/eco-ens-m3d/", organism="eco", host = "primordial")
 
 

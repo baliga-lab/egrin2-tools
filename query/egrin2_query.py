@@ -234,7 +234,7 @@ def rows2corem( rows = [ 0, 1 ], host = "localhost", port = 27017, db = "",  ver
 
 def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "localhost", port = 27017, db = "",  verbose = False, gre_lim = 10, pval_cutoff = 0.05, translate = True ):
 	"""
-	Determine how often 'x' occurs in biclusters. Usually just retrieve the counts. Retrieve additional bicluster info by setting count to False
+	Determine enrichment of y given x through bicluster co-membership. 
 
 	Available x_type(s)/y_type(s):
 
@@ -386,6 +386,15 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 		
 		print "Could not find any biclusters matching your criteria"
 		return None
+
+def fimoFinder( start = None, stop = None, chr = None, strand = None, mot_pval_cutoff = None, filter = None, filter_type = None, host = "localhost", port = 27017, db = "" ):
+	"""Find motifs/GREs that fall within a specific range. Filter by biclusters/genes/conditions/etc."""
+	
+	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+
+	mots = pd.DataFrame( list( client[db].fimo.find( { "start": { "gte": start }, "stop": {"lte": stop } } ) ) )
+
+
 
 
 if __name__ == '__main__':

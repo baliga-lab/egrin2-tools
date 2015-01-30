@@ -4,7 +4,7 @@
 
 Example:
 
-python assemble.py --organism eco --ratios /Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz --targetdir /Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ --ncbi_code 511145 --ensembledir /Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/eco-ens-m3d/ --col_annot /Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 100
+python assemble.py --organism eco --ratios /Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz --targetdir /Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ --ncbi_code 511145 --ensembledir /Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/eco-ens-m3d/ --col_annot /Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0
 
 """
 
@@ -66,14 +66,15 @@ if __name__ == '__main__':
 	corems.runCoremCscripts()
 	corems.addCorems()
 
-	# Make resample database
-	print "Computing resamples"
-	client = MongoClient( host = args.host, port= args.port )
-	db = sql2mongo.dbname
-	cols = range( 0,client[ db ][ "col_info" ].count( ) )
-	corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
-	corem_sizes.sort( )
-	tmp = Parallel(n_jobs=args.cores )( delayed( colResampleInd )( args.host, sql2mongo.dbname, i, cols, n_resamples = args.n_resamples) for i in corem_sizes )
+	if arg.n_resamples > 0:
+		# Make resample database
+		print "Computing resamples"
+		client = MongoClient( host = args.host, port= args.port )
+		db = sql2mongo.dbname
+		cols = range( 0,client[ db ][ "col_info" ].count( ) )
+		corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
+		corem_sizes.sort( )
+		tmp = Parallel(n_jobs=args.cores )( delayed( colResampleInd )( args.host, sql2mongo.dbname, i, cols, n_resamples = args.n_resamples) for i in corem_sizes )
 
 	print "Done"	
 
