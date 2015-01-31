@@ -54,10 +54,14 @@ class sql2mongoDB:
 		# retvalue = os.system("nohup mongod --port 27017 --quiet &")
 
 		if host is None:
-			host = "localhost"
+			self.host = "localhost"
+		else:
+			self.host = host
 
 		if port is None:
-			port = 27017
+			self.port = 27017
+		else:
+			self.port = port
 
 		if organism is None:
 			print "Requires an organism code, e.g. eco for E. coli"
@@ -66,7 +70,7 @@ class sql2mongoDB:
 			self.organism = organism
 
 		try:
-			client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' ) 
+			client = MongoClient( 'mongodb://'+self.host+':'+str(self.port)+'/' ) 
 			print "Connected to MongoDB"
 		except pymongo.errors.ConnectionFailure, e:
 			print "Could not connect to MongoDB: %s" % e
@@ -680,13 +684,20 @@ class sql2mongoDB:
 
 	def mongoDump( self, db, outfile ):
 		"""Write contents from MongoDB instance to binary file"""
-		outfile = os.path.abspath( os.path.join( self.targetdir,outfile ) )
-		sys_command = "mongodump --db " + db + " --out " + outfile + "--host " + self.host + "--port " +self.port 
-		os.system(sys_command)
+		print "Dumping MongoDB to BSON"
+		outfile_wdir = os.path.abspath( os.path.join( self.targetdir,outfile ) )
+		sys_command = "mongodump --db " + db + " --out " + outfile_wdir + " --host " + self.host + " --port " + str( self.port )
+		os.system( sys_command )
+		print "Compressing MongoDB BSON docs"
+		sys_command2 = "tar -czvf " + outfile + ".tgz " + "-C " + os.path.abspath( self.targetdir ) + " " +outfile
+		os.system( sys_command2 )
+		print "Cleaning up..."
+		sys_command3 = "rm -rf " + outfile_wdir
+		os.system( sys_command3 )
 
 	def mongoRestore( self, db, infile ):
 		"""Read contents of binary MongoDB dump into MongoDB instance"""
-		sys_command = "mongorestore --db " + db + " " + infile + "--host " + self.host + "--port " +self.port 
+		sys_command = "mongorestore --db " + db + " --host " + self.host + " --port " + str( self.port ) + " " + infile 
 		os.system(sys_command)
 
 	def compile( self ):
@@ -741,6 +752,6 @@ class sql2mongoDB:
 	    	return None
 
 if __name__ == '__main__':
-	self = sql2mongoDB( ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz",  col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz", ncbi_code = "511145", e_dir = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/eco-ens-m3d/", organism="eco", host = "primordial")
+	self = sql2mongoDB( ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz",  col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz", ncbi_code = "511145", e_dir = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/eco-ens-m3d/", organism="eco", host = "localhost")
 
 
