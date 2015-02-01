@@ -704,35 +704,35 @@ class sql2mongoDB:
 		"""Compile EGRIN2 ensemble"""
 		# print "Compiling EGRIN2 ensemble..."  
 		self.db_files = self.checkRuns( self.db_files, self.db_run_override, self.db )
-	    	self.run2id = self.get_run2id( self.db_files, self.db )
+    	self.run2id = self.get_run2id( self.db_files, self.db )
 	    	
-	    	print "Downloading genome information for NCBI taxonomy ID:", self.ncbi_code
+    	print "Downloading genome information for NCBI taxonomy ID:", self.ncbi_code
 		self.genome_collection = self.loadGenome( self.ncbi_code, self.genome_file )
-	    	self.expression = self.loadRatios( self.ratios_raw)
+    	self.expression = self.loadRatios( self.ratios_raw)
 	    	
-	    	print "Standardizing gene expression..."
-	    	self.expression_standardized = self.standardizeRatios( self.expression)
+    	print "Standardizing gene expression..."
+    	self.expression_standardized = self.standardizeRatios( self.expression)
 	    	
-	    	print "Inserting into row_info collection"
-	    	self.row2id = self.get_row2id( self.expression_standardized, self.db )
-	    	self.row_info_collection = self.insert_row_info( self.ncbi_code, self.row2id, self.row_annot, self.row_annot_match_col )
-	    	
-	    	print "Inserting into col_info collection"
-	    	self.col2id = self.get_col2id( self.expression_standardized, self.db )
-	    	self.col_info_collection = self.insert_col_info( self.col2id, self.col_annot )
-	    	
-	    	print "Inserting gene expression into database"
-	    	self.gene_expression_collection = self.insert_gene_expression( self.db, self.row2id, self.col2id, self.expression, self.expression_standardized )
-	    	
-	    	print "Inserting into ensemble_info collection"
-	    	self.ensemble_info_collection = self.insert_ensemble_info( self.db_files, self.db, self.run2id, self.row2id, self.col2id )
-	    	self.motif2gre = self.loadGREMap( self.gre2motif )
-	    	
-	    	print "Inserting into bicluster collection"
-	    	for i in self.db_files:
-	    		print i
-	    		self.bicluster_info_collection = self.insert_bicluster_info( self.db, self.e_dir, i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
-		
+    	print "Inserting into row_info collection"
+    	self.row2id = self.get_row2id( self.expression_standardized, self.db )
+    	self.row_info_collection = self.insert_row_info( self.ncbi_code, self.row2id, self.row_annot, self.row_annot_match_col )
+    	
+    	print "Inserting into col_info collection"
+    	self.col2id = self.get_col2id( self.expression_standardized, self.db )
+    	self.col_info_collection = self.insert_col_info( self.col2id, self.col_annot )
+    	
+    	print "Inserting gene expression into database"
+    	self.gene_expression_collection = self.insert_gene_expression( self.db, self.row2id, self.col2id, self.expression, self.expression_standardized )
+    	
+    	print "Inserting into ensemble_info collection"
+    	self.ensemble_info_collection = self.insert_ensemble_info( self.db_files, self.db, self.run2id, self.row2id, self.col2id )
+    	self.motif2gre = self.loadGREMap( self.gre2motif )
+    	
+    	print "Inserting into bicluster collection"
+    	for i in self.db_files:
+    		print i
+    		self.bicluster_info_collection = self.insert_bicluster_info( self.db, self.e_dir, i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
+	
 		print "Indexing bicluster collection"
 		self.bicluster_info_collection.ensure_index( "rows" )
 		self.bicluster_info_collection.ensure_index( "columns" )
@@ -745,11 +745,11 @@ class sql2mongoDB:
 		self.db.fimo.ensure_index( [ ( "scaffoldId", pymongo.ASCENDING ), ( "start", pymongo.ASCENDING ), ( "stop", pymongo.ASCENDING ),( "p-value", pymongo.ASCENDING ), ( "cluster_id", pymongo.ASCENDING ) ] ) 
 
 
-    		outfile =  self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
+		#outfile =  self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 		
-		print "Writing EGRIN2 MongoDB to %s" % self.targetdir + outfile   		
-    		self.mongoDump( self.dbname, outfile )
-	    	return None
+		# print "Writing EGRIN2 MongoDB to %s" % self.targetdir + outfile   		
+		# self.mongoDump( self.dbname, outfile )
+  		return None
 
 if __name__ == '__main__':
 	self = sql2mongoDB( ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz",  col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz", ncbi_code = "511145", e_dir = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/eco-ens-m3d/", organism="eco", host = "localhost")

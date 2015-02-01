@@ -62,7 +62,7 @@ if __name__ == '__main__':
 	
 	# Merge sql into mongoDB
 	sql2mongo.compile()
-	corems = makeCorems( organism = args.organism, host = args.host, port = args.port, dbname = args.db, dbfiles = None, backbone_pval = args.backbone_pval, out_dir = args.targetdir, n_subs = args.cores, link_comm_score = args.link_comm_score, link_comm_increment = args.link_comm_increment, link_comm_density_score = args.link_comm_density_score, corem_size_threshold = args.corem_size_threshold )
+	corems = makeCorems( organism = args.organism, host = args.host, port = args.port, db = args.db, dbfiles = None, backbone_pval = args.backbone_pval, out_dir = args.targetdir, n_subs = args.cores, link_comm_score = args.link_comm_score, link_comm_increment = args.link_comm_increment, link_comm_density_score = args.link_comm_density_score, corem_size_threshold = args.corem_size_threshold )
 
 	# Make corems
 	corems.rowRow()
@@ -78,6 +78,10 @@ if __name__ == '__main__':
 		corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
 		corem_sizes.sort( )
 		tmp = Parallel(n_jobs=args.cores )( delayed( colResampleInd )( args.host, sql2mongo.dbname, i, cols, n_resamples = args.n_resamples) for i in corem_sizes )
+
+	outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
+	print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile  
+	sql2mongo.mongoDump( sql2mongo.dbname, outfile )
 
 	print "Done"	
 
