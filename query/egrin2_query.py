@@ -241,6 +241,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 	'rows' or 'genes': search for row (genes) in biclusters. x should be a list of rows, eg ["carA","carB"] or [275, 276]
 	'columns' or 'conditions': search for columns (conditions) in biclusters. x should be a list of columns, eg ["dinI_U_N0025", "dinP_U_N0025"] or [0,1]
 	'gre': search for GREs in biclusters. x should be a list of GRE IDs, eg [4, 19]
+	'bicluster': self explanatory. takes or outputs bicluster '_id'
 	''
 
 	"""
@@ -293,7 +294,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 		x_type = "motif.gre_id"
 
 	if x_type == "cluster" or x_type == "clusters" or x_type == "bicluster" or x_type == "biclusters":
-		print "WARNING! I hope you are using cluster _id!!! Otherwise the results might surprise you..."
+		print "WARNING! I hope you are using cluster '_id'!!! Otherwise the results might surprise you..."
 		x_type = "_id"
 
 	# Check output types
@@ -323,64 +324,68 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 	
 	client.close()
 
+	
 	if query.shape[0] > 0: 
-		if y_type == "rows":
-			rows = pd.Series( list( itertools.chain( *query.rows.tolist() ) ) ).value_counts().to_frame( "counts" )
-			
-			# filter out rows that aren't in the database - i.e. not annotated in MicrobesOnline
-			in_db = pd.DataFrame( list( client[db].row_info.find( { }, { "_id" : 0, "row_id": 1 } ) ) ).row_id.tolist()
-			common_rows = list(set(rows.index).intersection(set(in_db)))
-			rows = rows.loc[common_rows]
-			
-			# find all bicluster counts
-			all_counts = pd.DataFrame( list( client[db].bicluster_info.find( { }, { "rows": 1 } ) ) )
-			all_counts = pd.Series( list( itertools.chain( *all_counts.rows.tolist() ) ) ).value_counts().to_frame( "all_counts" )
-			# combine two data frames
-			to_r = rows.join(all_counts).sort("counts",ascending=False)
+		if y_type == "_id":
+			return query
+		else:
+			if y_type == "rows":
+				rows = pd.Series( list( itertools.chain( *query.rows.tolist() ) ) ).value_counts().to_frame( "counts" )
+				
+				# filter out rows that aren't in the database - i.e. not annotated in MicrobesOnline
+				in_db = pd.DataFrame( list( client[db].row_info.find( { }, { "_id" : 0, "row_id": 1 } ) ) ).row_id.tolist()
+				common_rows = list(set(rows.index).intersection(set(in_db)))
+				rows = rows.loc[common_rows]
+				
+				# find all bicluster counts
+				all_counts = pd.DataFrame( list( client[db].bicluster_info.find( { }, { "rows": 1 } ) ) )
+				all_counts = pd.Series( list( itertools.chain( *all_counts.rows.tolist() ) ) ).value_counts().to_frame( "all_counts" )
+				# combine two data frames
+				to_r = rows.join(all_counts).sort("counts",ascending=False)
 
-			if translate:
-				to_r.index = row2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_row_name" )
+				if translate:
+					to_r.index = row2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_row_name" )
 
-		if y_type == "columns":
-			cols = pd.Series( list( itertools.chain( *query["columns"].tolist() ) ) ).value_counts().to_frame( "counts" )
-			
-			# filter out rows that aren't in the database - i.e. not annotated in MicrobesOnline
-			in_db = pd.DataFrame( list( client[db].col_info.find( { }, { "_id" : 0, "col_id": 1 } ) ) ).col_id.tolist()
-			common_cols = list( set( cols.index ).intersection( set( in_db )  ))
-			cols = cols.loc[common_cols]
-			
-			# find all bicluster counts
-			all_counts = pd.DataFrame( list( client[db].bicluster_info.find( { }, { "columns": 1 } ) ) )
-			all_counts = pd.Series( list( itertools.chain( *all_counts["columns"].tolist() ) ) ).value_counts().to_frame( "all_counts" )
-			# combine two data frames
-			to_r = cols.join(all_counts).sort("counts",ascending=False)
+			if y_type == "columns":
+				cols = pd.Series( list( itertools.chain( *query["columns"].tolist() ) ) ).value_counts().to_frame( "counts" )
+				
+				# filter out rows that aren't in the database - i.e. not annotated in MicrobesOnline
+				in_db = pd.DataFrame( list( client[db].col_info.find( { }, { "_id" : 0, "col_id": 1 } ) ) ).col_id.tolist()
+				common_cols = list( set( cols.index ).intersection( set( in_db )  ))
+				cols = cols.loc[common_cols]
+				
+				# find all bicluster counts
+				all_counts = pd.DataFrame( list( client[db].bicluster_info.find( { }, { "columns": 1 } ) ) )
+				all_counts = pd.Series( list( itertools.chain( *all_counts["columns"].tolist() ) ) ).value_counts().to_frame( "all_counts" )
+				# combine two data frames
+				to_r = cols.join(all_counts).sort("counts",ascending=False)
 
-			if translate:
-				to_r.index = col2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_col_name" )
-
-
-		if y_type == "motif.gre_id":
-			gres = pd.Series( list( itertools.chain( *[ i.values() for i in list( itertools.chain( *query.motif.tolist() ) ) ] ) ) )
-			gres = gres.value_counts().to_frame( "counts" )
-
-			# find all bicluster counts
-			all_counts = pd.DataFrame( list( client[db].bicluster_info.find( { }, { "motif.gre_id": 1 } ) ) )
-			all_counts = pd.Series( list( itertools.chain( *[ i.values() for i in list( itertools.chain( *all_counts.motif.tolist() ) ) ] ) ) ).value_counts().to_frame( "all_counts" )
-			# combine two data frames
-			to_r = gres.join(all_counts).sort("counts",ascending=False)
-
-			# filter by GREs with more than 10 instances
-			to_r = to_r.loc[ to_r.all_counts>=gre_lim, : ]
+				if translate:
+					to_r.index = col2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_col_name" )
 
 
-		to_r["pval"] = to_r.apply( compute_p, axis=1, M = client[db].bicluster_info.count(),  N = query.shape[ 0 ] )
-		to_r["qval_BH"] = multipletests( to_r.pval, method='fdr_bh' )[1]
-		to_r["qval_bonferroni"] = multipletests( to_r.pval, method='bonferroni' )[1]
-		to_r = to_r.sort( "pval", ascending=True )
-		# only return below pval cutoff
-		to_r = to_r.loc[ to_r.pval <= pval_cutoff, : ]
+			if y_type == "motif.gre_id":
+				gres = pd.Series( list( itertools.chain( *[ i.values() for i in list( itertools.chain( *query.motif.tolist() ) ) ] ) ) )
+				gres = gres.value_counts().to_frame( "counts" )
 
-		return to_r
+				# find all bicluster counts
+				all_counts = pd.DataFrame( list( client[db].bicluster_info.find( { }, { "motif.gre_id": 1 } ) ) )
+				all_counts = pd.Series( list( itertools.chain( *[ i.values() for i in list( itertools.chain( *all_counts.motif.tolist() ) ) ] ) ) ).value_counts().to_frame( "all_counts" )
+				# combine two data frames
+				to_r = gres.join(all_counts).sort("counts",ascending=False)
+
+				# filter by GREs with more than 10 instances
+				to_r = to_r.loc[ to_r.all_counts>=gre_lim, : ]
+
+
+			to_r["pval"] = to_r.apply( compute_p, axis=1, M = client[db].bicluster_info.count(),  N = query.shape[ 0 ] )
+			to_r["qval_BH"] = multipletests( to_r.pval, method='fdr_bh' )[1]
+			to_r["qval_bonferroni"] = multipletests( to_r.pval, method='bonferroni' )[1]
+			to_r = to_r.sort( "pval", ascending=True )
+			# only return below pval cutoff
+			to_r = to_r.loc[ to_r.pval <= pval_cutoff, : ]
+
+			return to_r
 	
 	else:
 		
