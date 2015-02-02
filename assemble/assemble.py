@@ -69,7 +69,7 @@ if __name__ == '__main__':
 	corems.runCoremCscripts()
 	corems.addCorems()
 
-	if arg.n_resamples > 0:
+	if args.n_resamples > 0:
 		# Make resample database
 		print "Computing resamples"
 		client = MongoClient( host = args.host, port= args.port )
