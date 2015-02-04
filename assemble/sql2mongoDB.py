@@ -720,8 +720,8 @@ class sql2mongoDB:
 				lookup =  [ x["motif_num" ] for x in mot2gre if x["gre_id"] is not "NaN" ] 
 				if len( lookup ) > 0:
 					for x in lookup:
-						tmp_fimo = fimo = fimo.loc[ fimo[ "motif_num" ] == x, ]
-						d_f = fimo.to_dict( orient='records' )
+						tmp_fimo = fimo.loc[ fimo[ "motif_num" ] == x, ]
+						d_f = tmp_fimo.to_dict( orient='records' )
 						db.fimo_small.insert( d_f )
 		    		return None
 			except Exception:
@@ -798,7 +798,8 @@ class sql2mongoDB:
 
 		#outfile =  self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 
-		# print "Writing EGRIN2 MongoDB to %s" % self.targetdir + outfile   		
+		# print "Writing EGRIN2 MongoDB to %s" % self.targetdir + outfile   		h
+
 		# self.mongoDump( self.dbname, outfile )
 		return None
 
