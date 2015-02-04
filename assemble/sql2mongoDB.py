@@ -713,16 +713,19 @@ class sql2mongoDB:
 
 				d_f = fimo.to_dict( orient='records' )
 
+
 				db.fimo.insert( d_f )
 
 				# insert into fimo_small only if the motif maps to a GRE and the pval is less than 1e-5
+
 				mot2gre = db.bicluster_info.find_one( { "_id": cluster_id },{ "motif.motif_num": 1,"motif.gre_id":1 } )[ "motif" ]
+				#print mot2gre
 				lookup =  [ x["motif_num" ] for x in mot2gre if x["gre_id"] is not "NaN" ] 
-				if len( lookup ) > 0:
-					for x in lookup:
-						tmp_fimo = fimo.loc[ fimo[ "motif_num" ] == x, ]
-						d_f = tmp_fimo.to_dict( orient='records' )
-						db.fimo_small.insert( d_f )
+				for x in lookup:
+					#print "Doing fimo_small! : %s" % x
+					tmp_fimo = fimo.loc[ fimo[ "motif_num" ] == x, ]
+					d_f = tmp_fimo.to_dict( orient='records' )
+					db.fimo_small.insert( d_f )
 		    		return None
 			except Exception:
 				return None
