@@ -59,14 +59,17 @@ def row2id( row, host, port, db,  verbose = False, return_field = "row_id" ):
 		print "ERROR: Cannot identify row name: %s" % row
 		return None
 
-def row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id" ):
-	"""Check name format of rows. If necessary, translate."""
-	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
-	query = pd.DataFrame( list( client[db].row_info.find( { "$or": [ { "row_id": { "$in": rows } }, { "egrin2_row_name": { "$in": rows } }, { "GI": { "$in": rows } }, { "accession": {"$in": rows } }, { "name": { "$in": rows } }, { "sysName": { "$in": rows }  } ] }, { return_field: 1 } ) ) ).loc[ :, return_field ].tolist()
-	client.close()
-	if len( rows ) > len( query ): 
-		print "WARNING: Returning fewer rows than originally supplied"
-	return query
+# def row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id" ):
+# 	"""Check name format of rows. If necessary, translate."""
+# 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+# 	query = pd.DataFrame( list( client[db].row_info.find( { "$or": [ { "row_id": { "$in": rows } }, { "egrin2_row_name": { "$in": rows } }, { "GI": { "$in": rows } }, { "accession": {"$in": rows } }, { "name": { "$in": rows } }, { "sysName": { "$in": rows }  } ] }, { "row_id": 1, "egrin2_row_name": 1, "GI": 1, "accession" : 1, "name" : 1 } ) ) )
+
+# 	[ for x in rows ]
+# 	.loc[ :, return_field ].tolist()
+# 	client.close()
+# 	if len( rows ) > len( query ): 
+# 		print "WARNING: Returning fewer rows than originally supplied"
+# 	return query
 	
 
 def col2id( col, host, port, db,  verbose = False, return_field = "row_id" ):
@@ -290,7 +293,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 			print "Cannot translate col names: %s" % x_o
 			return None  
 
-	if x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motfs" or x_type == "gres" or x_type == "motcs":
+	if x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motifs" or x_type == "gres" or x_type == "motcs":
 		x_type = "motif.gre_id"
 
 	if x_type == "cluster" or x_type == "clusters" or x_type == "bicluster" or x_type == "biclusters":
@@ -344,7 +347,8 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 				to_r = rows.join(all_counts).sort("counts",ascending=False)
 
 				if translate:
-					to_r.index = row2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_row_name" )
+					#to_r.index = row2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_row_name" )
+					to_r.index = [ row2id( i, host, port, db, return_field = "egrin2_row_name" ) for i in to_r.index.tolist() ]
 
 			if y_type == "columns":
 				cols = pd.Series( list( itertools.chain( *query["columns"].tolist() ) ) ).value_counts().to_frame( "counts" )
@@ -361,7 +365,8 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 				to_r = cols.join(all_counts).sort("counts",ascending=False)
 
 				if translate:
-					to_r.index = col2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_col_name" )
+					#to_r.index = col2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_col_name" )
+					to_r.index = [ col2id( i, host, port, db, return_field = "egrin2_col_name" ) for i in to_r.index.tolist() ]
 
 
 			if y_type == "motif.gre_id":

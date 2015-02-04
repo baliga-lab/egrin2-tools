@@ -23,6 +23,7 @@ import gzip
 import time
 from urllib2 import urlopen, URLError, HTTPError
 from zipfile import ZipFile
+import itertools
 
 import pdb
 
@@ -501,24 +502,29 @@ class sql2mongoDB:
  		mots = {}
  		with open(gre2motif, 'r') as f: 
  			for line in f:
- 				for motif in line.strip("\n").split( "\t" ):
- 					elements = motif.split("_")
- 					elements[1] = int(elements[1])
- 					elements[2] = int(elements[2])
- 					if elements[0] in mots.keys():
- 						if elements[1] in mots[elements[0]].keys():
- 							mots[elements[0]][elements[1]][elements[2]] = count
- 						else:
- 							mots[elements[0]][elements[1]] = {}
- 							mots[elements[0]][elements[1]][elements[2]] = count
- 					else:
-						mots[elements[0]] = {}
-						mots[elements[0]][elements[1]] = {}
-						mots[elements[0]][elements[1]][elements[2]] = count
-				count = count + 1
+ 				# only consider motif clusters with > 3 motifs
+ 				if len( line.strip("\n").split( "\t" ) ) > 3:
+	 				for motif in line.strip("\n").split( "\t" ):
+	 					elements = motif.split("_")
+	 					# cluster
+	 					elements[1] = int(elements[1])
+	 					# motif_num
+	 					elements[2] = int(elements[2])
+	 					# elements[0] = run_name
+	 					if elements[0] in mots.keys():
+	 						if elements[1] in mots[elements[0]].keys():
+	 							mots[elements[0]][elements[1]][elements[2]] = count
+	 						else:
+	 							mots[elements[0]][elements[1]] = {}
+	 							mots[elements[0]][elements[1]][elements[2]] = count
+	 					else:
+							mots[elements[0]] = {}
+							mots[elements[0]][elements[1]] = {}
+							mots[elements[0]][elements[1]][elements[2]] = count
+					count = count + 1
  		return mots
 
-	def insert_bicluster_info( self, db, e_dir, db_file, run2id, row2id, col2id, motif2gre, row_info_collection ): 
+	def insert_bicluster_info( self, db, db_file, run2id, row2id, col2id ): 
 		"""Find all biclusters in a cMonkey run, process and add as documents to bicluster collection
 
 		example queries
@@ -533,7 +539,7 @@ class sql2mongoDB:
 	    	last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!! 
 	    	w = (last_run,)
 	    	c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?;",w)
-		biclusters = [self.assemble_bicluster_info_single( db, e_dir, db_file, c, last_run, i[0], run2id, row2id, col2id, motif2gre, row_info_collection ) for i in c.fetchall()]
+		biclusters = [self.assemble_bicluster_info_single( db, db_file, c, last_run, i[0], run2id, row2id, col2id ) for i in c.fetchall()]
 		bicluster_info_collection = self.db.bicluster_info
 	    	# Check whether documents are already present in the collection before insertion
 	    	d_f = filter( None, [ self.check4existence( bicluster_info_collection, i, "run_id", i["run_id"], "cluster", i["cluster"] ) for i in biclusters ] )
@@ -545,7 +551,7 @@ class sql2mongoDB:
 	    	
 	    	return bicluster_info_collection
 
-	def assemble_bicluster_info_single( self, db, e_dir, db_file, cursor, iteration, cluster, run2id, row2id, col2id, motif2gre, row_info_collection ):
+	def assemble_bicluster_info_single( self, db, db_file, cursor, iteration, cluster, run2id, row2id, col2id ):
 		"""Create python ensemble_info dictionary for bulk import into MongoDB collections"""
 		#print cluster
 		run_name = db_file.split("/")[-2]
@@ -556,19 +562,56 @@ class sql2mongoDB:
 	    	rows = [ row2id.loc[ str(i[0]) ].row_id for i in cursor.fetchall() ]
 	    	cursor.execute("SELECT name FROM column_members JOIN column_names ON column_members.order_num = column_names.order_num WHERE column_members.cluster = ? AND column_members.iteration = ?;", w )
 	    	cols = [ col2id.loc[ str(i[0]) ].col_id for i in cursor.fetchall() ]
-	    	cursor.execute("SELECT motif_num FROM motif_infos WHERE cluster = ? AND iteration = ?;", w )
-	    	motif_nums = [ i[0] for i in cursor.fetchall() ]
+	    
 	    	d = {
 	    	"run_id": run2id.loc[run_name].run_id,
 	    	"cluster": cluster,
 	    	"rows": rows,
 	    	"columns": cols,
 	    	"residual": residual,
-	    	"motif": [ self.get_motif_info_single( db, e_dir, cursor, iteration, run_name, cluster, i, motif2gre, row_info_collection) for i in motif_nums ]
 	    	}
+
 	    	return d
 
-	def get_motif_info_single( self, db, e_dir, cursor, iteration, run_name, cluster, motif_num, motif2gre, row_info_collection):
+	def insert_motif_info( self, db, db_file, run2id, motif2gre, row_info_collection ): 
+		"""
+		"""
+		# Get all biclusters from cmonkey run
+		conn = sqlite3.connect(db_file)
+	    	c = conn.cursor()
+	    	c.execute("SELECT max(iteration) FROM cluster_stats;")
+	    	last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!! 
+	    	w = (last_run,)
+	    	
+	    	c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?;",w)
+		d_f = [ self.assemble_motif_info_single( db, db_file, c, last_run, i[ 0 ], run2id, motif2gre, row_info_collection )  for i in c.fetchall() ]
+		d_f = list( itertools.chain( *d_f ) ) 
+		d_f = filter( None, d_f )
+
+	    	if len(d_f) > 0:
+	    		db.motif_info.insert( d_f )
+	    	
+	    	return None
+
+    	def assemble_motif_info_single( self, db, db_file, cursor, iteration, cluster, run2id, motif2gre, row_info_collection ):
+    		
+    		run_name = db_file.split("/")[-2]
+    		cluster_id = list( db.bicluster_info.find( { "run_id": run2id.loc[ run_name ].run_id, "cluster": cluster}, { "_id":1 } ) )
+    		if len(cluster_id) > 1:
+    			print "Cluster %s from run %s matches more than one entry in MongoDB. You have a problem. Refusing to add motif_info." % ( cluster,run_name )
+    			return None
+		else:
+			cluster_id = ObjectId( cluster_id[ 0 ][ "_id" ] )
+    		
+	    	w = (cluster,iteration)
+    		cursor.execute("SELECT motif_num FROM motif_infos WHERE cluster = ? AND iteration = ?;", w )
+	    	motif_nums = [ i[0] for i in cursor.fetchall() ]
+
+    		motif_info = [ self.get_motif_info_single( db, cursor, iteration, run_name, cluster, i, motif2gre, row_info_collection, cluster_id) for i in motif_nums ]
+    		
+    		return motif_info
+
+	def get_motif_info_single( self, db, cursor, iteration, run_name, cluster, motif_num, motif2gre, row_info_collection, cluster_id):
 		w = (cluster, iteration, motif_num)
 		cursor.execute("SELECT seqtype, evalue FROM motif_infos WHERE cluster = ? AND iteration = ? AND motif_num = ?;", w )
 		motif_data = cursor.fetchone()
@@ -583,6 +626,7 @@ class sql2mongoDB:
 			gre_id = "NaN"
 
 		d = {
+		"cluster_id": cluster_id,
 		"gre_id": gre_id,
 		"motif_num": motif_num,
 		"seqtype": motif_data[0],
@@ -636,10 +680,6 @@ class sql2mongoDB:
 		}
 		return d
 
-	def tmp_fcn( self, i, e_dir ):
-		print i.cluster, i.run_id, e_dir
-		return None
-
 	def assemble_fimo( self ):
 
 		def get_fimo_scans_single( i, db, e_dir, run2id ):
@@ -667,12 +707,22 @@ class sql2mongoDB:
 				#fimo["cluster"] = cluster
 
 				# only keep specific columns
-				fimo = fimo.loc[ : , [ 'scaffoldId', 'start', 'stop', 'strand', 'score', 'p-value', 'in_coding_rgn', 'cluster_id' ] ]
+				fimo = fimo.loc[ : , [ 'scaffoldId', 'start', 'stop', 'strand', 'score', 'p-value', 'in_coding_rgn', 'cluster_id', 'motif_num' ] ]
+				# only store hits with p-value lte 1e-5
+				fimo = fimo.loc[ fimo[ "p-value" ] <= 1e-5, ]
 
 				d_f = fimo.to_dict( orient='records' )
 
 				db.fimo.insert( d_f )
 
+				# insert into fimo_small only if the motif maps to a GRE and the pval is less than 1e-5
+				mot2gre = db.bicluster_info.find_one( { "_id": cluster_id },{ "motif.motif_num": 1,"motif.gre_id":1 } )[ "motif" ]
+				lookup =  [ x["motif_num" ] for x in mot2gre if x["gre_id"] is not "NaN" ] 
+				if len( lookup ) > 0:
+					for x in lookup:
+						tmp_fimo = fimo = fimo.loc[ fimo[ "motif_num" ] == x, ]
+						d_f = fimo.to_dict( orient='records' )
+						db.fimo_small.insert( d_f )
 		    		return None
 			except Exception:
 				return None
@@ -731,7 +781,8 @@ class sql2mongoDB:
 		print "Inserting into bicluster collection"
 		for i in self.db_files:
 			print i
-			self.bicluster_info_collection = self.insert_bicluster_info( self.db, self.e_dir, i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
+			self.bicluster_info_collection = self.insert_bicluster_info( self.db, i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
+			self.insert_motif_info( self.db, i, self.run2id, self.motif2gre, self.row_info_collection ) 
 
 		print "Indexing bicluster collection"
 		self.bicluster_info_collection.ensure_index( "rows" )
