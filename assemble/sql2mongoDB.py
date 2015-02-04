@@ -787,7 +787,7 @@ class sql2mongoDB:
 		print "Indexing bicluster collection"
 		self.bicluster_info_collection.ensure_index( "rows" )
 		self.bicluster_info_collection.ensure_index( "columns" )
-		self.bicluster_info_collection.ensure_index( "motif.gre_id" ) 
+		#self.bicluster_info_collection.ensure_index( "motif.gre_id" ) 
 
 		print "Inserting into fimo collection. This might take awhile..."
 		self.assemble_fimo( )
