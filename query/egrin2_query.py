@@ -59,17 +59,17 @@ def row2id( row, host, port, db,  verbose = False, return_field = "row_id" ):
 		print "ERROR: Cannot identify row name: %s" % row
 		return None
 
-def row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id" ):
-	"""Check name format of rows. If necessary, translate."""
-	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
-	query = pd.DataFrame( list( client[db].row_info.find( { "$or": [ { "row_id": { "$in": rows } }, { "egrin2_row_name": { "$in": rows } }, { "GI": { "$in": rows } }, { "accession": {"$in": rows } }, { "name": { "$in": rows } }, { "sysName": { "$in": rows }  } ] }, { "row_id": 1, "egrin2_row_name": 1, "GI": 1, "accession" : 1, "name" : 1 } ) ) )
+# def row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id" ):
+# 	"""Check name format of rows. If necessary, translate."""
+# 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+# 	query = pd.DataFrame( list( client[db].row_info.find( { "$or": [ { "row_id": { "$in": rows } }, { "egrin2_row_name": { "$in": rows } }, { "GI": { "$in": rows } }, { "accession": {"$in": rows } }, { "name": { "$in": rows } }, { "sysName": { "$in": rows }  } ] }, { "row_id": 1, "egrin2_row_name": 1, "GI": 1, "accession" : 1, "name" : 1 } ) ) )
 
-	[ for x in rows ]
-	.loc[ :, return_field ].tolist()
-	client.close()
-	if len( rows ) > len( query ): 
-		print "WARNING: Returning fewer rows than originally supplied"
-	return query
+# 	[ for x in rows ]
+# 	.loc[ :, return_field ].tolist()
+# 	client.close()
+# 	if len( rows ) > len( query ): 
+# 		print "WARNING: Returning fewer rows than originally supplied"
+# 	return query
 	
 
 def col2id( col, host, port, db,  verbose = False, return_field = "row_id" ):
