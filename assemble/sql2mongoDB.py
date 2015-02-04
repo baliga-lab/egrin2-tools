@@ -501,21 +501,26 @@ class sql2mongoDB:
  		mots = {}
  		with open(gre2motif, 'r') as f: 
  			for line in f:
- 				for motif in line.strip("\n").split( "\t" ):
- 					elements = motif.split("_")
- 					elements[1] = int(elements[1])
- 					elements[2] = int(elements[2])
- 					if elements[0] in mots.keys():
- 						if elements[1] in mots[elements[0]].keys():
- 							mots[elements[0]][elements[1]][elements[2]] = count
- 						else:
- 							mots[elements[0]][elements[1]] = {}
- 							mots[elements[0]][elements[1]][elements[2]] = count
- 					else:
-						mots[elements[0]] = {}
-						mots[elements[0]][elements[1]] = {}
-						mots[elements[0]][elements[1]][elements[2]] = count
-				count = count + 1
+ 				# only consider motif clusters with > 3 motifs
+ 				if len( line.strip("\n").split( "\t" ) ) > 3:
+	 				for motif in line.strip("\n").split( "\t" ):
+	 					elements = motif.split("_")
+	 					# cluster
+	 					elements[1] = int(elements[1])
+	 					# motif_num
+	 					elements[2] = int(elements[2])
+	 					# elements[0] = run_name
+	 					if elements[0] in mots.keys():
+	 						if elements[1] in mots[elements[0]].keys():
+	 							mots[elements[0]][elements[1]][elements[2]] = count
+	 						else:
+	 							mots[elements[0]][elements[1]] = {}
+	 							mots[elements[0]][elements[1]][elements[2]] = count
+	 					else:
+							mots[elements[0]] = {}
+							mots[elements[0]][elements[1]] = {}
+							mots[elements[0]][elements[1]][elements[2]] = count
+					count = count + 1
  		return mots
 
 	def insert_bicluster_info( self, db, e_dir, db_file, run2id, row2id, col2id, motif2gre, row_info_collection ): 
@@ -667,12 +672,22 @@ class sql2mongoDB:
 				#fimo["cluster"] = cluster
 
 				# only keep specific columns
-				fimo = fimo.loc[ : , [ 'scaffoldId', 'start', 'stop', 'strand', 'score', 'p-value', 'in_coding_rgn', 'cluster_id' ] ]
+				fimo = fimo.loc[ : , [ 'scaffoldId', 'start', 'stop', 'strand', 'score', 'p-value', 'in_coding_rgn', 'cluster_id', 'motif_num' ] ]
+				# only store hits with p-value lte 1e-5
+				fimo = fimo.loc[ fimo[ "p-value" ] <= 1e-5, ]
 
 				d_f = fimo.to_dict( orient='records' )
 
 				db.fimo.insert( d_f )
 
+				# insert into fimo_small only if the motif maps to a GRE and the pval is less than 1e-5
+				mot2gre = db.bicluster_info.find_one( { "_id": cluster_id },{ "motif.motif_num": 1,"motif.gre_id":1 } )[ "motif" ]
+				lookup =  [ x["motif_num" ] for x in mot2gre if x["gre_id"] is not "NaN" ] 
+				if len( lookup ) > 0:
+					for x in lookup:
+						tmp_fimo = fimo = fimo.loc[ fimo[ "motif_num" ] == x, ]
+						d_f = fimo.to_dict( orient='records' )
+						db.fimo_small.insert( d_f )
 		    		return None
 			except Exception:
 				return None
