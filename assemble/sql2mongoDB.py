@@ -782,7 +782,7 @@ class sql2mongoDB:
 		for i in self.db_files:
 			print i
 			self.bicluster_info_collection = self.insert_bicluster_info( self.db, i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
-			self.insert_motif_info( self.db, i, self.run2id, self.motif2gre, self.row_info_collection ): 
+			self.insert_motif_info( self.db, i, self.run2id, self.motif2gre, self.row_info_collection ) 
 
 		print "Indexing bicluster collection"
 		self.bicluster_info_collection.ensure_index( "rows" )
