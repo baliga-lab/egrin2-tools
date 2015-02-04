@@ -39,6 +39,15 @@ def check_colResamples( col, n_rows, n_resamples, host, port, db,  ):
 		return col
 	client.close()
 
+def findMatch( x, df, return_field ):
+	print x
+	"""Find which 'df' element x matches. Return appropriate translation"""
+	# find matching row
+	counter = 0
+	while ( x in df.iloc[ counter ].tolist() ) == False:
+		counter = counter + 1
+	return df.iloc[ counter ][ return_field ]
+
 def row2id( row, host, port, db,  verbose = False, return_field = "row_id" ):
 	"""Check name format of rows. If necessary, translate."""
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
@@ -59,21 +68,28 @@ def row2id( row, host, port, db,  verbose = False, return_field = "row_id" ):
 		print "ERROR: Cannot identify row name: %s" % row
 		return None
 
-# def row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id" ):
-# 	"""Check name format of rows. If necessary, translate."""
-# 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
-# 	query = pd.DataFrame( list( client[db].row_info.find( { "$or": [ { "row_id": { "$in": rows } }, { "egrin2_row_name": { "$in": rows } }, { "GI": { "$in": rows } }, { "accession": {"$in": rows } }, { "name": { "$in": rows } }, { "sysName": { "$in": rows }  } ] }, { "row_id": 1, "egrin2_row_name": 1, "GI": 1, "accession" : 1, "name" : 1 } ) ) )
+def row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id", input_type = None ):
+	"""Check name format of rows. If necessary, translate."""
+	
+	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+	query = pd.DataFrame( list( client[db].row_info.find( { "$or": [ { "row_id": { "$in": rows } }, { "egrin2_row_name": { "$in": rows } }, { "GI": { "$in": rows } }, { "accession": {"$in": rows } }, { "name": { "$in": rows } }, { "sysName": { "$in": rows }  } ] }, { "row_id": 1, "egrin2_row_name": 1, "GI": 1, "accession" : 1, "name" : 1 } ) ) )
 
-# 	[ for x in rows ]
-# 	.loc[ :, return_field ].tolist()
-# 	client.close()
-# 	if len( rows ) > len( query ): 
-# 		print "WARNING: Returning fewer rows than originally supplied"
-# 	return query
+	if input_type in [  "row_id", "egrin2_row_name", "GI", "accession", "name", "sysName" ]:
+		query = query.set_index(input_type)
+		to_r = query.loc[ rows ][ return_field ].tolist()
+	else:
+		#try to match input_type automatically
+		print "Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query."
+		to_r= [ row2id( x, host, port, db, return_field ) for x in rows ]
+
+	client.close()
+	
+	return to_r
 	
 
 def col2id( col, host, port, db,  verbose = False, return_field = "row_id" ):
 	"""Check name format of rows. If necessary, translate."""
+
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 	query = list( client[db].col_info.find( { "$or": [ { "col_id": col }, { "egrin2_col_name": col } ] } ) )
 	client.close()
@@ -93,14 +109,22 @@ def col2id( col, host, port, db,  verbose = False, return_field = "row_id" ):
 		return None
 
 
-def col2id_batch( cols, host, port, db,  verbose = False, return_field = "col_id" ):
+def col2id_batch( cols, host, port, db,  verbose = False, return_field = "col_id", input_type = None ):
 	"""Check name format of rows. If necessary, translate."""
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 	query = pd.DataFrame( list( client[db].col_info.find( { "$or": [ { "col_id": { "$in": cols } }, { "egrin2_col_name": { "$in":cols } } ] }, { return_field: 1 } ) ) ).loc[ :, return_field ].tolist()
+
+	if input_type in [  "col_id", "egrin2_col_name" ]:
+		query = query.set_index( input_type )
+		to_r = query.loc[ cols ][ return_field ].tolist()
+	else:
+		#try to match input_type automatically
+		print "Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query."
+		to_r= [ col2id( x, host, port, db, return_field ) for x in cols ]
+	
 	client.close()
-	if len( cols ) > len( query ): 
-		print "WARNING: Returning fewer rows than originally supplied"
-	return query
+
+	return to_r
 
 def colResamplePval( rows = None, cols = None, n_resamples = None, host = "localhost", port = 27017, db = "", standardized = None, sig_cutoff = None, sort = True, add_override = False, n_jobs = 4, keepP = 0.1, verbose = True ):
 
@@ -347,8 +371,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 				to_r = rows.join(all_counts).sort("counts",ascending=False)
 
 				if translate:
-					#to_r.index = row2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_row_name" )
-					to_r.index = [ row2id( i, host, port, db, return_field = "egrin2_row_name" ) for i in to_r.index.tolist() ]
+					to_r.index = row2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_row_name", input_type = "row_id" )
 
 			if y_type == "columns":
 				cols = pd.Series( list( itertools.chain( *query["columns"].tolist() ) ) ).value_counts().to_frame( "counts" )
@@ -365,8 +388,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 				to_r = cols.join(all_counts).sort("counts",ascending=False)
 
 				if translate:
-					#to_r.index = col2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_col_name" )
-					to_r.index = [ col2id( i, host, port, db, return_field = "egrin2_col_name" ) for i in to_r.index.tolist() ]
+					to_r.index = col2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_col_name", input_type = "col_id" )
 
 
 			if y_type == "motif.gre_id":
