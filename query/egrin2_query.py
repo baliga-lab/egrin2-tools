@@ -25,6 +25,7 @@ from joblib import Parallel, delayed
 from scipy.stats import hypergeom
 from statsmodels.sandbox.stats.multicomp import multipletests
 import itertools
+from bson.code import Code
 
 from resample import *
 
@@ -70,6 +71,9 @@ def row2id( row, host, port, db,  verbose = False, return_field = "row_id" ):
 
 def row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id", input_type = None ):
 	"""Check name format of rows. If necessary, translate."""
+
+	if return_field == input_type:
+		return rows
 	
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 	query = pd.DataFrame( list( client[db].row_info.find( { "$or": [ { "row_id": { "$in": rows } }, { "egrin2_row_name": { "$in": rows } }, { "GI": { "$in": rows } }, { "accession": {"$in": rows } }, { "name": { "$in": rows } }, { "sysName": { "$in": rows }  } ] }, { "row_id": 1, "egrin2_row_name": 1, "GI": 1, "accession" : 1, "name" : 1 } ) ) )
@@ -87,7 +91,7 @@ def row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id
 	return to_r
 	
 
-def col2id( col, host, port, db,  verbose = False, return_field = "row_id" ):
+def col2id( col, host, port, db,  verbose = False, return_field = "col_id" ):
 	"""Check name format of rows. If necessary, translate."""
 
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
@@ -111,8 +115,12 @@ def col2id( col, host, port, db,  verbose = False, return_field = "row_id" ):
 
 def col2id_batch( cols, host, port, db,  verbose = False, return_field = "col_id", input_type = None ):
 	"""Check name format of rows. If necessary, translate."""
+
+	if return_field == input_type:
+		return cols
+
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
-	query = pd.DataFrame( list( client[db].col_info.find( { "$or": [ { "col_id": { "$in": cols } }, { "egrin2_col_name": { "$in":cols } } ] }, { return_field: 1 } ) ) ).loc[ :, return_field ].tolist()
+	query = pd.DataFrame( list( client[db].col_info.find( { "$or": [ { "col_id": { "$in": cols } }, { "egrin2_col_name": { "$in":cols } } ] }, { "col_id": 1, "egrin2_col_name":1 } ) ) )
 
 	if input_type in [  "col_id", "egrin2_col_name" ]:
 		query = query.set_index( input_type )
@@ -306,8 +314,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 		if len( x ) == 0:
 			print "Cannot translate row names: %s" % x_o
 			return None
-
-	if x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions":
+	elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type == "conds":
 		x_type = "columns"
 		x_o = x
 		x = [ col2id( i, host, port, db ) for i in x ]
@@ -316,35 +323,43 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 		if len( x ) == 0:
 			print "Cannot translate col names: %s" % x_o
 			return None  
-
-	if x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motifs" or x_type == "gres" or x_type == "motcs":
-		x_type = "motif.gre_id"
-
-	if x_type == "cluster" or x_type == "clusters" or x_type == "bicluster" or x_type == "biclusters":
+	elif x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motifs" or x_type == "gres" or x_type == "motcs":
+		x_type = "gre_id"
+	elif x_type == "cluster" or x_type == "clusters" or x_type == "bicluster" or x_type == "biclusters":
 		print "WARNING! I hope you are using cluster '_id'!!! Otherwise the results might surprise you..."
 		x_type = "_id"
+	else:
+		print "ERROR: Can't recognize your 'x_type' argument."
+		return None
 
 	# Check output types
 
 	if y_type == "rows" or y_type == "row" or y_type == "gene" or y_type == "genes":
 		y_type = "rows"
-
-	if y_type == "columns" or y_type == "column" or y_type == "col" or y_type == "cols" or y_type == "condition" or y_type == "conditions":
+	elif y_type == "columns" or y_type == "column" or y_type == "col" or y_type == "cols" or y_type == "condition" or y_type == "conditions" or x_type == "conds":
 		y_type = "columns"
-		
-	if y_type == "motif" or y_type == "gre" or y_type == "motc" or y_type == "motif.gre" or y_type == "motfs" or y_type == "gres" or y_type == "motcs":
-		y_type = "motif.gre_id"
-
-	if y_type == "cluster" or y_type == "clusters" or y_type == "bicluster" or y_type == "biclusters":
+	elif y_type == "motif" or y_type == "gre" or y_type == "motc" or y_type == "motif.gre" or y_type == "motfs" or y_type == "gres" or y_type == "motcs":
+		y_type = "gre_id"
+	elif y_type == "cluster" or y_type == "clusters" or y_type == "bicluster" or y_type == "biclusters":
 		print "WARNING! Will return bicluster _id. The results might surprise you..."
 		y_type = "_id"
+	else:
+		print "ERROR: Can't recognize your 'y_type' argument."
+		return None
 
 	# Compose query
 
 	if logic in [ "and","or","nor" ]:
 		q = { "$"+logic: [ { x_type : i } for i in x ] }
 		o = { y_type: 1 }
-		query = pd.DataFrame( list( client[db].bicluster_info.find( q, o ) ) )
+		if x_type == "gre_id":
+			queryPre = pd.DataFrame( list( client[db].motif_info.find( q, { "cluster_id" : 1 } ) ) )["cluster_id"].tolist()
+			query = pd.DataFrame( list( client[db].bicluster_info.find( { "_id": { "$in": queryPre } }, o ) ) )
+		elif y_type == "gre_id":
+			queryPre = pd.DataFrame( list( client[db].bicluster_info.find( q, { "_id" : 1 } ) ) )["_id"].tolist()
+			query = pd.DataFrame( list( client[db].motif_info.find(  { "cluster_id": { "$in": queryPre } }, { y_type : 1 } ) ) )
+		else:
+			query = pd.DataFrame( list( client[db].bicluster_info.find( q, o ) ) )
 	else:
 		print "I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'."
 		return None
@@ -353,10 +368,45 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 
 	
 	if query.shape[0] > 0: 
+
+		mapColumns = Code("""
+			function () {
+			this.columns.forEach(function(z) {
+				emit(z, 1);
+				});
+		 	}
+		 	""")
+		mapRows = Code("""
+			function () {
+			this.rows.forEach(function(z) {
+				emit(z, 1);
+				});
+		 	}
+		 	""")
+		mapGREs = Code("""
+			function () {
+			print(this);
+			emit(this.gre_id, 1);
+		 	}
+		 	""")
+		reduce = Code("""
+			function (key, values) {
+			               var total = 0;
+			               for (var i = 0; i < values.length; i++) {
+			               	total += values[i];
+		               		}
+	               		return total;
+		               }
+		               """)
+
 		if y_type == "_id":
 			return query
 		else:
 			if y_type == "rows":
+
+				if client[db].rowsCount_mapreduce.count() == 0:
+					client[db].bicluster_info.map_reduce(mapRows,reduce,"rowsCount_mapreduce")
+
 				rows = pd.Series( list( itertools.chain( *query.rows.tolist() ) ) ).value_counts().to_frame( "counts" )
 				
 				# filter out rows that aren't in the database - i.e. not annotated in MicrobesOnline
@@ -365,15 +415,21 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 				rows = rows.loc[common_rows]
 				
 				# find all bicluster counts
-				all_counts = pd.DataFrame( list( client[db].bicluster_info.find( { }, { "rows": 1 } ) ) )
-				all_counts = pd.Series( list( itertools.chain( *all_counts.rows.tolist() ) ) ).value_counts().to_frame( "all_counts" )
+				all_counts = pd.DataFrame( list( client[db].rowsCount_mapreduce.find( ) ) )
+				all_counts = all_counts.set_index("_id")
+
 				# combine two data frames
 				to_r = rows.join(all_counts).sort("counts",ascending=False)
+				to_r.columns = ["counts","all_counts"]
 
 				if translate:
 					to_r.index = row2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_row_name", input_type = "row_id" )
 
 			if y_type == "columns":
+
+				if client[db].columnsCount_mapreduce.count() == 0:
+					client[db].bicluster_info.map_reduce(mapColumns,reduce,"columnsCount_mapreduce")
+				
 				cols = pd.Series( list( itertools.chain( *query["columns"].tolist() ) ) ).value_counts().to_frame( "counts" )
 				
 				# filter out rows that aren't in the database - i.e. not annotated in MicrobesOnline
@@ -382,24 +438,33 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 				cols = cols.loc[common_cols]
 				
 				# find all bicluster counts
-				all_counts = pd.DataFrame( list( client[db].bicluster_info.find( { }, { "columns": 1 } ) ) )
-				all_counts = pd.Series( list( itertools.chain( *all_counts["columns"].tolist() ) ) ).value_counts().to_frame( "all_counts" )
+				all_counts = pd.DataFrame( list( client[db].columnsCount_mapreduce.find( ) ) )
+				all_counts = all_counts.set_index("_id")
+
 				# combine two data frames
 				to_r = cols.join(all_counts).sort("counts",ascending=False)
+				to_r.columns = ["counts","all_counts"]
 
 				if translate:
 					to_r.index = col2id_batch( to_r.index.tolist(), host, port, db, return_field = "egrin2_col_name", input_type = "col_id" )
 
 
-			if y_type == "motif.gre_id":
-				gres = pd.Series( list( itertools.chain( *[ i.values() for i in list( itertools.chain( *query.motif.tolist() ) ) ] ) ) )
-				gres = gres.value_counts().to_frame( "counts" )
+			if y_type == "gre_id":
+
+				if client[db].gresCount_mapreduce.count() == 0:
+					client[db].motif_info.map_reduce(mapGREs,reduce,"gresCount_mapreduce")
+
+				gres = query.gre_id.tolist() 
+				gres = filter(lambda x: x != "NaN", gres )
+				gres = pd.Series( gres ).value_counts().to_frame( "counts" )
 
 				# find all bicluster counts
-				all_counts = pd.DataFrame( list( client[db].bicluster_info.find( { }, { "motif.gre_id": 1 } ) ) )
-				all_counts = pd.Series( list( itertools.chain( *[ i.values() for i in list( itertools.chain( *all_counts.motif.tolist() ) ) ] ) ) ).value_counts().to_frame( "all_counts" )
+				all_counts = pd.DataFrame( list( client[db].gresCount_mapreduce.find( ) ) )
+				all_counts = all_counts.set_index("_id")
+
 				# combine two data frames
 				to_r = gres.join(all_counts).sort("counts",ascending=False)
+				to_r.columns = ["counts","all_counts"]
 
 				# filter by GREs with more than 10 instances
 				to_r = to_r.loc[ to_r.all_counts>=gre_lim, : ]
