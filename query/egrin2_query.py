@@ -69,7 +69,7 @@ def row2id( row, host, port, db,  verbose = False, return_field = "row_id" ):
 		print "ERROR: Cannot identify row name: %s" % row
 		return None
 
-def row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id", input_type = None ):
+def row2id_batch( rows, host, port, db,  verbose = True, return_field = "row_id", input_type = None ):
 	"""Check name format of rows. If necessary, translate."""
 
 	if return_field == input_type:
@@ -83,7 +83,8 @@ def row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id
 		to_r = query.loc[ rows ][ return_field ].tolist()
 	else:
 		#try to match input_type automatically
-		print "Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query."
+		if verbose:
+			print "Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query."
 		to_r= [ row2id( x, host, port, db, return_field ) for x in rows ]
 
 	client.close()
@@ -113,7 +114,7 @@ def col2id( col, host, port, db,  verbose = False, return_field = "col_id" ):
 		return None
 
 
-def col2id_batch( cols, host, port, db,  verbose = False, return_field = "col_id", input_type = None ):
+def col2id_batch( cols, host, port, db,  verbose = True, return_field = "col_id", input_type = None ):
 	"""Check name format of rows. If necessary, translate."""
 
 	if return_field == input_type:
@@ -127,7 +128,8 @@ def col2id_batch( cols, host, port, db,  verbose = False, return_field = "col_id
 		to_r = query.loc[ cols ][ return_field ].tolist()
 	else:
 		#try to match input_type automatically
-		print "Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query."
+		if verbose:
+			print "Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query."
 		to_r= [ col2id( x, host, port, db, return_field ) for x in cols ]
 	
 	client.close()
@@ -328,6 +330,8 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 	elif x_type == "cluster" or x_type == "clusters" or x_type == "bicluster" or x_type == "biclusters":
 		print "WARNING! I hope you are using cluster '_id'!!! Otherwise the results might surprise you..."
 		x_type = "_id"
+	elif x_type == "corems" or x_type == "corem":
+		x_type = "corem"
 	else:
 		print "ERROR: Can't recognize your 'x_type' argument."
 		return None
@@ -343,9 +347,14 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 	elif y_type == "cluster" or y_type == "clusters" or y_type == "bicluster" or y_type == "biclusters":
 		print "WARNING! Will return bicluster _id. The results might surprise you..."
 		y_type = "_id"
+	elif x_type == "corems" or x_type == "corem":
+		x_type = "corem"
 	else:
 		print "ERROR: Can't recognize your 'y_type' argument."
 		return None
+
+	if x_type == y_type:
+		return x
 
 	# Compose query
 
@@ -490,6 +499,77 @@ def fimoFinder( start = None, stop = None, chr = None, strand = None, mot_pval_c
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 
 	mots = pd.DataFrame( list( client[db].fimo.find( { "start": { "gte": start }, "stop": {"lte": stop } } ) ) )
+
+def coremFinder( x, x_type = "corem_id", y_type = "genes", host = "localhost", port = 27017, db = "" ):
+
+	if x_type is None:
+		print "Please supply an x_type for your query. Types include: 'rows' (genes), 'columns' (conditions), 'gres', edges "
+	if y_type is None:
+		print "Please supply an y_type for your query. Types include: 'rows' (genes), 'columns' (conditions), 'gres', edges "
+
+	if type( x ) == str or type( x ) == int:
+		# single
+		x = [ x ]
+
+	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+
+	# Check input types
+
+	if x_type == "rows" or x_type == "row" or x_type == "gene" or x_type == "genes":
+		x_type = "rows"
+		x_o = x
+		x = [ row2id( i, host, port, db ) for i in x ]
+		x = [ i for i in x if i is not None]
+		x = list( set( x ) )
+		if len( x ) == 0:
+			print "Cannot translate row names: %s" % x_o
+			return None
+
+	return None
+
+def expressionFinder( rows = None, cols = None, standardized = True, host = "localhost", port = 27017, db = "" ):
+	"""Find motifs/GREs that fall within a specific range. Filter by biclusters/genes/conditions/etc."""
+	
+	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+
+	input_type_rows = None
+	input_type_cols = None
+	if rows is None:
+		# assume all genes
+		rows = pd.DataFrame( list( client[ db ].row_info.find( {}, {"row_id":1} ) ) ).row_id.tolist()
+		input_type_rows = "row_id"
+	if cols is None:
+		# assume all cols
+		cols = pd.DataFrame( list( client[ db ].col_info.find( {}, {"col_id":1} ) ) ).col_id.tolist()
+		input_type_cols = "col_id"
+
+	if type( rows ) == str or type( rows ) == int:
+		# single
+		rows = [ rows ]
+
+	if type( cols ) == str or type( cols ) == int:
+		# single
+		cols = [ cols ]
+
+	# translate rows/cols
+
+	rows = row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id", input_type = input_type_rows )
+	cols = col2id_batch( cols, host, port, db,  verbose = False, return_field = "col_id", input_type = input_type_cols )
+
+	# get expression data
+	data = pd.DataFrame( None,columns = cols, index = rows )
+	query = pd.DataFrame ( list( client[ db ].gene_expression.find( { "$and": [ { "row_id": { "$in": rows } }, { "col_id": { "$in": cols } } ] } ) ) )
+	for i in query:
+		if standardized:
+			data = query.pivot(index="row_id",columns="col_id",values="standardized_expression")
+		else:
+			data = query.pivot(index="row_id",columns="col_id",values="normalized_expression")
+
+	return data
+
+
+
+
 
 
 

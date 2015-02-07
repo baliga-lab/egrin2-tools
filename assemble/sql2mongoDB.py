@@ -776,6 +776,8 @@ class sql2mongoDB:
 
 		print "Inserting gene expression into database"
 		self.gene_expression_collection = self.insert_gene_expression( self.db, self.row2id, self.col2id, self.expression, self.expression_standardized )
+		self.gene_expression_collection.ensure_index( "row_id" )
+		self.gene_expression_collection.ensure_index( "col_id" )
 
 		print "Inserting into ensemble_info collection"
 		self.ensemble_info_collection = self.insert_ensemble_info( self.db_files, self.db, self.run2id, self.row2id, self.col2id )
