@@ -327,11 +327,9 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 			return None  
 	elif x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motifs" or x_type == "gres" or x_type == "motcs":
 		x_type = "gre_id"
-	elif x_type == "cluster" or x_type == "clusters" or x_type == "bicluster" or x_type == "biclusters":
+	elif x_type == "cluster" or x_type == "clusters" or x_type == "bicluster" or x_type == "biclusters" or x_type == "bcs":
 		print "WARNING! I hope you are using cluster '_id'!!! Otherwise the results might surprise you..."
 		x_type = "_id"
-	elif x_type == "corems" or x_type == "corem":
-		x_type = "corem"
 	else:
 		print "ERROR: Can't recognize your 'x_type' argument."
 		return None
@@ -344,17 +342,12 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 		y_type = "columns"
 	elif y_type == "motif" or y_type == "gre" or y_type == "motc" or y_type == "motif.gre" or y_type == "motfs" or y_type == "gres" or y_type == "motcs":
 		y_type = "gre_id"
-	elif y_type == "cluster" or y_type == "clusters" or y_type == "bicluster" or y_type == "biclusters":
+	elif y_type == "cluster" or y_type == "clusters" or y_type == "bicluster" or y_type == "biclusters" or x_type == "bcs":
 		print "WARNING! Will return bicluster _id. The results might surprise you..."
 		y_type = "_id"
-	elif x_type == "corems" or x_type == "corem":
-		x_type = "corem"
 	else:
 		print "ERROR: Can't recognize your 'y_type' argument."
 		return None
-
-	if x_type == y_type:
-		return x
 
 	# Compose query
 
