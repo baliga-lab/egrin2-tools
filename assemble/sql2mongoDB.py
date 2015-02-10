@@ -433,7 +433,7 @@ class sql2mongoDB:
 					{
 				    	"row_id": row2id.loc[i].row_id,
 				    	"col_id": col2id.loc[j].col_id,
-			 		"normalized_expression": ratios.loc[i,j],
+			 		"raw_expression": ratios.loc[i,j],
 			 		"standardized_expression": ratios_standardized.loc[i,j]
 				    	} )
 			counter = counter + 1

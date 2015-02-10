@@ -27,11 +27,11 @@ def rsd( vals ):
 	return abs( np.std( vals ) / np.mean( vals ) )
 
 def resample( row_vals, n_rows ):
-		return rsd( random.sample( row_vals, n_rows ) )
+	return rsd( random.sample( row_vals, n_rows ) )
 
 def choose_n( col, vals, n, add, client, db, n_rows, n_resamples, old_records, keepP ):
-	normalized = vals.loc[:,"normalized_expression"].copy()
-	normalized.sort()
+	raw = vals.loc[:,"raw_expression"].copy()
+	raw.sort()
 	standardized = vals.loc[:,"standardized_expression"].copy()
 	standardized.sort()
 
@@ -40,7 +40,7 @@ def choose_n( col, vals, n, add, client, db, n_rows, n_resamples, old_records, k
 			"n_rows": n_rows,
 			"col_id": col,
 			"resamples": n_resamples,
-			"lowest_normalized": normalized.iloc[0:n].tolist(),
+			"lowest_raw": raw.iloc[0:n].tolist(),
 	 		"lowest_standardized": standardized.iloc[0:n].tolist()
 		}
 		client[ db ][ "col_resample" ].insert( d )
@@ -48,19 +48,19 @@ def choose_n( col, vals, n, add, client, db, n_rows, n_resamples, old_records, k
 		#update
 		resamples = n_resamples + old_records[ col ][ "resamples" ]
 		n2keep = round( resamples*keepP )
-		#print normalized, "\n", "break",  old_records[ col ][ "lowest_normalized" ]
-		ran = normalized.tolist() + old_records[ col ][ "lowest_normalized" ]
+		#print raw, "\n", "break",  old_records[ col ][ "lowest_raw" ]
+		ran = raw.tolist() + old_records[ col ][ "lowest_raw" ]
 		ran.sort()
 		ran = ran[ 0: int( n2keep ) ]
 		ras = standardized.tolist() + old_records[ col ][ "lowest_standardized" ]
 		ras.sort()
 		ras = ras[ 0: int( n2keep ) ]
-		client[ db ][ "col_resample" ].update( { "n_rows": n_rows, "col_id": col }, { "$set": { "resamples": resamples, "lowest_normalized": ran, "lowest_standardized": ras } } )
+		client[ db ][ "col_resample" ].update( { "n_rows": n_rows, "col_id": col }, { "$set": { "resamples": resamples, "lowest_raw": ran, "lowest_standardized": ras } } )
 
 def colResampleInd( host, db, n_rows, cols, n_resamples = 20000, keepP = 0.1, port = 27017):
-	"""Resample gene expression for a given number of genes in a particular condition using RSD"""
+	"""Resample gene expression for a given number of genes in a particular condition using RSD, brute force."""
 
-	print "Adding resample document for gene set size %i " % ( n_rows )
+	print "Adding brute force resample document for gene set size %i " % ( n_rows )
 
 	# make connection
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
@@ -83,7 +83,7 @@ def colResampleInd( host, db, n_rows, cols, n_resamples = 20000, keepP = 0.1, po
 	# toAdd
 	if len( toAdd ) > 0:
 		print "Computing resamples for new MongoDB documents"
-		df = pd.DataFrame( list( client[db].gene_expression.find( { "col_id": { "$in": toAdd } }, { "col_id":1, "normalized_expression":1, "standardized_expression":1 } ) ) )
+		df = pd.DataFrame( list( client[db].gene_expression.find( { "col_id": { "$in": toAdd } }, { "col_id":1, "raw_expression":1, "standardized_expression":1 } ) ) )
 		df = df.groupby("col_id")
 		df_rsd = pd.concat( [ df.aggregate( resample, n_rows ) for i in range( 0, n_resamples ) ] )
 		df_rsd = df_rsd.groupby( df_rsd.index )
@@ -93,7 +93,7 @@ def colResampleInd( host, db, n_rows, cols, n_resamples = 20000, keepP = 0.1, po
 	# toUpdate
 	if len( toUpdate ) > 0:
 		print "Computing resamples for updated MongoDB documents"
-		df = pd.DataFrame( list( client[db].gene_expression.find( { "col_id": { "$in": toUpdate } }, { "col_id":1, "normalized_expression":1, "standardized_expression":1 } ) ) )
+		df = pd.DataFrame( list( client[db].gene_expression.find( { "col_id": { "$in": toUpdate } }, { "col_id":1, "raw_expression":1, "standardized_expression":1 } ) ) )
 		df = df.groupby("col_id")
 		resamples = n_resamples - np.min( [ i[ "resamples" ] for i in old_records.values( ) ] )
 		if resamples > 0:
@@ -105,6 +105,7 @@ def colResampleInd( host, db, n_rows, cols, n_resamples = 20000, keepP = 0.1, po
 
 	return None
 
+
 if __name__ == '__main__':
 
 	host = "localhost"
@@ -114,11 +115,11 @@ if __name__ == '__main__':
 	client = MongoClient( host = host, port=port )
 	
 	cols = range( 0,client[ db ][ "col_info" ].count( ) )
-	#corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
-	#corem_sizes.sort( )
-	corem_sizes = [3,4,5,6,7,8,9,10]
+	corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
+	corem_sizes.sort( )
+	#corem_sizes = [3,4,5,6,7,8,9,10]
 
-	# tmp = Parallel(n_jobs=8)( delayed( colResampleInd )( host, i, cols, n_resamples = 20000) for i in corem_sizes )
-	tmp = Parallel(n_jobs=8)( delayed( colResampleInd )( host, i, cols, n_resamples = 2000) for i in corem_sizes )
+	tmp = Parallel(n_jobs=8)( delayed( colResampleInd )( host, i, cols, n_resamples = 10000) for i in corem_sizes )
+	#tmp = Parallel(n_jobs=8)( delayed( colResampleInd )( host, i, cols, n_resamples = 2000) for i in corem_sizes )
 
 	print "Done"	

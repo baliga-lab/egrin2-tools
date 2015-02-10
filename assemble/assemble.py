@@ -53,7 +53,7 @@ if __name__ == '__main__':
 	parser.add_argument('--link_comm_increment', default = None )
 	parser.add_argument('--link_comm_density_score', default = None )
 	parser.add_argument('--corem_size_threshold', default = None )
-	parser.add_argument('--n_resamples', default=1000, type=int, help="# resamples to compute for corem condition assignment")
+	parser.add_argument('--n_resamples', default=10000, type=int, help="# resamples to compute for corem condition assignment")
 
 	args = parser.parse_args()
 
