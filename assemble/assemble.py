@@ -24,9 +24,9 @@ import argparse
 import os
 import itertools
 
-from sql2mongoDB import *
-from makeCorems import * 
-from resample import *
+from assemble.sql2mongoDB import *
+from assemble.makeCorems import * 
+from assemble.resample import *
 
 DESCRIPTION = """assemble.py - prepare cluster runs"""
 

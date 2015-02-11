@@ -33,7 +33,7 @@ import colorbrewer as cb
 from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import pdist, squareform
 
-from resample import *
+from assemble.resample import *
 
 def rsd( vals ):
 	return abs( np.std( vals ) / np.mean( vals ) )
