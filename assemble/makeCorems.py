@@ -38,7 +38,7 @@ from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-from egrin2_query import *
+from query.egrin2_query import *
 
 
 class makeCorems:
