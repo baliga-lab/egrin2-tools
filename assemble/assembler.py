@@ -32,6 +32,10 @@ DESCRIPTION = """assemble.py - prepare cluster runs"""
 
 if __name__ == '__main__':
 
+	import argparse
+	import os
+	import itertools
+
 	parser = argparse.ArgumentParser(description=DESCRIPTION)
 	parser.add_argument('--organism', required=True, type=str, help="Organism code")
 	parser.add_argument('--ratios', required=True, help="These should be original 'raw' normalized ratios, not the standardized ratios used in cMonkey")
