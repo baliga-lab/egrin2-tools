@@ -26,6 +26,12 @@ from scipy.stats import hypergeom
 from statsmodels.sandbox.stats.multicomp import multipletests
 import itertools
 from bson.code import Code
+import matplotlib.pyplot as plt
+import plotly.plotly as py
+from plotly.graph_objs import *
+import colorbrewer as cb
+from scipy.cluster.hierarchy import linkage, dendrogram
+from scipy.spatial.distance import pdist, squareform
 
 from resample import *
 
@@ -549,6 +555,9 @@ def expressionFinder( rows = None, cols = None, standardized = True, host = "loc
 	rows = row2id_batch( rows, host, port, db,  verbose = False, return_field = "row_id", input_type = input_type_rows )
 	cols = col2id_batch( cols, host, port, db,  verbose = False, return_field = "col_id", input_type = input_type_cols )
 
+	if len( rows ) > 1000 or len( cols ) > 1000:
+		print "WARNING: This is a large query. Please be patient. If you need faster access, I would suggest saving this matrix and loading directly from file."
+
 	# get expression data
 	data = pd.DataFrame( None,columns = cols, index = rows )
 	query = pd.DataFrame ( list( client[ db ].gene_expression.find( { "$and": [ { "row_id": { "$in": rows } }, { "col_id": { "$in": cols } } ] } ) ) )
@@ -556,11 +565,93 @@ def expressionFinder( rows = None, cols = None, standardized = True, host = "loc
 		if standardized:
 			data = query.pivot(index="row_id",columns="col_id",values="standardized_expression")
 		else:
-			data = query.pivot(index="row_id",columns="col_id",values="normalized_expression")
+			data = query.pivot(index="row_id",columns="col_id",values="raw_expression")
+
+	data.index = row2id_batch( data.index.tolist(), host, port, db,  verbose = False, return_field = "egrin2_row_name", input_type = "row_id" )
+	data.columns = col2id_batch( data.columns.tolist(), host, port, db,  verbose = False, return_field = "egrin2_col_name", input_type = "col_id" )
+	data = data.sort_index( )
+	data = data.reindex_axis( sorted( data.columns ), axis=1 )
 
 	return data
 
+def plotExpression( data, plot_type = "line", ipynb = False, zlim = None ):
+	
+	if zlim is None:
+		# use 1st and 99th percentile
+		all_data = list( itertools.chain( *data.values.tolist() ) )
+		if np.percentile( all_data, 1 ) < 0:
+			zmin = -max( abs( np.percentile( all_data, [ 1, 99 ] ) ) )
+		else:
+			zmin = np.percentile( all_data, 1 )
+		zmax = max( abs( np.percentile( all_data, [ 1, 99 ] ) ) )
+	else:
+		zmin = zlim[0]
+		zmax = zlim[1]
 
+	def to_scatter( df ):
+		x = df.index.values
+		lines={}
+		for key in df:
+		    lines[key]={}
+		    lines[key]["x"]=x
+		    lines[key]["y"]=df[key].values
+		    lines[key]["name"]=key
+
+		    #Appending all lines
+		lines_plotly=[lines[key] for key in df]
+		return lines_plotly
+
+	def to_heatmap( df ):
+		# do hierarchical clustering to make it look pretty
+		D1 = squareform(pdist(df, metric='euclidean'))
+		D2 = squareform(pdist(df.T, metric='euclidean'))
+		Y = linkage(D1, method='complete')
+		Z1 = dendrogram(Y, orientation='right')
+		Y = linkage(D2, method='complete')
+    		Z2 = dendrogram(Y)
+		idx1 = Z1['leaves']
+		idx2 = Z2['leaves']
+		D = df.iloc[idx1, :]
+    		D = D.iloc[:, idx2]
+		to_r = Heatmap(
+		        z = [ D.loc[i].tolist() for i in D.index.tolist() ],
+		        y = D.index.tolist(),
+		        x = D.columns.tolist(),
+		        colorscale=[ [0.0, 'rgb(0,0,255)'], [0.5, 'rgb(0,0,0)'], [1.0, 'rgb(255,255,0)'] ],
+		        zauto = False,
+		        zmin = zmin,
+		        zmax = zmax
+
+		    )
+		return to_r
+
+	if plot_type == "line":
+		to_plot = to_scatter(data.T)
+
+		layout = Layout(
+		title='Expression',
+		xaxis=XAxis(
+			title='Condition',
+			ticks='',
+			showticklabels=False
+			),
+		yaxis=YAxis(
+			title='Expression Value',
+			zeroline=True,
+			)
+		)
+
+		fig = Figure(data=to_plot, layout=layout)
+
+	elif plot_type == "heatmap":
+		to_plot = to_heatmap(data)
+		fig = Data( [ to_plot ] )
+
+
+	if not ipynb:
+		py.plot( fig )
+
+	return fig
 
 
 
