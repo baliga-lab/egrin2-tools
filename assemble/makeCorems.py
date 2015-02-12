@@ -530,7 +530,7 @@ class makeCorems:
 			#print x._id
 			pvals = colResamplePval( rows = x.rows, row_type = "row_id", cols = cols, col_type = "col_id", n_resamples = self.n_resamples, host = self.host, port = self.port, db = self.db.name, standardized = True, sig_cutoff = 0.05, sort = True, add_override = False, n_jobs = 4, keepP = 0.05, verbose = False )
 			#pvals.index = [ self.col2id[ i ] for i in pvals.index.tolist() ]
-			pvals[ "col_id" ] = int( pvals.index )
+			pvals[ "col_id" ] = pvals.index
 			d = pvals.to_dict( 'records' )
 			self.db.corem.update( { "_id": x._id }, { "$set": { "cols": d } } )
 			return None
