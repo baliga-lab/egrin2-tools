@@ -83,6 +83,11 @@ if __name__ == '__main__':
 		corem_sizes.sort( )
 		tmp = Parallel(n_jobs=args.cores )( delayed( colResampleInd )( args.host, sql2mongo.dbname, i, cols, n_resamples = args.n_resamples) for i in corem_sizes )
 
+	# Finish corems by adding computed resamples
+	print "Finishing corems"
+	print "Adding condition information"
+	corems.finishCorems()
+
 	outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 	print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile  
 	sql2mongo.mongoDump( sql2mongo.dbname, outfile )
