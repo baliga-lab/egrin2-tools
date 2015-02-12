@@ -38,7 +38,7 @@ from assemble.resample import *
 def rsd( vals ):
 	return abs( np.std( vals ) / np.mean( vals ) )
 
-def check_colResamples( col, n_rows, n_resamples, host, port, db,  ):
+def check_colResamples( col, n_rows, n_resamples, host="localhost", port=27017, db="" ):
 	# connect to db
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' ) 
 	if client[db].col_resample.find_one( { "n_rows": n_rows, "col_id": col, "resamples": { "$gte": n_resamples } } ) is None:
@@ -55,7 +55,7 @@ def findMatch( x, df, return_field ):
 		counter = counter + 1
 	return df.iloc[ counter ][ return_field ]
 
-def row2id( row, host, port, db,  verbose = False, return_field = "row_id" ):
+def row2id( row, host="localhost", port=27017, db="",  verbose = False, return_field = "row_id" ):
 	"""Check name format of rows. If necessary, translate."""
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 	query = list( client[db].row_info.find( { "$or": [ { "row_id": row }, { "egrin2_row_name": row }, { "GI": row }, { "accession": row }, { "name": row }, { "sysName": row } ] } ) )
@@ -75,7 +75,7 @@ def row2id( row, host, port, db,  verbose = False, return_field = "row_id" ):
 		print "ERROR: Cannot identify row name: %s" % row
 		return None
 
-def row2id_batch( rows, host, port, db,  verbose = True, return_field = "row_id", input_type = None ):
+def row2id_batch( rows, host="localhost", port=27017, db="",  verbose = True, return_field = "row_id", input_type = None ):
 	"""Check name format of rows. If necessary, translate."""
 
 	if return_field == input_type:
@@ -98,7 +98,7 @@ def row2id_batch( rows, host, port, db,  verbose = True, return_field = "row_id"
 	return to_r
 	
 
-def col2id( col, host, port, db,  verbose = False, return_field = "col_id" ):
+def col2id( col, host="localhost", port=27017, db="",  verbose = False, return_field = "col_id" ):
 	"""Check name format of rows. If necessary, translate."""
 
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
@@ -120,7 +120,7 @@ def col2id( col, host, port, db,  verbose = False, return_field = "col_id" ):
 		return None
 
 
-def col2id_batch( cols, host, port, db,  verbose = True, return_field = "col_id", input_type = None ):
+def col2id_batch( cols, host="localhost", port=27017, db="",  verbose = True, return_field = "col_id", input_type = None ):
 	"""Check name format of rows. If necessary, translate."""
 
 	if return_field == input_type:
@@ -142,7 +142,7 @@ def col2id_batch( cols, host, port, db,  verbose = True, return_field = "col_id"
 
 	return to_r
 
-def colResamplePval( rows = None, cols = None, n_resamples = None, host = "localhost", port = 27017, db = "", standardized = None, sig_cutoff = None, sort = True, add_override = False, n_jobs = 4, keepP = 0.1, verbose = True ):
+def colResamplePval( rows = None, row_type = None, cols = None, col_type = None, n_resamples = None, host = "localhost", port = 27017, db = "", standardized = None, sig_cutoff = None, sort = True, add_override = False, n_jobs = 4, keepP = 0.1, verbose = True, col_outtype = "col_id" ):
 
 	def empirical_pval( i, random_rsd, resamples ):
 		for x in range( 0, len( i ) ):
@@ -157,18 +157,14 @@ def colResamplePval( rows = None, cols = None, n_resamples = None, host = "local
 				return val
 
 	rows_o = rows
-	rows = [ row2id( i, host, port, db ) for i in rows ]
-	rows = [ i for i in rows if i is not None]
-	rows = list( set( rows ) )
+	rows = row2id_batch( rows, host, port, db, input_type = row_type )
 	if len( rows ) == 0:
 		print "Please provide an appropriately named array of rows"
 		return None 
 	
 	cols_o = cols
-	cols = [ col2id( i, host, port, db ) for i in cols ]
-	cols = [ i for i in cols if i is not None]
-	rows = list( set( rows ) )
-	if len( rows ) == 0:
+	cols = col2id_batch( cols, host, port, db, input_type = col_type )
+	if len( cols ) == 0:
 		print "Please provide an appropriately named array of cols"
 		return None
 
@@ -219,14 +215,14 @@ def colResamplePval( rows = None, cols = None, n_resamples = None, host = "local
 		resamples = random_rsd.loc[ :, "resamples"].to_dict()
 		random_rsd = random_rsd.loc[ :,"lowest_standardized" ].to_dict()
 	else:
-		exp_df_rsd = exp_df_rsd.loc[ :, "normalized_expression"]
+		exp_df_rsd = exp_df_rsd.loc[ :, "raw_expression"]
 		resamples = random_rsd.loc[ :, "resamples"].to_dict()
-		random_rsd = random_rsd.loc[ :,"lowest_normalized" ].to_dict()
+		random_rsd = random_rsd.loc[ :,"lowest_raw" ].to_dict()
 		
 
 	pvals = exp_df_rsd.groupby( level=0 ).aggregate(empirical_pval, random_rsd, resamples )
 	pvals.columns = ["pval"]
-	pvals.index = [ col2name( i, host, port, db ) for i in pvals.index.values]
+	pvals.index = col2id_batch( pvals.index.values, host, port, db, input_type = "col_id", return_field = col_outtype )
 
 	if sig_cutoff is not None:
 		pvals = pvals[ pvals <= sig_cutoff ]
@@ -275,7 +271,7 @@ def rows2corem( rows = [ 0, 1 ], host = "localhost", port = 27017, db = "",  ver
 		print "Could not find any corems matching your criteria"
 		return None
 
-def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "localhost", port = 27017, db = "",  verbose = False, gre_lim = 10, pval_cutoff = 0.05, translate = True ):
+def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_output_type = None, logic = "and", host = "localhost", port = 27017, db = "",  verbose = False, gre_lim = 10, pval_cutoff = 0.05, translate = True ):
 	"""
 	Determine enrichment of y given x through bicluster co-membership. 
 
@@ -316,21 +312,19 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, logic = "and", host = "lo
 	if x_type == "rows" or x_type == "row" or x_type == "gene" or x_type == "genes":
 		x_type = "rows"
 		x_o = x
-		x = [ row2id( i, host, port, db ) for i in x ]
-		x = [ i for i in x if i is not None]
+		x = row2id_batch( x, host, port, db, input_type = x_input_type, return_field="row_id" )
 		x = list( set( x ) )
 		if len( x ) == 0:
 			print "Cannot translate row names: %s" % x_o
-			return None
-	elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type == "conds":
+			return None 
+	elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type - "conds":
 		x_type = "columns"
 		x_o = x
-		x = [ col2id( i, host, port, db ) for i in x ]
-		x = [ i for i in x if i is not None]
+		x = row2id_batch( x, host, port, db, input_type = x_input_type, return_field="col_id" )
 		x = list( set( x ) )
 		if len( x ) == 0:
 			print "Cannot translate col names: %s" % x_o
-			return None  
+			return None 
 	elif x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motifs" or x_type == "gres" or x_type == "motcs":
 		x_type = "gre_id"
 	elif x_type == "cluster" or x_type == "clusters" or x_type == "bicluster" or x_type == "biclusters" or x_type == "bcs":
@@ -499,7 +493,7 @@ def fimoFinder( start = None, stop = None, chr = None, strand = None, mot_pval_c
 
 	mots = pd.DataFrame( list( client[db].fimo.find( { "start": { "gte": start }, "stop": {"lte": stop } } ) ) )
 
-def coremFinder( x, x_type = "corem_id", y_type = "genes", host = "localhost", port = 27017, db = "" ):
+def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", y_return_field = None, logic = "and", host = "localhost", port = 27017, db = "" ):
 
 	if x_type is None:
 		print "Please supply an x_type for your query. Types include: 'rows' (genes), 'columns' (conditions), 'gres', edges "
@@ -517,14 +511,46 @@ def coremFinder( x, x_type = "corem_id", y_type = "genes", host = "localhost", p
 	if x_type == "rows" or x_type == "row" or x_type == "gene" or x_type == "genes":
 		x_type = "rows"
 		x_o = x
-		x = [ row2id( i, host, port, db ) for i in x ]
-		x = [ i for i in x if i is not None]
+		x = row2id_batch( x, host, port, db, input_type = x_input_type, return_field="row_id" )
 		x = list( set( x ) )
 		if len( x ) == 0:
 			print "Cannot translate row names: %s" % x_o
-			return None
+			return None 
+	elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type == "conds":
+		x_type = "col_id"
+		x_o = x
+		x = col2id_batch( x, host, port, db, input_type = x_input_type, return_field="row_id" )
+		x = list( set( x ) )
+		if len( x ) == 0:
+			print "Cannot translate row names: %s" % x_o
+			return None 
+	elif x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motifs" or x_type == "gres" or x_type == "motcs":
+		x_type = "gre_id"
+	elif x_type == "corem_id" or x_type == "corem" or "corems":
+		x_type = "corem_id"
+	if y_type == "rows" or x_type == "row" or x_type == "gene" or x_type == "genes":
+		y_type = "rows"
 
-	return None
+	if logic in [ "and","or","nor" ]:
+		if logic == "and" and x_type == "corem_id":
+			q = { "$or": [ { x_type : i } for i in x ] }
+		else:
+			q = { "$"+logic: [ { x_type : i } for i in x ] }
+		o = { y_type: 1 }
+		query = pd.DataFrame( list( client[db].corem.find( q, o ) ) )
+	else:
+		print "I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'."
+		return None
+
+	if y_type == "rows":
+		if y_return_field is None:
+			y_return_field = "egrin2_row_name"
+		if query.shape[0] > 1:
+			to_r = row2id_batch( to_r.index.tolist(), host, port, db, return_field = y_return_field, input_type = "row_id" )
+		else:
+			to_r = row2id_batch( query.rows[0], host, port, db, return_field = y_return_field, input_type = "row_id" )
+
+	return to_r
 
 def expressionFinder( rows = None, cols = None, standardized = True, host = "localhost", port = 27017, db = "" ):
 	"""Find motifs/GREs that fall within a specific range. Filter by biclusters/genes/conditions/etc."""
