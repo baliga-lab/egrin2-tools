@@ -238,39 +238,6 @@ def colResamplePval( rows = None, row_type = None, cols = None, col_type = None,
 
 	return pvals
 
-def rows2corem( rows = [ 0, 1 ], host = "localhost", port = 27017, db = "",  verbose = False, return_field = [ "corem_id" ], logic = "and" ):
-	"""Find corems in which row(s) co-occur."""
-	
-	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
-
-	rows_o = rows
-	rows = [ row2id( i, host, port, db ) for i in rows ]
-	rows = [ i for i in rows if i is not None]
-	rows = list( set( rows ) )
-	if len( rows ) == 0:
-		print "Cannot translate row names: %s" % rows_o
-		return None 
-
-	if logic in [ "and","or","nor" ]:
-		q = { "$"+logic: [ { "rows" : i } for i in rows ] }
-		query = pd.DataFrame( list( client[db].corem.find( q ) ) )
-	else:
-		print "I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'."
-	
-	client.close()
-
-	if query.shape[0] > 0: 
-		if return_field == "all":
-			return query
-		else:
-			try:
-				return query.loc[ :, return_field ]
-			except Exception:
-				return query
-	else:
-		print "Could not find any corems matching your criteria"
-		return None
-
 def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_output_type = None, logic = "and", host = "localhost", port = 27017, db = "",  verbose = False, gre_lim = 10, pval_cutoff = 0.05, translate = True ):
 	"""
 	Determine enrichment of y given x through bicluster co-membership. 
@@ -338,7 +305,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 
 	if y_type == "rows" or y_type == "row" or y_type == "gene" or y_type == "genes":
 		y_type = "rows"
-	elif y_type == "columns" or y_type == "column" or y_type == "col" or y_type == "cols" or y_type == "condition" or y_type == "conditions" or x_type == "conds":
+	elif y_type == "columns" or y_type == "column" or y_type == "col" or y_type == "cols" or y_type == "condition" or y_type == "conditions" or y_type == "conds":
 		y_type = "columns"
 	elif y_type == "motif" or y_type == "gre" or y_type == "motc" or y_type == "motif.gre" or y_type == "motfs" or y_type == "gres" or y_type == "motcs":
 		y_type = "gre_id"
@@ -368,7 +335,6 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 	
 	client.close()
 
-	
 	if query.shape[0] > 0: 
 
 		mapColumns = Code("""
@@ -407,6 +373,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 			if y_type == "rows":
 
 				if client[db].rowsCount_mapreduce.count() == 0:
+					print "Initializing MapReduce lookup table. Future queries will be much faster!"
 					client[db].bicluster_info.map_reduce(mapRows,reduce,"rowsCount_mapreduce")
 				else:
 					# do spot check to make sure mapreduce is up to date
@@ -414,6 +381,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 					ref = client[db].rowsCount_mapreduce.find_one( { "_id": random_id } )["value"]
 					test = client[db].bicluster_info.find( { "rows": random_id } ).count()
 					if ref != test:
+						print "Initializing MapReduce lookup table. Future queries will be much faster!"
 						client[db].bicluster_info.map_reduce(mapRows,reduce,"rowsCount_mapreduce")
 
 				rows = pd.Series( list( itertools.chain( *query.rows.tolist() ) ) ).value_counts().to_frame( "counts" )
@@ -437,6 +405,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 			if y_type == "columns":
 
 				if client[db].columnsCount_mapreduce.count() == 0:
+					print "Initializing MapReduce lookup table. Future queries will be much faster!"
 					client[db].bicluster_info.map_reduce(mapColumns,reduce,"columnsCount_mapreduce")
 				else:
 					# do spot check to make sure mapreduce is up to date
@@ -444,6 +413,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 					ref = client[db].columnsCount_mapreduce.find_one( { "_id": random_id } )["value"]
 					test = client[db].bicluster_info.find( { "columns": random_id } ).count()
 					if ref != test:
+						print "Initializing MapReduce lookup table. Future queries will be much faster!"
 						client[db].bicluster_info.map_reduce(mapColumns,reduce,"columnsCount_mapreduce")
 
 				if client[db].columnsCount_mapreduce.count() == 0:
@@ -471,6 +441,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 			if y_type == "gre_id":
 
 				if client[db].gresCount_mapreduce.count() == 0:
+					print "Initializing MapReduce lookup table. Future queries will be much faster!"
 					client[db].motif_info.map_reduce(mapGREs,reduce,"gresCount_mapreduce")
 				else:
 					# do spot check to make sure mapreduce is up to date
@@ -478,6 +449,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 					ref = client[db].gresCount_mapreduce.find_one( { "_id": random_id } )["value"]
 					test = client[db].motif_info.find( { "gre_id": random_id } ).count()
 					if ref != test:
+						print "Initializing MapReduce lookup table. Future queries will be much faster!"
 						client[db].motif_info.map_reduce(mapGREs,reduce,"gresCount_mapreduce")
 
 				gres = query.gre_id.tolist() 
@@ -541,9 +513,9 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 			print "Cannot translate row names: %s" % x_o
 			return None 
 	elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type == "conds":
-		x_type = "col_id"
+		x_type = "cols"
 		x_o = x
-		x = col2id_batch( x, host, port, db, input_type = x_input_type, return_field="row_id" )
+		x = col2id_batch( x, host, port, db, input_type = x_input_type, return_field="col_id" )
 		x = list( set( x ) )
 		if len( x ) == 0:
 			print "Cannot translate row names: %s" % x_o
@@ -557,6 +529,9 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 
 	if y_type == "rows" or x_type == "row" or x_type == "gene" or x_type == "genes":
 		y_type = "rows"
+
+	elif y_type == "columns" or y_type == "column" or y_type == "col" or y_type == "cols" or y_type == "condition" or y_type == "conditions" or y_type == "conds":
+		y_type = "cols"
 
 	if logic in [ "and","or","nor" ]:
 		if logic == "and" and x_type == "corem_id":
@@ -577,14 +552,14 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 			if logic == "and":
 				to_r = pd.Series( to_r ).value_counts()
 				if count:
-					to_r = to_r[ to_r >= len( x ) ]
+					to_r = to_r[ to_r >= query.shape[0] ]
 					if to_r.shape[0] > 0:
 						to_r.index = row2id_batch( to_r.index.tolist(), host, port, db, return_field = y_return_field, input_type = "row_id" )
 					else:
 						print "No genes found"
 						return None
 				else:
-					to_r = to_r[ to_r > 1 ].index.tolist()
+					to_r = to_r[ to_r > query.shape[0] ].index.tolist()
 					if len( to_r ):
 						to_r = row2id_batch( to_r, host, port, db, return_field = y_return_field, input_type = "row_id" )
 						to_r.sort()
@@ -609,6 +584,48 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 						return None 
 		else:
 			to_r = row2id_batch( query.rows[0], host, port, db, return_field = y_return_field, input_type = "row_id" )
+
+	elif y_type == "cols":
+		if y_return_field is None:
+			y_return_field = "egrin2_col_name"
+		if query.shape[0] > 1:
+			to_r = [int(i["col_id"]) for i in list(itertools.chain( *query.cols.values.tolist())) if i["col_id"] if type(i["col_id"]) is float]
+			if logic == "and":
+				to_r = pd.Series( to_r ).value_counts()
+				if count:
+					to_r = to_r[ to_r >= query.shape[0] ]
+					if to_r.shape[0] > 0:
+						to_r.index = col2id_batch( to_r.index.tolist(), host, port, db, return_field = y_return_field, input_type = "col_id" )
+					else:
+						print "No conditions found"
+						return None
+				else:
+					to_r = to_r[ to_r >= query.shape[0] ].index.tolist()
+					if len( to_r ):
+						to_r = col2id_batch( to_r, host, port, db, return_field = y_return_field, input_type = "col_id" )
+						to_r.sort()
+					else:
+						print "No conditions found"
+						return None
+			else:
+				if count:
+					to_r = pd.Series( to_r ).value_counts()
+					if to_r.shape[0] > 0:
+						to_r.index = col2id_batch( to_r.index.tolist(), host, port, db, return_field = y_return_field, input_type = "col_id" )
+					else:
+						print "No conditions found"
+						return None
+				else:
+					to_r = list( set( to_r ) )
+					if len( to_r ):
+						to_r = col2id_batch( to_r, host, port, db, return_field = y_return_field, input_type = "col_id" )
+						to_r.sort()
+					else:
+						print "No conditions found"
+						return None 
+		else:
+			to_r = [int(i["col_id"]) for i in list(itertools.chain( *query.cols.values.tolist())) if i["col_id"] if type(i["col_id"]) is float]
+			to_r = col2id_batch( to_r, host, port, db, return_field = y_return_field, input_type = "col_id" )
 
 	return to_r
 
