@@ -408,6 +408,13 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 
 				if client[db].rowsCount_mapreduce.count() == 0:
 					client[db].bicluster_info.map_reduce(mapRows,reduce,"rowsCount_mapreduce")
+				else:
+					# do spot check to make sure mapreduce is up to date
+					random_id = random.randint( 0, client[db].rowsCount_mapreduce.count() )
+					ref = client[db].rowsCount_mapreduce.find_one( { "_id": random_id } )["value"]
+					test = client[db].bicluster_info.find( { "rows": random_id } ).count()
+					if ref != test:
+						client[db].bicluster_info.map_reduce(mapRows,reduce,"rowsCount_mapreduce")
 
 				rows = pd.Series( list( itertools.chain( *query.rows.tolist() ) ) ).value_counts().to_frame( "counts" )
 				
@@ -431,10 +438,20 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 
 				if client[db].columnsCount_mapreduce.count() == 0:
 					client[db].bicluster_info.map_reduce(mapColumns,reduce,"columnsCount_mapreduce")
+				else:
+					# do spot check to make sure mapreduce is up to date
+					random_id = random.randint( 0, client[db].columnsCount_mapreduce.count() )
+					ref = client[db].columnsCount_mapreduce.find_one( { "_id": random_id } )["value"]
+					test = client[db].bicluster_info.find( { "columns": random_id } ).count()
+					if ref != test:
+						client[db].bicluster_info.map_reduce(mapColumns,reduce,"columnsCount_mapreduce")
+
+				if client[db].columnsCount_mapreduce.count() == 0:
+					client[db].bicluster_info.map_reduce(mapColumns,reduce,"columnsCount_mapreduce")
 				
 				cols = pd.Series( list( itertools.chain( *query["columns"].tolist() ) ) ).value_counts().to_frame( "counts" )
 				
-				# filter out rows that aren't in the database - i.e. not annotated in MicrobesOnline
+				# filter out columns that aren't in the database - i.e. not annotated in MicrobesOnline
 				in_db = pd.DataFrame( list( client[db].col_info.find( { }, { "_id" : 0, "col_id": 1 } ) ) ).col_id.tolist()
 				common_cols = list( set( cols.index ).intersection( set( in_db )  ))
 				cols = cols.loc[common_cols]
@@ -455,6 +472,13 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 
 				if client[db].gresCount_mapreduce.count() == 0:
 					client[db].motif_info.map_reduce(mapGREs,reduce,"gresCount_mapreduce")
+				else:
+					# do spot check to make sure mapreduce is up to date
+					random_id = random.randint( 0, client[db].gresCount_mapreduce.count() )
+					ref = client[db].gresCount_mapreduce.find_one( { "_id": random_id } )["value"]
+					test = client[db].motif_info.find( { "gre_id": random_id } ).count()
+					if ref != test:
+						client[db].motif_info.map_reduce(mapGREs,reduce,"gresCount_mapreduce")
 
 				gres = query.gre_id.tolist() 
 				gres = filter(lambda x: x != "NaN", gres )
@@ -493,7 +517,7 @@ def fimoFinder( start = None, stop = None, chr = None, strand = None, mot_pval_c
 
 	mots = pd.DataFrame( list( client[db].fimo.find( { "start": { "gte": start }, "stop": {"lte": stop } } ) ) )
 
-def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", y_return_field = None, logic = "and", host = "localhost", port = 27017, db = "" ):
+def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", y_return_field = None, count = False, logic = "or", host = "localhost", port = 27017, db = "" ):
 
 	if x_type is None:
 		print "Please supply an x_type for your query. Types include: 'rows' (genes), 'columns' (conditions), 'gres', edges "
@@ -528,6 +552,9 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 		x_type = "gre_id"
 	elif x_type == "corem_id" or x_type == "corem" or "corems":
 		x_type = "corem_id"
+	
+	# Check output types
+
 	if y_type == "rows" or x_type == "row" or x_type == "gene" or x_type == "genes":
 		y_type = "rows"
 
@@ -546,7 +573,40 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 		if y_return_field is None:
 			y_return_field = "egrin2_row_name"
 		if query.shape[0] > 1:
-			to_r = row2id_batch( to_r.index.tolist(), host, port, db, return_field = y_return_field, input_type = "row_id" )
+			to_r = list( itertools.chain( *query.rows.values.tolist() ) )
+			if logic == "and":
+				to_r = pd.Series( to_r ).value_counts()
+				if count:
+					to_r = to_r[ to_r >= len( x ) ]
+					if to_r.shape[0] > 0:
+						to_r.index = row2id_batch( to_r.index.tolist(), host, port, db, return_field = y_return_field, input_type = "row_id" )
+					else:
+						print "No genes found"
+						return None
+				else:
+					to_r = to_r[ to_r > 1 ].index.tolist()
+					if len( to_r ):
+						to_r = row2id_batch( to_r, host, port, db, return_field = y_return_field, input_type = "row_id" )
+						to_r.sort()
+					else:
+						print "No genes found"
+						return None
+			else:
+				if count:
+					to_r = pd.Series( to_r ).value_counts()
+					if to_r.shape[0] > 0:
+						to_r.index = row2id_batch( to_r.index.tolist(), host, port, db, return_field = y_return_field, input_type = "row_id" )
+					else:
+						print "No genes found"
+						return None
+				else:
+					to_r = list( set( to_r ) )
+					if len( to_r ):
+						to_r = row2id_batch( to_r, host, port, db, return_field = y_return_field, input_type = "row_id" )
+						to_r.sort()
+					else:
+						print "No genes found"
+						return None 
 		else:
 			to_r = row2id_batch( query.rows[0], host, port, db, return_field = y_return_field, input_type = "row_id" )
 
