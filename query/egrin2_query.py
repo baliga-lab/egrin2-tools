@@ -527,7 +527,7 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 	
 	# Check output types
 
-	if y_type == "rows" or x_type == "row" or x_type == "gene" or x_type == "genes":
+	if y_type == "rows" or y_type == "row" or y_type == "gene" or y_type == "genes":
 		y_type = "rows"
 
 	elif y_type == "columns" or y_type == "column" or y_type == "col" or y_type == "cols" or y_type == "condition" or y_type == "conditions" or y_type == "conds":
@@ -626,6 +626,9 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 		else:
 			to_r = [int(i["col_id"]) for i in list(itertools.chain( *query.cols.values.tolist())) if i["col_id"] if type(i["col_id"]) is float]
 			to_r = col2id_batch( to_r, host, port, db, return_field = y_return_field, input_type = "col_id" )
+	else:
+		print "Could not find corems matching your query"
+		to_r = None
 
 	return to_r
 
