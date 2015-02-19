@@ -45,7 +45,7 @@ from Bio import SeqIO
 
 class sql2mongoDB:
     
-	def __init__( self, organism = None, host = None, port = None, e_dir = None, targetdir = None, prefix = None,ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None , db_run_override = None, genome_file = None, row_annot = None, row_annot_match_col = None ):
+	def __init__( self, organism = None, host = None, port = None, ensembledir = None, targetdir = None, prefix = None,ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None , db_run_override = None, genome_file = None, row_annot = None, row_annot_match_col = None ):
 		
 		# connect to database
 		# make sure mongodb is running
@@ -89,25 +89,25 @@ class sql2mongoDB:
 			self.prefix = organism+'-out-'
 		else:
 			self.prefix = prefix
-		if e_dir is None:
-			self.e_dir = './'
+		if ensembledir is None:
+			self.ensembledir = './'
 		else:
-			self.e_dir = e_dir
+			self.ensembledir = ensembledir
 		if targetdir is None:
 			self.targetdir = './'
 		else:
 			self.targetdir = targetdir
 		if gre2motif == None:
 			# default file name?
-			if os.path.isfile( self.e_dir + "out.mot_metaclustering.txt.I45.txt" ):
-				self.gre2motif = self.e_dir + "out.mot_metaclustering.txt.I45.txt"
+			if os.path.isfile( self.ensembledir + "out.mot_metaclustering.txt.I45.txt" ):
+				self.gre2motif = self.ensembledir + "out.mot_metaclustering.txt.I45.txt"
 			else:
 				print "I cannot find a GRE clustering file. If you want to assign GREs, please specify this file."
 				self.gre2motif = None
 		else:
 			self.gre2motif = gre2motif
 
-	    	self.db_files = np.sort( np.array( glob.glob( self.e_dir + self.prefix + "???/cmonkey_run.db" ) ) ) # get all cmonkey_run.db files
+	    	self.db_files = np.sort( np.array( glob.glob( self.ensembledir + self.prefix + "???/cmonkey_run.db" ) ) ) # get all cmonkey_run.db files
 	    	self.db_run_override = db_run_override
 	    	
 	    	if ncbi_code == None:
@@ -129,8 +129,8 @@ class sql2mongoDB:
     		self.row_annot_match_col = row_annot_match_col
 
     		if len(self.db_files) < 1:
-	    		print "I cannot find any cMonkey SQLite databases in the current directory: %s\nMake sure 'e_dir' variable points to the location of your cMonkey-2 ensemble results." % os.getcwd()
-
+	    		print "I cannot find any cMonkey SQLite databases in the current directory: %s\nMake sure 'ensembledir' variable points to the location of your cMonkey-2 ensemble results." % os.getcwd()
+	    		return None
     		return None
 
 	def dlfile( self, url, save_name=None):
@@ -216,8 +216,8 @@ class sql2mongoDB:
 			print "No custom genome annotation file supplied by 'genome_file' parameter. Attempting automated download from MicrobesOnline"
 			# download genome from microbes online. store in MongoDB collection
 			# 
-			url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId="+ncbi_code+";export=genome"
-			save_name=ncbi_code+"_genome.fa"
+			url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId="+str( ncbi_code )+";export=genome"
+			save_name= str( ncbi_code )+"_genome.fa"
 			self.dlfile( url, save_name)
 			
 			seqs_b = []
@@ -233,28 +233,34 @@ class sql2mongoDB:
 		else:
 			# TBD
 			seqs_b = []
-		
+
 		genome_collection = self.db.genome
-	    
-	    	# Check whether documents are already present in the collection before insertion
-	    	seqs_f = filter( None, [ self.check4existence( genome_collection, i ) for i in seqs_b ] )
 
-	    	print "%s new records to write" % len( seqs_f )
-	    	if len(seqs_f) > 0:
-	    		genome_collection.insert( seqs_f )
+		# Check whether documents are already present in the collection before insertion
+		seqs_f = filter( None, [ self.check4existence( genome_collection, i ) for i in seqs_b ] )
 
-	    	return genome_collection
+		print "%s new records to write" % len( seqs_f )
+		if len(seqs_f) > 0:
+			genome_collection.insert( seqs_f )
+
+		return genome_collection
 	
 	def loadRatios( self, file_in ):
 		"""Loads ratios from individual cMonkey runs (unfinished) or single flat file (gzip compressed)."""
 		if file_in == None:
 			# compile from individual runs
 			# do be done
-			file_in = np.sort( np.array( glob.glob( e_dir + prefix + "???/ratios.tsv.gz" ) ) )
+			file_in = np.sort( np.array( glob.glob( ensembledir + prefix + "???/ratios.tsv.gz" ) ) )
 		else:
 			print "Loading gene expression file from %s" % file_in
 			# load directly from gzip file
-			ratios= pd.read_csv( gzip.open( file_in, 'rb' ), index_col=0, sep="\t" ) 
+			ratios= pd.read_csv( gzip.open( file_in, 'rb' ), index_col=0, sep="\t" )
+			if ratios.shape[1] == 0:
+				# wrong delimiter? try comma
+				 ratios= pd.read_csv( gzip.open( file_in, 'rb' ), index_col=0, sep="," )
+			if ratios.shape[1] == 0:
+				# still wrong delimiter 
+				print "Cannot read ratios file. Check delimiter. Should be '\t' or ',' "
 		return ratios
 
 	def standardizeRatios( self, ratios ):
@@ -330,7 +336,7 @@ class sql2mongoDB:
 		# write to mongoDB collection 
 		row_info_collection = self.db.row_info
 		# Check whether documents are already present in the collection before insertion
-		d = row_table.to_dict( orient='records' )
+		d = row_table.to_dict( 'records' )
 	    	d_f = filter( None, [ self.check4existence( row_info_collection, i ) for i in d ] )
 
 	    	print "%s new records to write" % len( d_f )
@@ -377,8 +383,9 @@ class sql2mongoDB:
 		if  col_annot != None:
 			# assumes default microbes online schema
 			col_annot = pd.read_csv( gzip.open( col_annot, 'rb' ), sep="\t" )	
-
-		col_table = pd.merge( col_info, col_annot, left_on="egrin2_col_name", right_on="experiment_name" )
+			col_table = pd.merge( col_info, col_annot, left_on="egrin2_col_name", right_on="experiment_name" )
+		else:
+			col_table = col_info
 		col_info_4_mongoDB = []
 		for i in range( 0, len( col_info.egrin2_col_name ) ):
 			col_info_4_mongoDB.append( self.condInfo2Dict( col_table, col_info.egrin2_col_name[i] ) )
@@ -399,8 +406,9 @@ class sql2mongoDB:
 	def condInfo2Dict( self, col_table, cond_name):
 		cond_data = col_table[col_table.egrin2_col_name==cond_name]
 		cond_dict = { "col_id": np.unique( cond_data.col_id )[0], "egrin2_col_name": np.unique( cond_data.egrin2_col_name )[0], "additional_info": [] }
-		for i in range(0,cond_data.shape[0]):
-			cond_dict[ "additional_info" ].append( { "name": cond_data.irow(i)["feature_name" ], "value": cond_data.irow(i)["value"], "units": cond_data.irow(i)["feature_units"] } )
+		if "feature_name" in cond_data.columns and "value" in cond_data.columns and "feature_units" in cond_data.columns:
+			for i in range(0,cond_data.shape[0]):
+				cond_dict[ "additional_info" ].append( { "name": cond_data.irow(i)["feature_name" ], "value": cond_data.irow(i)["value"], "units": cond_data.irow(i)["feature_units"] } )
 		return cond_dict
 
 	def parseRatios( self, ratios_files ):
@@ -686,13 +694,13 @@ class sql2mongoDB:
 
 	def assemble_fimo( self ):
 
-		def get_fimo_scans_single( i, db, e_dir, run2id ):
+		def get_fimo_scans_single( i, db, ensembledir, run2id ):
 			cluster = i.cluster
 			run_name =run2id[ run2id[ "run_id" ]==i.run_id ][ "run_name" ][ 0 ]
 			cluster_id = i._id
 			try:
 				# get all fimo scans in the dir
-				f = e_dir + run_name + "/fimo-outs/fimo-out-" + "%04d" % (cluster,) + ".bz2" 
+				f = ensembledir + run_name + "/fimo-outs/fimo-out-" + "%04d" % (cluster,) + ".bz2" 
 				#print motif_num
 
 				fimo = pd.read_csv( f, sep="\t", compression = "bz2" )
@@ -715,7 +723,7 @@ class sql2mongoDB:
 				# only store hits with p-value lte 1e-5
 				fimo = fimo.loc[ fimo[ "p-value" ] <= 1e-5, ]
 
-				d_f = fimo.to_dict( orient='records' )
+				d_f = fimo.to_dict( 'records' )
 
 
 				db.fimo.insert( d_f )
@@ -728,7 +736,7 @@ class sql2mongoDB:
 					#print "Doing fimo_small! : %s" % x
 					if mot2gre.iloc[ x ].gre_id != "NaN":
 						tmp_fimo = fimo.loc[ fimo[ "motif_num" ] == mot2gre.iloc[ x ].motif_num, ]
-						d_f = tmp_fimo.to_dict( orient='records' )
+						d_f = tmp_fimo.to_dict( 'records' )
 						db.fimo_small.insert( d_f )
 		    		return None
 			except Exception:
@@ -736,7 +744,7 @@ class sql2mongoDB:
 
 		# get all biclusters
 		bcs = pd.DataFrame( list( self.db.bicluster_info.find( {}, { "cluster" : 1, "run_id": 1 } ) ) )
-		tmp = bcs.apply( get_fimo_scans_single, axis=1, db = self.db, e_dir = self.e_dir, run2id = self.run2id  )
+		tmp = bcs.apply( get_fimo_scans_single, axis=1, db = self.db, ensembledir = self.ensembledir, run2id = self.run2id  )
 		return None
 
 	def mongoDump( self, db, outfile ):
@@ -814,6 +822,6 @@ class sql2mongoDB:
 		return None
 
 if __name__ == '__main__':
-	self = sql2mongoDB( ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz",  col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz", ncbi_code = "511145", e_dir = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/eco-ens-m3d/", organism="eco", host = "localhost")
+	self = sql2mongoDB( ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz",  col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz", ncbi_code = "511145", ensembledir = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/eco-ens-m3d/", organism="eco", host = "localhost")
 
 

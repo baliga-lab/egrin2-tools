@@ -64,35 +64,37 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 
 	# Initialize to find problems early!!
-	sql2mongo = sql2mongoDB( organism = args.organism, host = args.host, port = args.port, e_dir = args.ensembledir, prefix = args.prefix, ratios_raw = args.ratios, gre2motif = args.gre2motif, col_annot = args.col_annot, ncbi_code = args.ncbi_code, dbname = args.db, db_run_override = None, genome_file = args.genome_annot, row_annot = args.row_annot, row_annot_match_col = args.row_annot_matchCol )
-	
-	# Merge sql into mongoDB
-	sql2mongo.compile()
-	corems = makeCorems( organism = args.organism, host = args.host, port = args.port, db = args.db, dbfiles = None, backbone_pval = args.backbone_pval, out_dir = args.targetdir, n_subs = args.cores, link_comm_score = args.link_comm_score, link_comm_increment = args.link_comm_increment, link_comm_density_score = args.link_comm_density_score, corem_size_threshold = args.corem_size_threshold )
+	sql2mongo = sql2mongoDB( organism = args.organism, host = args.host, port = args.port, ensembledir = args.ensembledir, prefix = args.prefix, ratios_raw = args.ratios, gre2motif = args.gre2motif, col_annot = args.col_annot, ncbi_code = args.ncbi_code, dbname = args.db, db_run_override = None, genome_file = args.genome_annot, row_annot = args.row_annot, row_annot_match_col = args.row_annot_matchCol )
+	if len( sql2mongo.db_files ) >0:
+		# Merge sql into mongoDB
+		sql2mongo.compile()
+		corems = makeCorems( organism = args.organism, host = args.host, port = args.port, db = args.db, dbfiles = None, backbone_pval = args.backbone_pval, out_dir = args.targetdir, n_subs = args.cores, link_comm_score = args.link_comm_score, link_comm_increment = args.link_comm_increment, link_comm_density_score = args.link_comm_density_score, corem_size_threshold = args.corem_size_threshold )
 
-	# Make corems
-	corems.rowRow()
-	corems.runCoremCscripts()
-	corems.addCorems()
+		# Make corems
+		corems.rowRow()
+		corems.runCoremCscripts()
+		corems.addCorems()
 
-	if args.n_resamples > 0:
-		# Make resample database
-		print "Computing resamples"
-		client = MongoClient( host = args.host, port= args.port )
-		db = sql2mongo.dbname
-		cols = range( 0,client[ db ][ "col_info" ].count( ) )
-		corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
-		corem_sizes.sort( )
-		tmp = Parallel(n_jobs=args.cores )( delayed( colResampleInd )( args.host, sql2mongo.dbname, i, cols, n_resamples = args.n_resamples) for i in corem_sizes )
+		if args.n_resamples > 0:
+			# Make resample database
+			print "Computing resamples"
+			client = MongoClient( host = args.host, port= args.port )
+			db = sql2mongo.dbname
+			cols = range( 0,client[ db ][ "col_info" ].count( ) )
+			corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
+			corem_sizes.sort( )
+			tmp = Parallel(n_jobs=args.cores )( delayed( colResampleInd )( args.host, sql2mongo.dbname, i, cols, n_resamples = args.n_resamples) for i in corem_sizes )
 
-		# Finish corems by adding computed resamples
-		print "Finishing corems"
-		print "Adding condition information"
-		corems.finishCorems()
+			# Finish corems by adding computed resamples
+			print "Finishing corems"
+			print "Adding condition information"
+			corems.finishCorems()
 
-	outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
-	print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile  
-	sql2mongo.mongoDump( sql2mongo.dbname, outfile )
+		outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
+		print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile  
+		sql2mongo.mongoDump( sql2mongo.dbname, outfile )
 
-	print "Done"	
-
+		print "Done"
+	else:	
+		print "No cMonkey2 DB files. Please specify --ensembledir"
+		
