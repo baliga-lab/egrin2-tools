@@ -162,23 +162,26 @@ class sql2mongoDB:
 		to_keep = []
 		ensemble_info_collection = db.ensemble_info
 		for i in db_files:
-			conn = sqlite3.connect( i )
-			c = conn.cursor()
-			c.execute("SELECT * FROM run_infos;")
-			run_info = c.fetchone()
-			if run_info is None:
-				pass
-			else:
-				if db_run_override == None:
-					# do not include runs that are already in the database
-					# check for existence
-					run_name = i.split("/")[-2]
-					if ensemble_info_collection.find( { "run_name": run_name } ).count() > 0:
-						pass
+			try:
+				conn = sqlite3.connect( i )
+				c = conn.cursor()
+				c.execute("SELECT * FROM run_infos;")
+				run_info = c.fetchone()
+				if run_info is None:
+					pass
+				else:
+					if db_run_override == None:
+						# do not include runs that are already in the database
+						# check for existence
+						run_name = i.split("/")[-2]
+						if ensemble_info_collection.find( { "run_name": run_name } ).count() > 0:
+							pass
+						else:
+							to_keep.append( i )
 					else:
 						to_keep.append( i )
-				else:
-					to_keep.append( i )
+			except Exception:
+				pass
 		return to_keep
 
 	def get_run2id( self, dbfiles, db ):
@@ -404,7 +407,6 @@ class sql2mongoDB:
 		return col_info_collection
 	    	 	
 	def condInfo2Dict( self, col_table, cond_name):
-		#test
 		cond_data = col_table[col_table.egrin2_col_name==cond_name]
 		cond_dict = { "col_id": np.unique( cond_data.col_id )[0], "egrin2_col_name": np.unique( cond_data.egrin2_col_name )[0], "additional_info": [] }
 		if "feature_name" in cond_data.columns and "value" in cond_data.columns and "feature_units" in cond_data.columns:
