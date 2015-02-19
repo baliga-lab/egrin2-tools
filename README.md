@@ -25,7 +25,7 @@ Documentation is available on the [wiki](http://nbviewer.ipython.org/github/scal
 * sqlite3 >= 2.6.0
 * statsmodels >= 0.6.1
 
-In addition, you must compile the C++ code provided in the [./src/ directory](./src/). Instructions for compiling this code are available on the [wiki](http://nbviewer.ipython.org/github/scalefreegan/egrin2-tools/blob/master/doc/index.ipynb).
+In addition, you must compile the C++ code provided in the [src/ directory](./src/). Instructions for compiling this code are available on the [wiki](http://nbviewer.ipython.org/github/scalefreegan/egrin2-tools/blob/master/doc/index.ipynb).
 
 
 
