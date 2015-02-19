@@ -101,7 +101,11 @@ class sql2mongoDB:
 			self.targetdir = targetdir
 		if gre2motif == None:
 			# default file name?
-			self.gre2motif = self.e_dir + "out.mot_metaclustering.txt.I45.txt"
+			if os.path.isfile( self.e_dir + "out.mot_metaclustering.txt.I45.txt" )
+				self.gre2motif = self.e_dir + "out.mot_metaclustering.txt.I45.txt"
+			else:
+				print "I cannot find a GRE clustering file. If you want to assign GREs, please specify this file."
+				self.gre2motif = None
 		else:
 			self.gre2motif = gre2motif
 
@@ -497,31 +501,34 @@ class sql2mongoDB:
 	    	return ensemble_info_collection
 
  	def loadGREMap( self, gre2motif ):
- 		count = 1
- 		mots = {}
- 		with open(gre2motif, 'r') as f: 
- 			for line in f:
- 				# only consider motif clusters with > 3 motifs
- 				if len( line.strip("\n").split( "\t" ) ) > 3:
-	 				for motif in line.strip("\n").split( "\t" ):
-	 					elements = motif.split("_")
-	 					# cluster
-	 					elements[1] = int(elements[1])
-	 					# motif_num
-	 					elements[2] = int(elements[2])
-	 					# elements[0] = run_name
-	 					if elements[0] in mots.keys():
-	 						if elements[1] in mots[elements[0]].keys():
-	 							mots[elements[0]][elements[1]][elements[2]] = count
-	 						else:
-	 							mots[elements[0]][elements[1]] = {}
-	 							mots[elements[0]][elements[1]][elements[2]] = count
-	 					else:
-							mots[elements[0]] = {}
-							mots[elements[0]][elements[1]] = {}
-							mots[elements[0]][elements[1]][elements[2]] = count
-					count = count + 1
- 		return mots
+ 		if gre2motif is not None:
+	 		count = 1
+	 		mots = {}
+	 		with open(gre2motif, 'r') as f: 
+	 			for line in f:
+	 				# only consider motif clusters with > 3 motifs
+	 				if len( line.strip("\n").split( "\t" ) ) > 3:
+		 				for motif in line.strip("\n").split( "\t" ):
+		 					elements = motif.split("_")
+		 					# cluster
+		 					elements[1] = int(elements[1])
+		 					# motif_num
+		 					elements[2] = int(elements[2])
+		 					# elements[0] = run_name
+		 					if elements[0] in mots.keys():
+		 						if elements[1] in mots[elements[0]].keys():
+		 							mots[elements[0]][elements[1]][elements[2]] = count
+		 						else:
+		 							mots[elements[0]][elements[1]] = {}
+		 							mots[elements[0]][elements[1]][elements[2]] = count
+		 					else:
+								mots[elements[0]] = {}
+								mots[elements[0]][elements[1]] = {}
+								mots[elements[0]][elements[1]][elements[2]] = count
+						count = count + 1
+	 		return mots
+		else:
+			return None
 
 	def insert_bicluster_info( self, db, db_file, run2id, row2id, col2id ): 
 		"""Find all biclusters in a cMonkey run, process and add as documents to bicluster collection
