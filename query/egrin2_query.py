@@ -513,7 +513,7 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 			print "Cannot translate row names: %s" % x_o
 			return None 
 	elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type == "conds":
-		x_type = "cols"
+		x_type = "cols.col_id"
 		x_o = x
 		x = col2id_batch( x, host, port, db, input_type = x_input_type, return_field="col_id" )
 		x = list( set( x ) )
@@ -522,16 +522,36 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 			return None 
 	elif x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motifs" or x_type == "gres" or x_type == "motcs":
 		x_type = "gre_id"
-	elif x_type == "corem_id" or x_type == "corem" or "corems":
+	elif x_type == "corem_id" or x_type == "corem" or x_type == "corems":
 		x_type = "corem_id"
+	elif x_type == "edge" or x_type == "edges":
+		x_type = "edges"
+		x_new = []
+		for i in x:
+			i_trans = row2id_batch( i.split("-"), host, port, db, input_type = x_input_type, return_field="row_id", verbose = False )
+			i_trans = [ str( j ) for j in i_trans ]
+			x_new.append( "-".join( i_trans ) )
+			i_trans.reverse()
+			x_new.append( "-".join( i_trans ) )
+		x = x_new
+		if len( x ) == 0:
+			print "Cannot translate row names: %s" % x_o
+			return None 
+
+
 	
 	# Check output types
 
 	if y_type == "rows" or y_type == "row" or y_type == "gene" or y_type == "genes":
 		y_type = "rows"
-
 	elif y_type == "columns" or y_type == "column" or y_type == "col" or y_type == "cols" or y_type == "condition" or y_type == "conditions" or y_type == "conds":
-		y_type = "cols"
+		y_type = "cols.col_id"
+	elif y_type == "motif" or y_type == "gre" or y_type == "motc" or y_type == "motif.gre" or y_type == "motifs" or y_type == "gres" or y_type == "motcs":
+		y_type = "gre_id"
+	elif y_type == "corem_id" or y_type == "corem" or y_type == "corems":
+		y_type = "corem_id"
+	elif y_type == "edge" or y_type == "edges":
+		y_type = "edges"
 
 	if logic in [ "and","or","nor" ]:
 		if logic == "and" and x_type == "corem_id":
@@ -585,7 +605,7 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 		else:
 			to_r = row2id_batch( query.rows[0], host, port, db, return_field = y_return_field, input_type = "row_id" )
 
-	elif y_type == "cols":
+	elif y_type == "cols.col_id":
 		if y_return_field is None:
 			y_return_field = "egrin2_col_name"
 		if query.shape[0] > 1:
@@ -626,6 +646,20 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 		else:
 			to_r = [int(i["col_id"]) for i in list(itertools.chain( *query.cols.values.tolist())) if i["col_id"] if type(i["col_id"]) is float]
 			to_r = col2id_batch( to_r, host, port, db, return_field = y_return_field, input_type = "col_id" )
+	elif y_type == "corem_id":
+		to_r = query.corem_id.tolist()
+	elif y_type == "edges":
+		if y_return_field is None:
+			y_return_field = "egrin2_row_name"
+		to_r = list( itertools.chain( *query.edges.values.tolist() ) )
+		to_r_new = []
+		for i in to_r:
+			i_trans = row2id_batch( [ int( j ) for j in i.split("-") ], host, port, db, input_type = "row_id", return_field=y_return_field, verbose = False )
+			i_trans = [ str( j ) for j in i_trans ]
+			to_r_new.append( "-".join( i_trans ) )
+		to_r = to_r_new
+		to_r.sort()
+
 	else:
 		print "Could not find corems matching your query"
 		to_r = None

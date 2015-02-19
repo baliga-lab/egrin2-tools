@@ -41,7 +41,7 @@ if __name__ == '__main__':
 	parser.add_argument('--ratios', required=True, help="These should be original 'raw' normalized ratios, not the standardized ratios used in cMonkey")
 	parser.add_argument('--targetdir', required=True, help="Where should MongoDB and corem data be stored")
 	parser.add_argument('--ncbi_code', required=True)
-	parser.add_argument('--cores', default=4, type=int)
+	parser.add_argument('--cores', default=3, type=int)
 	parser.add_argument('--ensembledir', default=None, help="Location of the ensemble runs. Default: cwd")
 	parser.add_argument('--col_annot', default=None, help="A tab-delimited file with condition annotations")
 	parser.add_argument('--host', default="localhost", help="Host for MongoDB")
@@ -50,8 +50,8 @@ if __name__ == '__main__':
 	parser.add_argument('--row_annot', default=None, help="Optional row (gene) annotation tab-delimited file. If not specified, annotations will be downloaded from MicrobesOnline using --ncbi_code.")
 	parser.add_argument('--row_annot_matchCol', default=None, help="Which column of row_annot matches row names in ratios file.")
 	parser.add_argument('--gre2motif', default=None, help="Motif->GRE clustering file")
-	parser.add_argument('--db', default=None, help="Optional ensemble MongoDB databse name")
-	parser.add_argument('--genome_annot', default=None, help="Optional genome annotation file. Automatically doenloaded from MicrobesOnline using --ncbi_code")
+	parser.add_argument('--db', default=None, help="Optional ensemble MongoDB database name")
+	parser.add_argument('--genome_annot', default=None, help="Optional genome annotation file. Automatically downloaded from MicrobesOnline using --ncbi_code")
 	parser.add_argument('--backbone_pval', default = 0.05, type=float )
 	parser.add_argument('--link_comm_score', default = None )
 	parser.add_argument('--link_comm_increment', default = None )
@@ -83,10 +83,10 @@ if __name__ == '__main__':
 		corem_sizes.sort( )
 		tmp = Parallel(n_jobs=args.cores )( delayed( colResampleInd )( args.host, sql2mongo.dbname, i, cols, n_resamples = args.n_resamples) for i in corem_sizes )
 
-	# Finish corems by adding computed resamples
-	print "Finishing corems"
-	print "Adding condition information"
-	corems.finishCorems()
+		# Finish corems by adding computed resamples
+		print "Finishing corems"
+		print "Adding condition information"
+		corems.finishCorems()
 
 	outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 	print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile  
