@@ -404,6 +404,7 @@ class sql2mongoDB:
 		return col_info_collection
 	    	 	
 	def condInfo2Dict( self, col_table, cond_name):
+		#test
 		cond_data = col_table[col_table.egrin2_col_name==cond_name]
 		cond_dict = { "col_id": np.unique( cond_data.col_id )[0], "egrin2_col_name": np.unique( cond_data.egrin2_col_name )[0], "additional_info": [] }
 		if "feature_name" in cond_data.columns and "value" in cond_data.columns and "feature_units" in cond_data.columns:
