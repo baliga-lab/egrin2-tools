@@ -25,8 +25,6 @@ from urllib2 import urlopen, URLError, HTTPError
 from zipfile import ZipFile
 import itertools
 
-import pdb
-
 import numpy as np
 import pandas as pd
 
