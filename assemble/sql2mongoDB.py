@@ -99,7 +99,7 @@ class sql2mongoDB:
 			self.targetdir = targetdir
 		if gre2motif == None:
 			# default file name?
-			if os.path.isfile( self.e_dir + "out.mot_metaclustering.txt.I45.txt" )
+			if os.path.isfile( self.e_dir + "out.mot_metaclustering.txt.I45.txt" ):
 				self.gre2motif = self.e_dir + "out.mot_metaclustering.txt.I45.txt"
 			else:
 				print "I cannot find a GRE clustering file. If you want to assign GREs, please specify this file."
