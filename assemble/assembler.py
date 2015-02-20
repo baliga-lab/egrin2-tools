@@ -50,7 +50,7 @@ if __name__ == '__main__':
 	parser.add_argument('--port', default=27017, help="MongoDB port", type=int)
 	parser.add_argument('--prefix', default=None, help="Ensemble run name prefix. Default: *organism*-out-")
 	parser.add_argument('--row_annot', default=None, help="Optional row (gene) annotation tab-delimited file. If not specified, annotations will be downloaded from MicrobesOnline using --ncbi_code.")
-	parser.add_argument('--row_annot_matchCol', default=None, help="Which column of row_annot matches row names in ratios file.")
+	parser.add_argument('--row_annot_matchCol', default=None, help="Name of column in row_annot that matches row names in ratios file.")
 	parser.add_argument('--gre2motif', default=None, help="Motif->GRE clustering file")
 	parser.add_argument('--db', default=None, help="Optional ensemble MongoDB database name")
 	parser.add_argument('--genome_annot', default=None, help="Optional genome annotation file. Automatically downloaded from MicrobesOnline using --ncbi_code")
