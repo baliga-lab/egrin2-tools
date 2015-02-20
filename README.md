@@ -22,8 +22,9 @@ Documentation is available on the [wiki](http://nbviewer.ipython.org/github/scal
 * plotly >= 1.6.6
 * pymongo >= 2.7.2
 * scipy >= 0.13.3
-* sqlite3 >= 2.6.0
 * statsmodels >= 0.6.1
+
+These can be installed easily using [`pip`](https://pip.pypa.io/en/latest/index.html).
 
 In addition, you must compile the C++ code provided in the [`src directory`](./src/). Instructions for compiling this code are available on the [wiki](http://nbviewer.ipython.org/github/scalefreegan/egrin2-tools/blob/master/doc/index.ipynb).
 
