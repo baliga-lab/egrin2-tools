@@ -509,21 +509,21 @@ class sql2mongoDB:
 
 	def insert_ensemble_info( self, db_files, db, run2id, row2id, col2id ):
 		"""Compile and insert ensemble_info collection into MongoDB collection"""
-	    	to_insert = [ self.assemble_ensemble_info( i, run2id, row2id, col2id ) for i in db_files ]
-	    	ensemble_info_collection = db.ensemble_info
-	    	
-	    	# Check whether documents are already present in the collection before insertion
-	    	if ensemble_info_collection.count() > 0:
-				d_f = filter( None, [ self.check4existence( ensemble_info_collection, i, "run_name", i["run_name"] ) for i in to_insert ] )
-			else:
-				d_f = to_insert
-	    	
-	    	print "%s new records to write" % len( d_f )
-	    	
-	    	if len(d_f) > 0:
-	    		ensemble_info_collection.insert( d_f )
+		to_insert = [ self.assemble_ensemble_info( i, run2id, row2id, col2id ) for i in db_files ]
+		ensemble_info_collection = db.ensemble_info
 
-	    	return ensemble_info_collection
+		# Check whether documents are already present in the collection before insertion
+		if ensemble_info_collection.count() > 0:
+			d_f = filter( None, [ self.check4existence( ensemble_info_collection, i, "run_name", i["run_name"] ) for i in to_insert ] )
+		else:
+			d_f = to_insert
+
+		print "%s new records to write" % len( d_f )
+
+		if len(d_f) > 0:
+			ensemble_info_collection.insert( d_f )
+
+		return ensemble_info_collection
 
  	def loadGREMap( self, gre2motif ):
  		if gre2motif is not None:
