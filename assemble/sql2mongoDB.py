@@ -454,12 +454,14 @@ class sql2mongoDB:
 		gene_expression_collection = db.gene_expression
 		
 		# Check whether documents are already present in the collection before insertion
-	    	d_f = filter( None, [ self.check4existence( gene_expression_collection, i ) for i in exp_data ] )
+		#d_f = filter( None, [ self.check4existence( gene_expression_collection, i ) for i in exp_data ] )
+		# This step takes too long! Removing it. 
 
-	    	print "%s new records to write" % len( d_f )
-	    	
-	    	if len(d_f) > 0:
-	    		gene_expression_collection.insert( d_f )
+		print "%s new records to write" % len( d_f )
+
+		if len(d_f) > 0:
+
+			gene_expression_collection.insert( d_f )
 
 		return gene_expression_collection
 
