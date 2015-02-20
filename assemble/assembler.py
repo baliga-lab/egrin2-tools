@@ -73,6 +73,7 @@ if __name__ == '__main__':
 		# Make corems
 		corems.rowRow()
 		corems.runCoremCscripts()
+		corems.getCorems()
 		corems.addCorems()
 
 		if args.n_resamples > 0:

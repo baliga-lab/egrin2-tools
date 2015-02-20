@@ -165,9 +165,12 @@ class sql2mongoDB:
 			try:
 				conn = sqlite3.connect( i )
 				c = conn.cursor()
-				c.execute("SELECT * FROM run_infos;")
+				c.execute("SELECT num_iterations FROM run_infos;")
 				run_info = c.fetchone()
 				if run_info is None:
+					pass
+				elif run_info[0] < 1000:
+					# incomplete runs
 					pass
 				else:
 					if db_run_override == None:
