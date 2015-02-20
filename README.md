@@ -26,7 +26,7 @@ Documentation is available on the [wiki](http://nbviewer.ipython.org/github/scal
 
 These can be installed easily using [`pip`](https://pip.pypa.io/en/latest/index.html).
 
-In addition, you must compile the C++ code provided in the [`src directory`](./src/). Instructions for compiling this code are available on the [wiki](http://nbviewer.ipython.org/github/scalefreegan/egrin2-tools/blob/master/doc/index.ipynb).
+In addition, you must compile the C++ code provided in the [`src directory`](./src/). Instructions for compiling this code are available on the [wiki](http://nbviewer.ipython.org/github/scalefreegan/egrin2-tools/blob/master/doc/cpp_scripts.ipynb).
 
 
 
