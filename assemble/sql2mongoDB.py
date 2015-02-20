@@ -240,7 +240,10 @@ class sql2mongoDB:
 		genome_collection = self.db.genome
 
 		# Check whether documents are already present in the collection before insertion
-		seqs_f = filter( None, [ self.check4existence( genome_collection, i ) for i in seqs_b ] )
+		if genome_collection.count() > 0:
+			seqs_f = filter( None, [ self.check4existence( genome_collection, i ) for i in seqs_b ] )
+		else:
+			seqs_f = seqs_b
 
 		print "%s new records to write" % len( seqs_f )
 		if len(seqs_f) > 0:
@@ -340,14 +343,18 @@ class sql2mongoDB:
 		row_info_collection = self.db.row_info
 		# Check whether documents are already present in the collection before insertion
 		d = row_table.to_dict( 'records' )
-	    	d_f = filter( None, [ self.check4existence( row_info_collection, i ) for i in d ] )
 
-	    	print "%s new records to write" % len( d_f )
-	    	
-	    	if len(d_f) > 0:
-	    		row_info_collection.insert( d_f )
+		if row_info_collection.count() > 0:
+			d_f = filter( None, [ self.check4existence( row_info_collection, i ) for i in d ] )
+		else:
+			d_f = d
 
-	    	return row_info_collection
+		print "%s new records to write" % len( d_f )
+
+		if len(d_f) > 0:
+			row_info_collection.insert( d_f )
+
+		return row_info_collection
 
 	def get_col2id( self, ratios_standardized, db ):
 		"""make cond2id and id2cond dicts for lookup"""
@@ -397,12 +404,15 @@ class sql2mongoDB:
 		col_info_collection = self.db.col_info
 		
 		# Check whether documents are already present in the collection before insertion
-	    	d_f = filter( None, [ self.check4existence( col_info_collection, i ) for i in col_info_4_mongoDB ] )
+		if col_info_collection.count() > 0:
+			d_f = filter( None, [ self.check4existence( col_info_collection, i ) for i in col_info_4_mongoDB ] )
+		else:
+			d_f = col_info_4_mongoDB
+		
+		print "%s new records to write" % len( d_f )
 
-	    	print "%s new records to write" % len( d_f )
-	    	
-	    	if len(d_f) > 0:
-	    		col_info_collection.insert( d_f )
+		if len(d_f) > 0:
+			col_info_collection.insert( d_f )
 
 		return col_info_collection
 	    	 	
@@ -454,13 +464,14 @@ class sql2mongoDB:
 		gene_expression_collection = db.gene_expression
 		
 		# Check whether documents are already present in the collection before insertion
-		#d_f = filter( None, [ self.check4existence( gene_expression_collection, i ) for i in exp_data ] )
-		# This step takes too long! Removing it. 
+		if gene_expression_collection.count() > 0:
+			d_f = filter( None, [ self.check4existence( gene_expression_collection, i ) for i in exp_data ] )
+		else:
+			d_f = exp_data 
 
 		print "%s new records to write" % len( d_f )
 
 		if len(d_f) > 0:
-
 			gene_expression_collection.insert( d_f )
 
 		return gene_expression_collection
@@ -502,8 +513,11 @@ class sql2mongoDB:
 	    	ensemble_info_collection = db.ensemble_info
 	    	
 	    	# Check whether documents are already present in the collection before insertion
-	    	d_f = filter( None, [ self.check4existence( ensemble_info_collection, i, "run_name", i["run_name"] ) for i in to_insert ] )
-
+	    	if ensemble_info_collection.count() > 0:
+				d_f = filter( None, [ self.check4existence( ensemble_info_collection, i, "run_name", i["run_name"] ) for i in to_insert ] )
+			else:
+				d_f = to_insert
+	    	
 	    	print "%s new records to write" % len( d_f )
 	    	
 	    	if len(d_f) > 0:
@@ -558,15 +572,20 @@ class sql2mongoDB:
 	    	c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?;",w)
 		biclusters = [self.assemble_bicluster_info_single( db, db_file, c, last_run, i[0], run2id, row2id, col2id ) for i in c.fetchall()]
 		bicluster_info_collection = self.db.bicluster_info
-	    	# Check whether documents are already present in the collection before insertion
-	    	d_f = filter( None, [ self.check4existence( bicluster_info_collection, i, "run_id", i["run_id"], "cluster", i["cluster"] ) for i in biclusters ] )
 
-	    	print "%s new records to write" % len( d_f )
-	    	
-	    	if len(d_f) > 0:
-	    		bicluster_info_collection.insert( d_f )
-	    	
-	    	return bicluster_info_collection
+		# Check whether documents are already present in the collection before insertion
+		if bicluster_info_collection.count() > 0:
+			d_f = filter( None, [ self.check4existence( bicluster_info_collection, i, "run_id", i["run_id"], "cluster", i["cluster"] ) for i in biclusters ] )
+		else:
+			d_f = biclusters
+		
+
+		print "%s new records to write" % len( d_f )
+
+		if len(d_f) > 0:
+			bicluster_info_collection.insert( d_f )
+
+		return bicluster_info_collection
 
 	def assemble_bicluster_info_single( self, db, db_file, cursor, iteration, cluster, run2id, row2id, col2id ):
 		"""Create python ensemble_info dictionary for bulk import into MongoDB collections"""
