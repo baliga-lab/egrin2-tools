@@ -57,7 +57,7 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -pe serial %s
 #$ -l mem_free=8G
 
-python egrin2/run_coding_fracs.py --cache_dir %s --features_file %s --organism_name %s --input_dir %s > %s/coding_fracs.out
+python egrin2-tools/postproc/run_coding_fracs.py --cache_dir %s --features_file %s --organism_name %s --input_dir %s > %s/coding_fracs.out
 """
 
 

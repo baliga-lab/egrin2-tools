@@ -92,7 +92,11 @@ def make_meme_file(dbpaths, maxiter, targetdir, gene,
             conn = sqlite3.connect(dbpath)
             cursor = conn.cursor()
             cursor2 = conn.cursor()
-            cursor.execute('select count(*) from row_names where name=?', [gene])
+	    try:
+                cursor.execute('select count(*) from row_names where name=?', [gene])
+	    except:
+                print "SKIPPING:", dbpath
+                continue
             # make sure we have at least one
             if cursor.fetchone()[0] > 0:
               cursor.execute('select order_num from row_names where name=?', [gene])
@@ -148,17 +152,20 @@ def get_all_genes(inpath, prefix):
     #print "resultdirs for '%s', prefix: '%s': %s" % (inpath, prefix, str(resultdirs))
     dbpaths = [os.path.join(resultdir, 'cmonkey_run.db') for resultdir in resultdirs]
 
-    print "adding indexes..."
-    for dbpath in dbpaths:
-        conn = sqlite3.connect(dbpath)
-        cursor = conn.cursor()
-        cursor.execute("create index if not exists cluststat_iter_index on cluster_stats (iteration)")
-        cursor.execute("create index if not exists rowmemb_order_index on row_members (order_num)")
-        cursor.execute("create index if not exists rowmemb_clust_index on row_members (cluster)")
-        cursor.execute("create index if not exists motinf_clust_index on motif_infos (cluster)")
-        cursor.close()
-        conn.close()
-    print "indexes added."
+    ## print "adding indexes..."
+    ## for dbpath in dbpaths:
+    ##     try:
+    ## 	    conn = sqlite3.connect(dbpath)
+    ##         cursor = conn.cursor()
+    ##         cursor.execute("create index if not exists cluststat_iter_index on cluster_stats (iteration)")
+    ##         cursor.execute("create index if not exists rowmemb_order_index on row_members (order_num)")
+    ##         cursor.execute("create index if not exists rowmemb_clust_index on row_members (cluster)")
+    ##         cursor.execute("create index if not exists motinf_clust_index on motif_infos (cluster)")
+    ##         cursor.close()
+    ##         conn.close()
+    ## 	except:
+    ## 	    conn.close()
+    ## print "indexes added."
 
     # extract max iteration
     conn = sqlite3.connect(dbpaths[0])

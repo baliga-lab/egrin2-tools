@@ -20,7 +20,7 @@ file in the target directory
 
 Usage:
 
-./egrin2/tomtom.py --dir <dir> --prefix <prefix> --targetdir <target directory>
+./egrin2-tools/postproc/tomtom.py --dir <dir> --prefix <prefix> --targetdir <target directory>
 """
 import argparse
 import bz2
@@ -34,8 +34,8 @@ RESID_CUTOFF  = 0.8
 DIST_METHOD   = "ed"
 Q_THRESHOLD   = 0.5
 MIN_OVERLAP   = 4
-Q_PSEUDO      = 0
-T_PSEUDO      = 0
+Q_PSEUDO      = 0.01
+T_PSEUDO      = 0.01
 
 
 MAX_CLUSTER_RESIDUAL = None
@@ -54,7 +54,7 @@ export PATH=/tools/bin:${PATH}
 #$ -pe serial %d
 #$ -l mem_free=8G
 
-python ./egrin2/tomtom.py --dir . --prefix eco-out- --targetdir tomtom_out --gene %s
+python ./egrin2-tools/postproc/tomtom.py --dir . --prefix %s --targetdir tomtom_out --gene %s
 
 tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s | bzip2 -c  > %s
 """
@@ -73,7 +73,7 @@ setenv PATH /tools/bin:${PATH}
 #$ -pe serial %d
 #$ -l mem_free=8G
 
-python ./egrin2/tomtom.py --dir . --prefix eco-out- --targetdir tomtom_out --gene %s
+python ./egrin2-tools/postproc/tomtom.py --dir . --prefix %s --targetdir tomtom_out --gene %s
 
 tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s | bzip2 -c > %s
 """
@@ -85,13 +85,13 @@ qsub $f
 end
 """
 
-def emit_tomtom_script(targetdir, filepath, gene, login, q_thresh=Q_THRESHOLD, dist_method=DIST_METHOD,
+def emit_tomtom_script(targetdir, filepath, prefix, gene, login, q_thresh=Q_THRESHOLD, dist_method=DIST_METHOD,
                min_overlap=MIN_OVERLAP, q_pseudo=Q_PSEUDO, t_pseudo=T_PSEUDO):
     ##login = 'mharris'
     num_cores = 1
 
     with open(os.path.join(targetdir, '%s-tomtom.sh' % gene), 'w') as outfile:
-        outfile.write(QSUB_TEMPLATE % (login, login, num_cores, gene, q_thresh,
+        outfile.write(QSUB_TEMPLATE % (login, login, num_cores, prefix, gene, q_thresh,
                                        dist_method, min_overlap, q_pseudo, t_pseudo,
                                        filepath, filepath, '%s-tomtom.tsv.bz2' % filepath))
     with open('qsub_tomtom.sh', 'w') as outfile:
@@ -150,4 +150,4 @@ if __name__ == '__main__':
         genes, dbpaths, max_iteration = export_motifs.get_all_genes(args.dir, args.prefix)
         for gene in genes:
             print gene
-            emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, '%s.meme' % gene), gene, login)
+            emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, '%s.meme' % gene), args.prefix, gene, login)

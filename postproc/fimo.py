@@ -59,7 +59,7 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -t 1-%s
 #$ -cwd
 #$ -pe serial %s
-#$ -l mem_free=8G
+#$ -l mem_free=2G
 
 %s
 """
@@ -76,7 +76,7 @@ setenv PATH /tools/bin:${PATH}
 set BATCHNUM="`printf '%03d' ${SGE_TASK_ID}`"
 """
 
-QSUB_TEMPATE_CSH = """#$ -S /bin/csh
+QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -m be
 #$ -q baliga
 #$ -P Bal_%s
@@ -84,7 +84,7 @@ QSUB_TEMPATE_CSH = """#$ -S /bin/csh
 #$ -t 1-%s
 #$ -cwd
 #$ -pe serial %s
-#$ -l mem_free=8G
+#$ -l mem_free=2G
 
 %s
 """
@@ -138,7 +138,7 @@ def main():
     op.add_option('-i', '--base_dir', default='.', help='Cmonkey-python base directory.')
     op.add_option('-t', '--target_dir', default='.', help='The output directory name')
     op.add_option('-q', '--qsub_script', default='fimo_batch_script.sh', help='The script name for running fimo on cmonkey results')
-    op.add_option('-n', '--num_cores', default=2, help='Number of cores to use on cluster')
+    op.add_option('-n', '--num_cores', default=1, help='Number of cores to use on cluster')
     op.add_option('-s', '--csh', help='If c-shell indicate with this flag', action='store_true')
     op.add_option('-f', '--fix', default=False, help='Fix meme files', action='store_true')
     opt, args = op.parse_args()
