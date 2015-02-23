@@ -134,7 +134,7 @@ if __name__ == '__main__':
     if args.user is not None:
         login = args.user
     else:
-        login = os.getlogin()
+        None ##login = os.getlogin()  ## causes an error when run via sge
 
     if args.csh:
       QSUB_TEMPLATE = QSUB_TEMPLATE_CSH
