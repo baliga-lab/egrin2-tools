@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 
-from query.egrin2_query import )
+from query.egrin2_query import *
  
 def rsd( vals ):
 	return abs( np.std( vals ) / np.mean( vals ) )
