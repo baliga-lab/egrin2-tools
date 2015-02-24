@@ -152,7 +152,7 @@ if __name__ == '__main__':
 	client = MongoClient( host = args.host, port= args.port )
 	
 	if args.cols is None:
-		cols = pd.DataFrame( list ( client[ db ][ "col_info" ].find({},{"col_id":1}) ) ).col_id.tolist()
+		cols = pd.DataFrame( list ( client[ args.db ][ "col_info" ].find({},{"col_id":1}) ) ).col_id.tolist()
 	else:
 		# not supported yet
 		print "Not supported yet"
