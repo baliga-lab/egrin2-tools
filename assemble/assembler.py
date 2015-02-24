@@ -80,7 +80,7 @@ if __name__ == '__main__':
 			# Make resample database
 			print "Computing resamples"
 			client = MongoClient( host = args.host, port= args.port )
-			db = sql2mongo.dbname
+			db = sql2mongo.dbname 
 			cols = range( 0,client[ db ][ "col_info" ].count( ) )
 			corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
 			corem_sizes.sort( )
