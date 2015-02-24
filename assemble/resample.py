@@ -21,15 +21,14 @@ __email__ = "brooksan@uw.edu"
 __status__ = "Development"
 
 import random
-
 import argparse
 import os
 import itertools
+import math
 
 from pymongo import MongoClient
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
 
 from query.egrin2_query import *
  
