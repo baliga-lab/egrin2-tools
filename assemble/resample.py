@@ -154,8 +154,7 @@ if __name__ == '__main__':
 	else:
 		# not supported yet
 		print "Not supported yet"
-		cols = args.cols
-		break 
+		cols = None
 
 	#corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
 
