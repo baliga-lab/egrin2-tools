@@ -33,6 +33,8 @@ from joblib import Parallel, delayed
 
 from query.egrin2_query import *
  
+DESCRIPTION = """resample.py - prepare brute force random resamples"""
+
 def rsd( vals ):
 	return abs( np.std( vals ) / np.mean( vals ) )
 
