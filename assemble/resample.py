@@ -140,12 +140,12 @@ if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser( description=DESCRIPTION )
 	parser.add_argument( '--host', required=True, type=str, help="Host for MongoDB" )
-	parser.add_argument('--db', required=True, help="Database name")
-	parser.add_argument('--n_rows', required=True, help="Gene set size to test")
-	parser.add_argument('--n_resamples', default=1000, help="Number of resamples to compute")
+	parser.add_argument('--db', required=True, type=str, help="Database name")
+	parser.add_argument('--n_rows', required=True, type=int, help="Gene set size to test")
+	parser.add_argument('--n_resamples', default=1000, type=int, help="Number of resamples to compute")
 	parser.add_argument('--port', default=27017, help="MongoDB port", type=int )
 	parser.add_argument('--keep_p', default=0.1, help="Lowest percent to store", type=int )
-	parser.add_argument('--cols', default=None, help="Columns (experiments) for resampling. Should be path to tab-delimited file containing column names that map to egrin2_col_names in MongoDB database, eg experiment names.", type=int )
+	parser.add_argument('--cols', default=None, help="Columns (experiments) for resampling. Should be path to tab-delimited file containing column names that map to egrin2_col_names in MongoDB database, eg experiment names.", type=str )
 
 	args = parser.parse_args()
 
