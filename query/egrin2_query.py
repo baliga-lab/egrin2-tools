@@ -13,11 +13,6 @@ __status__ = "Development"
 
 import random
 
-# $ hg clone ssh://hg@bitbucket.org/djcbeach/monary ./monary
-# $ cd ./monary && python setup.py install
-#from monary import Monary
-# can't get monary to connect to a remote host!!
-
 from pymongo import MongoClient
 import numpy as np
 import pandas as pd
