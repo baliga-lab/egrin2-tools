@@ -118,18 +118,18 @@ if __name__ == '__main__':
 		print "Done"
 	else:
 		# Initialize to find problems early!!
-		#sql2mongo = sql2mongoDB( organism = args.organism, host = args.host, port = args.port, ensembledir = args.ensembledir, prefix = args.prefix, ratios_raw = args.ratios, gre2motif = args.gre2motif, col_annot = args.col_annot, ncbi_code = args.ncbi_code, dbname = args.db, db_run_override = None, genome_file = args.genome_annot, row_annot = args.row_annot, row_annot_match_col = args.row_annot_matchCol )
-		#if len( sql2mongo.db_files ) >0:
-		if True:
+		sql2mongo = sql2mongoDB( organism = args.organism, host = args.host, port = args.port, ensembledir = args.ensembledir, prefix = args.prefix, ratios_raw = args.ratios, gre2motif = args.gre2motif, col_annot = args.col_annot, ncbi_code = args.ncbi_code, dbname = args.db, db_run_override = None, genome_file = args.genome_annot, row_annot = args.row_annot, row_annot_match_col = args.row_annot_matchCol )
+		if len( sql2mongo.db_files ) >0:
+		#if True:
 			# Merge sql into mongoDB
-			#sql2mongo.compile()
+			sql2mongo.compile()
 			corems = makeCorems( organism = args.organism, host = args.host, port = args.port, db = db, dbfiles = None, backbone_pval = args.backbone_pval, out_dir = targetdir, n_subs = args.cores, link_comm_score = args.link_comm_score, link_comm_increment = args.link_comm_increment, link_comm_density_score = args.link_comm_density_score, corem_size_threshold = args.corem_size_threshold )
 
 			# Make corems
-			# corems.rowRow()
-			# corems.runCoremCscripts()
-			# corems.getCorems()
-			# corems.addCorems()
+			corems.rowRow()
+			corems.runCoremCscripts()
+			corems.getCorems()
+			corems.addCorems()
 
 			if args.cluster:
 				client = MongoClient( host = args.host, port= args.port )
