@@ -3,6 +3,8 @@
 This is the template for generating resample QSub scripts
 for submission to SGE cluster
 
+python resample_QSub.py --name resample_55 --host primordial --db mtu_db --n_rows 55 --user abrooks
+
 """
 
 __author__ = "Aaron Brooks"
@@ -20,95 +22,55 @@ import itertools
 
 DESCRIPTION = """resample_QSub.py - generate QSub scripts for SGE cluster"""
 
-# Templates for Bourne Shell
-QSUB_TEMPLATE_HEADER = """#!/bin/bash
-
-export PATH=/tools/bin:${PATH}
-export BATCHNUM=`printf "%03d" $SGE_TASK_ID`
-"""
-
-QSUB_TEMPLATE = """#$ -S /bin/bash
-#$ -m be
-#$ -q baliga
-#$ -P Bal_%s
-#$ -tc %d
-#$ -l hostname="baliga1baliga2|baliga3"
-#$ -M %s@systemsbiology.org
-#$ -cwd
-#$ -pe serial %d
-#$ -l mem_free=10G
-
-python cmonkey.py --organism %s --ratios %s --config %s --out %s
-
-bzip2 -f %s/*.pkl
-"""
-
 # Templates for csh
 
 QSUB_TEMPLATE_HEADER_CSH = """#!/bin/csh
 
-setenv LD_LIBRARY_PATH /tools/lib:/tools/R-3.0.3/lib64/R/lib
-setenv PATH /tools/bin:${PATH}
-setenv BATCHNUM `printf "%03d" $SGE_TASK_ID`
 """
 
 QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
+#$ -N %(name)s
+#$ -o 'out_messages.txt'
+#$ -e 'error_messages.txt'
 #$ -m be
 #$ -q baliga
-#$ -P Bal_%s
-#$ -t 1-%d
-#$ -tc %d
-#$ -l hostname="baliga1baliga2|baliga3"
-#$ -M %s@systemsbiology.org
+#$ -P Bal_%(user)s
+#$ -l hostname="baliga2|baliga3"
+#$ -M %(user)s@systemsbiology.org
 #$ -cwd
-#$ -pe serial %d
-#$ -l mem_free=10G
+#$ -pe serial %(n_cores)i
+#$ -l mem_free=8G
 
-python cmonkey.py --organism %s --ratios %s --config %s --out %s --minimize_io
+python resample.py --host %(host)s --db %(db)s --n_rows %(n_rows)i --n_resamples %(n_resamples)i --port %(port)i
 
-bzip2 -f %s/*.pkl
 """
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser(description=DESCRIPTION)
-    parser.add_argument('--organism', required=True, help="Organism code")
-    parser.add_argument('--ratios', required=True)
-    parser.add_argument('--targetdir', required=True)
-    parser.add_argument('--numruns', type=int, default=4)
-    parser.add_argument('--ncbi_code', default="")
-    parser.add_argument('--mincols', type=int, default=8)
-    parser.add_argument('--num_cores', type=int, default=8)
-    parser.add_argument('--max_tasks', type=int, default=20)
+    parser.add_argument( '--host', required=True, type=str, help="Host for MongoDB" )
+    parser.add_argument('--db', required=True, type=str, help="Database name")
+    parser.add_argument('--n_rows', required=True, type=int, help="Gene set size to test")
+    parser.add_argument('--n_resamples', default=1000, type=int, help="Number of resamples to compute")
+    parser.add_argument('--port', default=27017, help="MongoDB port", type=int )
+    parser.add_argument('--cols', default=None, help="Columns (experiments) for resampling. Should be path to tab-delimited file containing column names that map to egrin2_col_names in MongoDB database, eg experiment names.", type=str )
     parser.add_argument('--user', default=None)
-    parser.add_argument('--csh', action='store_true')
-    parser.add_argument('--blocks', default=None)
-    parser.add_argument('--inclusion', default=None)
-    parser.add_argument('--exclusion', default=None)
-    parser.add_argument('--pipeline', default=None)
-    parser.add_argument('--setenrich', default=None)
-    parser.add_argument('--setenrich_files', default=None)
+    parser.add_argument('--targetdir', default="./", help="Directory to store Qsub scripts")
+    parser.add_argument('--n_cores', default=1, help="Number of cores to reserve on cluster")
+
     args = parser.parse_args()
 
-    if args.csh:
-        header = QSUB_TEMPLATE_HEADER_CSH
-        template = QSUB_TEMPLATE_CSH
-    else:
-        header = QSUB_TEMPLATE_HEADER
-        template = QSUB_TEMPLATE
+    header = QSUB_TEMPLATE_HEADER_CSH
+    template = QSUB_TEMPLATE_CSH
 
+    args_d = vars(args)
+    args_d["name"] = "r.%s" % args_d["n_rows"]
 
-    with open(os.path.join(args.targetdir, "%s.sh" % args.organism), 'w') as outfile:
+    with open(os.path.join(args.targetdir, "%s.sh" % args.name), 'w') as outfile:
         if args.user is not None:
             login = args.user
         else:
             login = os.getlogin()
 
         outfile.write(header)
-        outfile.write(template % (login, args.numruns, login,
-                                  args.num_cores,
-                                  args.max_tasks,
-                                  args.organism,
-                                  os.path.join(args.targetdir, "ratios-$BATCHNUM.tsv"),
-                                  os.path.join(args.targetdir, "config-$BATCHNUM.ini"),
-                                  "%s-out-$BATCHNUM" % (args.organism),
-                                  "%s-out-$BATCHNUM" % (args.organism) ) )
+        outfile.write(template % vars(args) )

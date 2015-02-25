@@ -38,7 +38,8 @@ def rsd( vals ):
 	return abs( np.std( vals ) / np.mean( vals ) )
 
 def resample( row_vals, n_rows ):
-	return rsd( random.sample( row_vals, n_rows ) )
+	# filter out nan values!!!!
+	return rsd( random.sample( row_vals.dropna(), n_rows ) )
 
 def choose_n( col, vals, n, add, client, db, n_rows, n_resamples, old_records, keepP ):
 	raw = vals.loc[:,"raw_expression"].copy()
@@ -68,7 +69,7 @@ def choose_n( col, vals, n, add, client, db, n_rows, n_resamples, old_records, k
 		ras = ras[ 0: int( n2keep ) ]
 		client[ db ][ "col_resample" ].update( { "n_rows": n_rows, "col_id": col }, { "$set": { "resamples": resamples, "lowest_raw": ran, "lowest_standardized": ras } } )
 
-def colResampleInd( host, db, n_rows, cols, n_resamples = 20000, keepP = 0.1, port = 27017):
+def colResampleInd( host, db, n_rows, cols, n_resamples = 1000, keepP = 0.1, port = 27017):
 	"""Resample gene expression for a given number of genes in a particular condition using RSD, brute force."""
 
 	print "Adding brute force resample document for gene set size %i " % ( n_rows )
@@ -98,8 +99,8 @@ def colResampleInd( host, db, n_rows, cols, n_resamples = 20000, keepP = 0.1, po
 	# toAdd
 	if len( toAdd ) > 0:
 		print "Computing resamples for new MongoDB documents"
-		# do in batches of 500 so memory usage doesn't get too high
-		nbins = int( math.ceil( len( toAdd )/500.0 ) )
+		# do in batches of 100 so memory usage doesn't get too high
+		nbins = int( math.ceil( len( toAdd )/100.0 ) )
 		bins = split_list( toAdd, nbins)
 		for b in bins:
 			df = pd.DataFrame( list( client[db].gene_expression.find( { "col_id": { "$in": b } }, { "col_id":1, "raw_expression":1, "standardized_expression":1 } ) ) )
@@ -114,7 +115,7 @@ def colResampleInd( host, db, n_rows, cols, n_resamples = 20000, keepP = 0.1, po
 	if len( toUpdate ) > 0:
 		print "Computing resamples for updated MongoDB documents"
 		# do in batches of 500 so memory usage doesn't get too high
-		nbins = int( math.ceil( len( toUpdate )/500.0 ) )
+		nbins = int( math.ceil( len( toUpdate )/100.0 ) )
 		bins = split_list( toUpdate, nbins)
 		for b in bins:
 			df = pd.DataFrame( list( client[db].gene_expression.find( { "col_id": { "$in": b } }, { "col_id":1, "raw_expression":1, "standardized_expression":1 } ) ) )
@@ -158,6 +159,8 @@ if __name__ == '__main__':
 		cols = None
 
 	#corem_sizes = list( set( [ len( i[ "rows" ] ) for i in client[ db ][ "corem" ].find( {}, {"rows":1} ) ] ) )
+
+	print "Starting resample for n_rows = %s" % args.n_rows
 
 	colResampleInd( host = args.host, db = args.db, n_rows = args.n_rows, cols = cols, n_resamples = args.n_resamples, keepP = args.keep_p, port = args.port)
 
