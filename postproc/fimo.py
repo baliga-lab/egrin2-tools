@@ -90,44 +90,46 @@ QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 """
 
 def fix_meme_files(meme_files):
-    #  Read memefile line by line and output, replacing strange e-value formats (e.g. "E= 10.0e+003" to "E= 1.0e+004")
     for memef in meme_files:
-        IN = open(memef,'rb')
-        OUT = open(memef+'_fimo', 'wb')
-        for line in IN:
-            if 'letter-probability matrix' in line: # Note: fimo uses this matrix for input
-                linespl = line.split()
-                evalue = linespl[9].split('e')
-                p1 = float(evalue[0]) # first part of evalue, want format to be 1.0 instead of 10.0 for e.g.
-                if p1 >= 10.0: # this is something we need to change!
-                    p1 /= 10. # shift decimal
-                    p1 = round(p1,1) # round to 1 decimal place
-                    p2 = evalue[1] # second part of evalue, will have a + or - at beginning
-                    newevalue = ''
-                    if '+' in p2:
-                        p2 = p2.replace('+','')
-                        if p2 == '000':
-                            p2 = 0
-                            newevalue = "%se+%03d" % (str(p1),p2)
-                        else:
-                            p2 = int(p2.lstrip("0")) + 1 # now an int
-                            newevalue = "%se+%03d" % (str(p1),p2)
-                    else:
-                        p2 = p2.replace('-','')
-                        if p2 == '000':
-                            p2 = 0
-                            newevalue = "%se+%03d" % (str(p1),p2)
-                        else:
-                            p2 = int(p2.lstrip("0")) - 1 # now an int
-                            newevalue = "%se-%03d" % (str(p1),p2)
-                    linespl[9] = newevalue
-                    OUT.write(' '.join(linespl)+'\n')
-            else:
-                OUT.write(line)
-        IN.close()
-        OUT.close()
-        os.rename((memef+'_fimo'),memef)
+    	fix_meme_file(memef)
 
+def fix_meme_file(meme_files):
+    #  Read memefile line by line and output, replacing strange e-value formats (e.g. "E= 10.0e+003" to "E= 1.0e+004")
+    IN = open(memef,'rb')
+    OUT = open(memef+'_fimo', 'wb')
+    for line in IN:
+      if 'letter-probability matrix' in line: # Note: fimo uses this matrix for input
+        linespl = line.split()
+        evalue = linespl[9].split('e')
+        p1 = float(evalue[0]) # first part of evalue, want format to be 1.0 instead of 10.0 for e.g.
+        if p1 >= 10.0: # this is something we need to change!
+          p1 /= 10. # shift decimal
+          p1 = round(p1,1) # round to 1 decimal place
+          p2 = evalue[1] # second part of evalue, will have a + or - at beginning
+          newevalue = ''
+          if '+' in p2:
+            p2 = p2.replace('+','')
+            if p2 == '000':
+              p2 = 0
+              newevalue = "%se+%03d" % (str(p1),p2)
+            else:
+              p2 = int(p2.lstrip("0")) + 1 # now an int
+              newevalue = "%se+%03d" % (str(p1),p2)
+          else:
+            p2 = p2.replace('-','')
+            if p2 == '000':
+              p2 = 0
+              newevalue = "%se+%03d" % (str(p1),p2)
+            else:
+              p2 = int(p2.lstrip("0")) - 1 # now an int
+              newevalue = "%se-%03d" % (str(p1),p2)
+          linespl[9] = newevalue
+          OUT.write(' '.join(linespl)+'\n')
+      else:
+        OUT.write(line)
+    IN.close()
+    OUT.close()
+    os.rename((memef+'_fimo'),memef)
 
 def main():
     #  Collect & check args
@@ -234,14 +236,16 @@ def main():
         else:
             os.getlogin()
 
-        num_runs = len(org_out_dirs)
+        ##num_runs = len(org_out_dirs)
+	max_run = max( [int(i.split('-')[2]) for i in org_out_dirs] )
         subscript = "%s-out-${BATCHNUM}/fimo_script.sh >& %s-out-${BATCHNUM}/fimo_script.sh.out" % (opt.organism_name, \
                                                                                                     opt.organism_name)
 
         outfile.write(header)
         outfile.write(template % (login, 
             login,
-            num_runs,
+            ##num_runs,
+	    max_run,
             opt.num_cores, 
             subscript))
 
