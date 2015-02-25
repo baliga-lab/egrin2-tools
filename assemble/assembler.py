@@ -59,7 +59,7 @@ done
 
 RUN_INFO_TEMPLATE = """[ General ensemble info ]
 
-assembly_date: %(date)s
+assembly_date_utc: %(date)s
 compiled_by: %(user)s
 organism: %(organism)s
 ncbi_code: %(ncbi_code)s
@@ -132,7 +132,7 @@ if __name__ == '__main__':
 		user = os.getlogin()
 
 	info_d = {
-	"date_utc": str( datetime.datetime.utcnow() ),
+	"date": str( datetime.datetime.utcnow() ),
 	"user": user,
 	"organism": args.organism,
 	"ncbi_code": args.ncbi_code,
