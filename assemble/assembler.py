@@ -57,6 +57,29 @@ for FILE in r_*; do
 done
 """
 
+RUN_INFO_TEMPLATE = """[ General ensemble info ]
+
+assembly_date: %(date)s
+compiled_by: %(user)s
+organism: %(organism)s
+ncbi_code: %(ncbi_code)s
+host: %(host)s
+port: %(port)s
+db: %(db)s
+
+[ Corem parameters ]
+
+backbone_pval: %(backbone_pval)s
+link_comm_score: %(link_comm_score)s
+link_comm_increment: %(link_comm_increment)s
+link_comm_density_score: %(link_comm_density_score)s
+corem_size_threshold: %(corem_size_threshold)s
+
+[ Condition resamples ]
+
+n_resamples: %(n_resamples)s
+"""
+
 DESCRIPTION = """assemble.py - prepare cluster runs"""
 
 if __name__ == '__main__':
