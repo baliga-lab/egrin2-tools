@@ -137,7 +137,7 @@ if __name__ == '__main__':
 				if not os.path.isdir(  os.path.abspath( os.path.join( targetdir, "qsub" ) ) ):
 					os.makedirs( os.path.abspath( os.path.join( targetdir, "qsub" ) ) )
 				for x in corem_sizes:
-					name = "r_" +  str(x)
+					name = args.organism + "_r_" +  str(x)
 					with open(os.path.join( os.path.abspath( os.path.join( targetdir, "qsub" ) ), "%s.sh" % name), 'w') as outfile:
 						if args.user is not None:
 						    user = args.user
