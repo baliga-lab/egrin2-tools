@@ -105,11 +105,11 @@ if __name__ == '__main__':
 	parser.add_argument('--db', default=None, help="Optional ensemble MongoDB database name")
 	parser.add_argument('--genome_annot', default=None, help="Optional genome annotation file. Automatically downloaded from MicrobesOnline using --ncbi_code")
 	parser.add_argument('--backbone_pval', default = 0.05, type=float )
-	parser.add_argument('--link_comm_score', default = None )
-	parser.add_argument('--link_comm_increment', default = None )
-	parser.add_argument('--link_comm_density_score', default = None )
-	parser.add_argument('--corem_size_threshold', default = None )
-	parser.add_argument('--n_resamples', default=1000, type=int, help="# resamples to compute for corem condition assignment")
+	parser.add_argument('--link_comm_score', default = 0, type=int )
+	parser.add_argument('--link_comm_increment', default = 0.1, type=float )
+	parser.add_argument('--link_comm_density_score', default = 5, type=int)
+	parser.add_argument('--corem_size_threshold', default = 3, type=int )
+	parser.add_argument('--n_resamples', default=10000, type=int, help="# resamples to compute for corem condition assignment")
 	parser.add_argument('--cluster', default=True, help="Run re-samples on cluster?")
 	parser.add_argument('--finish_only', default=False, help="Finish corems only. In case session gets dropped")
 	parser.add_argument('--user', default=None, help="Cluster user name")
@@ -125,6 +125,30 @@ if __name__ == '__main__':
 		targetdir = "./"
 	else:
 		targetdir = args.targetdir
+
+	if args.user is not None:
+		user = args.user
+	else:
+		user = os.getlogin()
+
+	info_d = {
+	"date_utc": str( datetime.datetime.utcnow() ),
+	"user": user,
+	"organism": args.organism,
+	"ncbi_code": args.ncbi_code,
+	"host": args.host,
+	"port": args.port,
+	"db": db,
+	"backbone_pval": args.backbone_pval,
+	"link_comm_score": args.link_comm_score,
+	"link_comm_increment": args.link_comm_increment,
+	"link_comm_density_score": args.link_comm_density_score,
+	"corem_size_threshold": args.corem_size_threshold,
+	"n_resamples": args.n_resamples
+	}
+
+	with open(os.path.join( os.path.abspath( os.path.join( targetdir, "qsub" ) ), "ensemble.info"), 'w') as outfile:
+		outfile.write( RUN_INFO_TEMPLATE % info_d )
 
 	if args.finish_only:
 		
@@ -162,10 +186,6 @@ if __name__ == '__main__':
 				for x in corem_sizes:
 					name = args.organism + "_r_" +  str(x)
 					with open(os.path.join( os.path.abspath( os.path.join( targetdir, "qsub" ) ), "%s.sh" % name), 'w') as outfile:
-						if args.user is not None:
-						    user = args.user
-						else:
-						    user = os.getlogin()
 						argss = {
 							"user": user,
 							"n_resamples": args.n_resamples,
@@ -191,8 +211,10 @@ if __name__ == '__main__':
 			corems.finishCorems()
 
 			outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
-			print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile  
-			sql2mongo.mongoDump( sql2mongo.dbname, outfile )
+			print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile 
+			info = os.path.join( os.path.abspath( os.path.join( targetdir, "qsub" ) ), "ensemble.info") 
+			pdf = os.path.join( corems.out_dir, "density_stats.pdf") 
+			sql2mongo.mongoDump( sql2mongo.dbname, outfile, add_files = info + " " + pdf )
 
 			print "Done"
 		else:	

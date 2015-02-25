@@ -774,14 +774,17 @@ class sql2mongoDB:
 		tmp = bcs.apply( get_fimo_scans_single, axis=1, db = self.db, ensembledir = self.ensembledir, run2id = self.run2id  )
 		return None
 
-	def mongoDump( self, db, outfile ):
+	def mongoDump( self, db, outfile, add_files = None ):
 		"""Write contents from MongoDB instance to binary file"""
 		print "Dumping MongoDB to BSON"
 		outfile_wdir = os.path.abspath( os.path.join( self.targetdir,outfile ) )
 		sys_command = "mongodump --db " + db + " --out " + outfile_wdir + " --host " + self.host + " --port " + str( self.port )
 		os.system( sys_command )
 		print "Compressing MongoDB BSON docs"
-		sys_command2 = "tar -czvf " + outfile + ".tgz " + "-C " + os.path.abspath( self.targetdir ) + " " +outfile
+		if add_files is not None:
+			sys_command2 = "tar -czvf " + outfile + ".tgz " + "-C " + os.path.abspath( self.targetdir ) + " " + outfile + " " + add_files
+		else:
+			sys_command2 = "tar -czvf " + outfile + ".tgz " + "-C " + os.path.abspath( self.targetdir ) + " " + outfile
 		os.system( sys_command2 )
 		print "Cleaning up..."
 		sys_command3 = "rm -rf " + outfile_wdir
