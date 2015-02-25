@@ -147,7 +147,7 @@ if __name__ == '__main__':
 	"n_resamples": args.n_resamples
 	}
 
-	with open(os.path.join( os.path.abspath( os.path.join( targetdir, "qsub" ) ), "ensemble.info"), 'w') as outfile:
+	with open( os.path.abspath( os.path.join( targetdir, "ensemble.info" ) ) , 'w') as outfile:
 		outfile.write( RUN_INFO_TEMPLATE % info_d )
 
 	if args.finish_only:
@@ -212,7 +212,7 @@ if __name__ == '__main__':
 
 			outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 			print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile 
-			info = os.path.join( os.path.abspath( os.path.join( targetdir, "qsub" ) ), "ensemble.info") 
+			info = os.path.abspath( os.path.join( targetdir, "ensemble.info" ) ) 
 			pdf = os.path.join( corems.out_dir, "density_stats.pdf") 
 			sql2mongo.mongoDump( sql2mongo.dbname, outfile, add_files = info + " " + pdf )
 
