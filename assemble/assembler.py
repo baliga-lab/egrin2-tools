@@ -52,7 +52,7 @@ python resample.py --host %(host)s --db %(db)s --n_rows %(n_rows)i --n_resamples
 """
 
 RUN_ALL_TEMPLATE = """#!/bin/bash
-for FILE in r_*; do
+for FILE in %s *; do
         qsub $FILE
 done
 """
@@ -157,10 +157,10 @@ if __name__ == '__main__':
 		corems.finishCorems()
 		
 		outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
-		
-		print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile  
-		
-		sql2mongo.mongoDump( sql2mongo.dbname, outfile )
+		print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile 
+		info = os.path.abspath( os.path.join( targetdir, "ensemble.info" ) ) 
+		pdf = os.path.join( corems.out_dir, "density_stats.pdf") 
+		sql2mongo.mongoDump( sql2mongo.dbname, outfile, add_files = info + " " + pdf )
 
 		print "Done"
 	else:
@@ -198,7 +198,7 @@ if __name__ == '__main__':
 						outfile.write(QSUB_TEMPLATE_HEADER_CSH)
 						outfile.write(QSUB_TEMPLATE_CSH % argss )
 				with open(os.path.join( os.path.abspath( os.path.join( targetdir, "qsub" ) ), "resample.sh" ), 'w') as outfile:
-					outfile.write( RUN_ALL_TEMPLATE )
+					outfile.write( RUN_ALL_TEMPLATE % args.organism + "_r_" )
 					#os.chmod(os.path.join( os.path.abspath( os.path.join( targetdir, "qsub" ) ), "resample.sh" ), stat.S_IXOTH)
 				print "Output Qsub scripts to %s.\n\nTransfer these documents to the cluster. Run 'resample.sh' with resample.py in your working directory to compute all resamples. \n\nOnce this is done, return here to finish processing corems.\n" % os.path.abspath( os.path.join( targetdir, "qsub" ) )
 				ready = None
