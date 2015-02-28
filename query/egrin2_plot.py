@@ -11,27 +11,35 @@ __maintainer__ = "Aaron Brooks"
 __email__ = "brooksan@uw.edu"
 __status__ = "Development"
 
-import random
-
-from pymongo import MongoClient
 import numpy as np
 import pandas as pd
-from scipy.stats import hypergeom
-from statsmodels.sandbox.stats.multicomp import multipletests
 import itertools
-from bson.code import Code
-import matplotlib.pyplot as plt
+
 import plotly.plotly as py
 from plotly.graph_objs import *
 import colorbrewer as cb
-from scipy.cluster.hierarchy import linkage, dendrogram
-from scipy.spatial.distance import pdist, squareform
 
 from assemble.resample import *
 from query.egrin2_query import *
 
-def plotExpression( data, plot_type = "boxplot", ipynb = False, zlim = None, sort = True, boxpoints = None ):
-	
+def plotExpression( data, plot_type = "boxplot", ipynb = False, zlim = None, sort = False, boxpoints = None ):
+	"""
+	Plot gene expression using plot.ly
+
+	'data': Pandas dataframe containing data to plot
+
+	'plot_type': Available plot types include: boxplot, line, heatmap
+
+	'ipynb': set to True if plot is embedded in iPython notebook
+
+	'zlim': custom limits for heatmap (optional)
+
+	'sort': sort data (boolean)
+
+	'boxpoints': include points in boxplot (boolean)
+
+	"""
+
 	if sort:
 		c_order = data.mean(0).order().index.tolist()
 		data = data.loc[:,c_order]

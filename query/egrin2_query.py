@@ -235,10 +235,13 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 
 	Available x_type(s)/y_type(s):
 
-	'rows' or 'genes': search for row (genes) in biclusters. x should be a list of rows, eg ["carA","carB"] or [275, 276]
-	'columns' or 'conditions': search for columns (conditions) in biclusters. x should be a list of columns, eg ["dinI_U_N0025", "dinP_U_N0025"] or [0,1]
-	'gre': search for GREs in biclusters. x should be a list of GRE IDs, eg [4, 19]
-	'bicluster': self explanatory. takes or outputs bicluster '_id'
+	'rows' or 'genes': x should be a gene name or list of genes, eg ["carA","carB"] or [275, 276]
+	
+	'columns' or 'conditions': x should be a condition name or list of conditions, eg ["dinI_U_N0025", "dinP_U_N0025"] or [0,1]
+	
+	'gre':  x should be a GRE ID or list of GRE IDs, eg [4, 19]
+	
+	'bicluster': takes or outputs bicluster '_id'
 	''
 
 	"""
@@ -278,7 +281,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 	elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type - "conds":
 		x_type = "columns"
 		x_o = x
-		x = row2id_batch( x, host, port, db, input_type = x_input_type, return_field="col_id" )
+		x = col2id_batch( x, host, port, db, input_type = x_input_type, return_field="col_id" )
 		x = list( set( x ) )
 		if len( x ) == 0:
 			print "Cannot translate col names: %s" % x_o
@@ -482,6 +485,24 @@ def fimoFinder( start = None, stop = None, chr = None, strand = None, mot_pval_c
 
 def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", y_return_field = None, count = False, logic = "or", host = "localhost", port = 27017, db = "" ):
 
+	"""
+	Fetch corem-related info 'y' given query 'x'. 
+
+	Available x_type(s)/y_type(s):
+
+	'corem_id': x is corem_id (int), eg [1]
+
+	'rows' or 'genes': x should be a gene name or list of genes, eg ["carA","carB"] or [275, 276]
+	
+	'columns' or 'conditions': x should be a condition or list of conditions, eg ["dinI_U_N0025", "dinP_U_N0025"] or [0,1]
+	
+	'gre': x should be a GRE or a list of GRE IDs, eg [4, 19]
+
+	'edge': x should be an edge or list of edges. Genes in edges should be separated by '-', eg ["carA-carB"] or ["275-276"]
+	
+	"""
+
+
 	if x_type is None:
 		print "Please supply an x_type for your query. Types include: 'rows' (genes), 'columns' (conditions), 'gres', edges "
 	if y_type is None:
@@ -658,7 +679,7 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 	return to_r
 
 def expressionFinder( rows = None, cols = None, standardized = True, host = "localhost", port = 27017, db = "" ):
-	"""Find motifs/GREs that fall within a specific range. Filter by biclusters/genes/conditions/etc."""
+	"""Fetch gene expression given rows and columns."""
 	
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 
@@ -704,13 +725,6 @@ def expressionFinder( rows = None, cols = None, standardized = True, host = "loc
 	data = data.reindex_axis( sorted( data.columns ), axis=1 )
 
 	return data
-
-
-
-
-
-
-
 
 if __name__ == '__main__':
 	print "yuuuup"
