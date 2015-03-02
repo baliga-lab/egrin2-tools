@@ -154,13 +154,18 @@ if __name__ == '__main__':
 		sql2mongo = sql2mongoDB( organism = args.organism, host = args.host, port = args.port, ensembledir = args.ensembledir, prefix = args.prefix, ratios_raw = args.ratios, gre2motif = args.gre2motif, col_annot = args.col_annot, ncbi_code = args.ncbi_code, dbname = args.db, db_run_override = None, genome_file = args.genome_annot, row_annot = args.row_annot, row_annot_match_col = args.row_annot_matchCol )
 		corems = makeCorems( organism = args.organism, host = args.host, port = args.port, db = db, dbfiles = None, backbone_pval = args.backbone_pval, out_dir = targetdir, n_subs = args.cores, link_comm_score = args.link_comm_score, link_comm_increment = args.link_comm_increment, link_comm_density_score = args.link_comm_density_score, corem_size_threshold = args.corem_size_threshold )
 		
-		corems.finishCorems()
+		#corems.finishCorems()
 		
 		outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 		print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile 
+		add_files = " "
 		info = os.path.abspath( os.path.join( targetdir, "ensemble.info" ) ) 
+		if os.path.isfile(info):
+			add_files = add_files + info 
 		pdf = os.path.join( corems.out_dir, "density_stats.pdf") 
-		sql2mongo.mongoDump( sql2mongo.dbname, outfile, add_files = info + " " + pdf )
+		if os.path.isfile(pdf):
+			add_files = add_files + pdf 
+		sql2mongo.mongoDump( sql2mongo.dbname, outfile, add_files = add_files.strip() )
 
 		print "Done"
 	else:
@@ -212,9 +217,14 @@ if __name__ == '__main__':
 
 			outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 			print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile 
+			add_files = " "
 			info = os.path.abspath( os.path.join( targetdir, "ensemble.info" ) ) 
+			if os.path.isfile(info):
+				add_files = add_files + info 
 			pdf = os.path.join( corems.out_dir, "density_stats.pdf") 
-			sql2mongo.mongoDump( sql2mongo.dbname, outfile, add_files = info + " " + pdf )
+			if os.path.isfile(pdf):
+				add_files = add_files + pdf 
+			sql2mongo.mongoDump( sql2mongo.dbname, outfile, add_files = add_files.strip() )
 
 			print "Done"
 		else:	
