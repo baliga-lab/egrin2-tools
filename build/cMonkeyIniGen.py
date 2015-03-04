@@ -235,7 +235,7 @@ class cMonkeyIniGen:
 		if "max_width" not in params.keys():
 			params[ "max_width" ] = random.randint(12, 30)
 		if "background_order" not in params.keys():
-			params[ "background_order" ] = BGORDER[ random.randint( 0, 6 ) ]
+			params[ "background_order" ] = BGORDER[ random.randint( 0, 5 ) ]
 		if "arg_mod" not in params.keys():
 			params[ "arg_mod" ] = "zoops"
 		
