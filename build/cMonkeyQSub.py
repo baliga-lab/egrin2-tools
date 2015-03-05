@@ -169,11 +169,15 @@ if __name__ == '__main__':
             login = os.getlogin()
 
         outfile.write(header)
-        outfile.write(template % (login, args.numruns, login,
+        outfile.write(template % (login, 
+                                  args.numruns, 
                                   args.num_cores,
+                                  login,
                                   args.max_tasks,
                                   args.organism,
                                   os.path.join(args.targetdir, "ratios-$BATCHNUM.tsv"),
                                   os.path.join(args.targetdir, "config-$BATCHNUM.ini"),
                                   "%s-out-$BATCHNUM" % (args.organism),
                                   "%s-out-$BATCHNUM" % (args.organism) ) )
+
+        print "Done"
