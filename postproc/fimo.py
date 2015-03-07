@@ -32,6 +32,8 @@ import sys
 import os
 import glob
 
+import util
+
 #  TODO:
 #	-Instead of creating a fimo_script.sh for every run with simple multiple calls to fimo
 #		make it such that this is more parallel (perhaps a fimo script for each meme file)
@@ -139,7 +141,7 @@ def main():
     op.add_option('-u', '--user', help='User name on cluster')
     op.add_option('-i', '--base_dir', default='.', help='Cmonkey-python base directory.')
     op.add_option('-t', '--target_dir', default='.', help='The output directory name')
-    op.add_option('-q', '--qsub_script', default='fimo_batch_script.sh', help='The script name for running fimo on cmonkey results')
+    op.add_option('-q', '--qsub_script', default='qsub_fimo.sh', help='The script name for running fimo on cmonkey results')
     op.add_option('-n', '--num_cores', default=1, help='Number of cores to use on cluster')
     op.add_option('-s', '--csh', help='If c-shell indicate with this flag', action='store_true')
     op.add_option('-f', '--fix', default=False, help='Fix meme files', action='store_true')
@@ -186,10 +188,10 @@ def main():
     org_out_dirs = glob.glob(os.path.join(opt.base_dir,"%s-out-*" % opt.organism_name))
     ##out_dir_dict = {}
 
-    for org_dir in org_out_dirs:
+    for org_dir in sorted(org_out_dirs):
         print org_dir
         #  Find MEME files
-        meme_files = glob.glob(os.path.join(org_dir, "meme-out-*"))
+        meme_files = sorted(glob.glob(os.path.join(org_dir, "meme-out-*")))
         if opt.fix:
             fix_meme_files(meme_files) # Fixes e-value formats  - TODO: make more efficient
         ##out_dir_dict[org_dir] = meme_files
@@ -209,16 +211,21 @@ def main():
         for meme in meme_files:
             num = os.path.basename(meme).split('-')[3] # Get the bicluster number
             #num = num[1:] # remove leading 0
-            fimo_cmd += '\n' + 'echo "%s"' % (meme) + '\n'
-            fimo_cmd += '\n' + FIMO_TEMPLATE % (meme, seqsfile_out, os.path.join(org_dir, "fimo-outs/fimo-out-%s" % num)) + '\n'
+            if util.file_exists( os.path.join(org_dir, "fimo-outs/fimo-out-%s.bz2" % num) ):
+                print 'SKIPPING:', os.path.join(org_dir, "fimo-outs/fimo-out-%s.bz2" % num)
+                fimo_cmd += '\n' + 'echo SKIPPING "%s"' % (meme) + '\n'
+            else:
+                fimo_cmd += '\n' + 'echo "%s"' % (meme) + '\n'
+                fimo_cmd += '\n' + FIMO_TEMPLATE % (meme, seqsfile_out, 
+                                                    os.path.join(org_dir, "fimo-outs/fimo-out-%s" % num)) + '\n'
 
         ##sub_scripts[org_dir] = fimo_cmd
 
     ##for org_dir in org_out_dirs:
         outfile_name = os.path.join(org_dir, 'fimo_script.sh')
         with open(outfile_name, 'w') as outfile:
-            subscript_template = shellheader + fimo_cmd ##sub_scripts[org_dir]
-            outfile.write(shellheader)
+            #subscript_template = shellheader + '\n' + fimo_cmd ##sub_scripts[org_dir]
+            outfile.write(shellheader + '\n')
             outfile.write(fimo_cmd) ##sub_scripts[org_dir])
             #rendered = Template(subscript_template).render()
             #outfile.write(rendered)
@@ -241,7 +248,7 @@ def main():
         subscript = "%s-out-${BATCHNUM}/fimo_script.sh >& %s-out-${BATCHNUM}/fimo_script.sh.out" % (opt.organism_name, \
                                                                                                     opt.organism_name)
 
-        outfile.write(header)
+        outfile.write(header + '\n')
         outfile.write(template % (login, 
             login,
             ##num_runs,

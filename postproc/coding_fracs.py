@@ -111,7 +111,7 @@ def main():
         header = QSUB_TEMPLATE_HEADER
         template = QSUB_TEMPLATE
 
-    with open(os.path.join(os.getcwd(), 'coding_fracs_batch.sh'), 'w') as outfile:
+    with open(os.path.join(os.getcwd(), 'qsub_coding_fracs.sh'), 'w') as outfile:
         if opt.user is not None:
             login = opt.user
         else:
