@@ -227,6 +227,8 @@ def colResamplePval( rows = None, row_type = None, cols = None, col_type = None,
 	if pvals.shape[ 0 ] == 0:
 		print "No cols pass the significance cutoff of %f" % sig_cutoff
 
+	client.close()
+
 	return pvals
 
 def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_output_type = None, logic = "and", host = "localhost", port = 27017, db = "",  verbose = False, gre_lim = 10, pval_cutoff = 0.05, translate = True ):
@@ -278,7 +280,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 		if len( x ) == 0:
 			print "Cannot translate row names: %s" % x_o
 			return None 
-	elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type - "conds":
+	elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type == "conds":
 		x_type = "columns"
 		x_o = x
 		x = col2id_batch( x, host, port, db, input_type = x_input_type, return_field="col_id" )
@@ -476,12 +478,129 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 		print "Could not find any biclusters matching your criteria"
 		return None
 
-def fimoFinder( start = None, stop = None, chr = None, strand = None, mot_pval_cutoff = None, filter = None, filter_type = None, host = "localhost", port = 27017, db = "" ):
+def fimoFinder( start = None, stop = None, locusId = None, strand = None, mot_pval_cutoff = None, filterby = None, filter_type = None, filterby_input_type = None, host = "localhost", port = 27017, db = None, use_fimo_small = True, logic = "or", return_format = "file" ):
 	"""Find motifs/GREs that fall within a specific range. Filter by biclusters/genes/conditions/etc."""
 	
-	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+	def getBCs( x, x_type ):
+		if x is None:
+			to_r = pd.DataFrame( list( client[ db ].motif_info.find( { }, { "cluster_id" : 1, "gre_id" : 1} ) ) )
+		else:
+			to_r = pd.DataFrame( list( client[ db ].motif_info.find( { x_type: x }, { "cluster_id" : 1, "gre_id" : 1 } ) ) )
+		return( to_r.loc[ :, [ "gre_id" ,"cluster_id" ] ] )
 
-	mots = pd.DataFrame( list( client[db].fimo.find( { "start": { "gte": start }, "stop": {"lte": stop } } ) ) )
+	def aggSeq( x ):
+		# print x.gre_id
+		def count( y ):
+			return( range( y.start, y.stop+1) )
+		if x.shape[0] == 0:
+			return( [] )
+		else:
+			to_r = [ count( x.iloc[i] ) for i in range( x.shape[ 0 ] ) ]
+			to_r = list( itertools.chain( *to_r ) )
+			to_r.sort()
+		return( to_r )
+
+	try:
+		client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+	except Exception:
+		print "Cant connect to MongoDB at host = %s, port = %s" % ( host, str(port) )
+
+	if db is None:
+		print "Please provide a database name, e.g. *org*_db, where *org* is a three lettter short organism code"
+		return None
+
+	db_chr = pd.DataFrame( list( client[ db ].genome.find( { }, { "scaffoldId":1, "NCBI_RefSeq":1 } ) ) )
+	db_scaffoldId = db_chr.scaffoldId.tolist( )
+	db_NCBI_RefSeq = db_chr.NCBI_RefSeq.tolist( )
+	
+	if locusId is None:
+		print "Please provide a chromosome Locus ID. This is probably the scaffoldID from MicrobesOnline.\n\nLocusIds in database %s include: \n\nScaffoldId\n%s\n\nNCBI_RefSeq\n%s" % ( db, (", ").join( db_scaffoldId ), (", ").join( db_NCBI_RefSeq ) )
+		return None
+
+	locusId = str( locusId )
+	
+	if locusId not in db_scaffoldId and locusId not in db_NCBI_RefSeq:
+		print "LocusId %s not in EGRIN 2.0 database %s. \n\nLocusIds in this database include: \n\nScaffoldId\n%s\n\nNCBI_RefSeq\n%s" % ( locusId, db, (", ").join( db_scaffoldId ), (", ").join( db_NCBI_RefSeq ) )
+		return None
+
+	chromosome = client[ db ].genome.find_one( { "$or": [ { "scaffoldId": locusId }, { "NCBI_RefSeq": locusId } ] } )
+	scaffoldId = chromosome[ "scaffoldId" ]
+	ncbi = chromosome[ "NCBI_RefSeq" ]
+
+	# if start/stop is None, assume whole chromosome
+	if start is None:
+		print "Start not provided. Assuming beginning of chromosome"
+		start = 0
+
+	if stop is None:
+		print "Stop not provided. Assuming end of chromosome"
+		stop = len( chromosome["sequence"] )
+
+	if use_fimo_small:
+		fimo_collection = "fimo_small"
+	else:
+		fimo_collection = "fimo"
+
+	if filterby is None:
+		print "No filter applied"
+	
+	if filter_type is not None:
+		print "WARNING: Many of these filters are not supported currently. Only GREs!!!"
+		if filter_type == "rows" or filter_type == "row" or filter_type == "gene" or filter_type == "genes":
+			filter_type = "rows"
+			filterby_o = filterby
+			filterby = row2id_batch( filterby, host, port, db, input_type = filter_input_type, return_field="row_id" )
+			filterby = list( set( filterby ) )
+			if len( filterby ) == 0:
+				print "Cannot translate row names: %s" % filterby_o
+				return None 
+		elif filter_type == "columns" or filter_type == "column" or filter_type == "col" or filter_type == "cols" or filter_type == "condition" or filter_type == "conditions" or filter_type == "conds":
+			filter_type = "columns"
+			filterby_o = filterby
+			filterby = col2id_batch( filterby, host, port, db, input_type = filterby_input_type, return_field="col_id" )
+			filterby = list( set( filterby ) )
+			if len( filterby ) == 0:
+				print "Cannot translate col names: %s" % filterby_o
+				return None 
+		elif filter_type == "motif" or filter_type == "gre" or filter_type == "motc" or filter_type == "motif.gre" or filter_type == "motifs" or filter_type == "gres" or filter_type == "motcs":
+			filter_type = "gre_id"
+		elif filter_type == "cluster" or filter_type == "clusters" or filter_type == "bicluster" or filter_type == "biclusters" or filter_type == "bcs":
+			print "WARNING! I hope you are using cluster '_id'!!! Otherwise the results might surprise you..."
+			filter_type = "_id"
+		print "Filtering motifs by %s" % filter_type
+		bcs_df= pd.concat( [ getBCs( i, filter_type ) for i in filterby ], ignore_index = True ) 
+
+		mots = pd.DataFrame( list( client[db][fimo_collection].find( { "start": { "$gte": start }, "stop": {"$lte": stop }, "cluster_id": {"$in": bcs_df.cluster_id.tolist() }, "scaffoldId": scaffoldId } ) ) )
+		mots = pd.merge( mots, bcs_df, on= "cluster_id" )
+	else:
+		bcs_df= pd.concat( [ getBCs( None, filter_type ) ], ignore_index = True ) 
+		mots = pd.DataFrame( list( client[db][fimo_collection].find( { "start": { "$gte": start }, "stop": {"$lte": stop }, "scaffoldId": scaffoldId } ) ) )
+		mots = pd.merge( mots, bcs_df, on= "cluster_id" )
+
+	gre_scans = mots.groupby( "gre_id" ).apply( aggSeq )
+
+	if return_format == "dictionary":
+		gre_scans = { i: pd.Series( gre_scans.loc[ i ] ).value_counts().sort_index() for i in gre_scans.index }
+
+	if return_format == "file":
+		# return with file format ready to save for GGBweb
+		# start stop strand chr value id
+		tmp_gre_scans = []
+		for i in gre_scans.index:
+			tmp_df = pd.DataFrame(columns=[ "start","end","strand","chr","value","id" ] )
+			gre_counts = pd.Series( gre_scans.loc[ i ] ).value_counts().sort_index()
+			tmp_df[ "start" ] =  gre_counts.index
+			tmp_df[ "end" ] =  gre_counts.index
+			tmp_df[ "strand" ] = "+"
+			tmp_df[ "chr" ] = ncbi
+			tmp_df[ "value" ] = gre_counts.values
+			tmp_df[ "id" ] = "GRE_" + str(i)
+			tmp_gre_scans.append( tmp_df )
+		gre_scans = pd.concat( tmp_gre_scans, ignore_index=True )
+
+	client.close()
+
+	return gre_scans
 
 def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", y_return_field = None, count = False, logic = "or", host = "localhost", port = 27017, db = "" ):
 
@@ -550,8 +669,6 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 			print "Cannot translate row names: %s" % x_o
 			return None 
 
-
-	
 	# Check output types
 
 	if y_type == "rows" or y_type == "row" or y_type == "gene" or y_type == "genes":
@@ -676,6 +793,8 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 		print "Could not find corems matching your query"
 		to_r = None
 
+	client.close()
+
 	return to_r
 
 def expressionFinder( rows = None, cols = None, standardized = True, host = "localhost", port = 27017, db = "" ):
@@ -723,6 +842,8 @@ def expressionFinder( rows = None, cols = None, standardized = True, host = "loc
 	data.columns = col2id_batch( data.columns.tolist(), host, port, db,  verbose = False, return_field = "egrin2_col_name", input_type = "col_id" )
 	data = data.sort_index( )
 	data = data.reindex_axis( sorted( data.columns ), axis=1 )
+
+	client.close()
 
 	return data
 
