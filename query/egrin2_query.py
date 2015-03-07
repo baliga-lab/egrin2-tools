@@ -492,10 +492,10 @@ def fimoFinder( start = None, stop = None, locusId = None, strand = None, mot_pv
 		# print x.gre_id
 		def count( y ):
 			return( range( y.start, y.stop+1) )
-		if x.shape[0] == 0:
+		if x.shape[ 0 ] == 0:
 			return( [] )
 		else:
-			to_r = [ count( x.iloc[i] ) for i in range( x.shape[ 0 ] ) ]
+			to_r = [ count( x.iloc[ i ] ) for i in range( x.shape[ 0 ] ) ]
 			to_r = list( itertools.chain( *to_r ) )
 			to_r.sort()
 		return( to_r )
