@@ -52,10 +52,13 @@ def row2id( row, host="localhost", port=27017, db="",  verbose = False, return_f
 	query = list( client[db].row_info.find( { "$or": [ { "row_id": row }, { "egrin2_row_name": row }, { "GI": row }, { "accession": row }, { "name": row }, { "sysName": row } ] } ) )
 	client.close()
 	if len( query ) == 1: 
-		try:
-			row = query[ 0 ][ return_field ]
-		except Exception:
-			row = query[ 0 ][ "row_id" ]
+		if return_field == "all":
+			row = query[0]
+		else:
+			try:
+				row = query[ 0 ][ return_field ]
+			except Exception:
+				row = query[ 0 ][ "row_id" ]
 		return row
 	elif len( query ) > 0:
 		print "ERROR: Multiple rows match the row name: %s" % row
@@ -82,7 +85,7 @@ def row2id_batch( rows, host="localhost", port=27017, db="",  verbose = True, re
 		#try to match input_type automatically
 		if verbose:
 			print "Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query."
-		to_r= [ row2id( x, host, port, db, return_field ) for x in rows ]
+		to_r= [ row2id( x, host, port, db, return_field = return_field ) for x in rows ]
 
 	client.close()
 	
@@ -127,7 +130,7 @@ def col2id_batch( cols, host="localhost", port=27017, db="",  verbose = True, re
 		#try to match input_type automatically
 		if verbose:
 			print "Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query."
-		to_r= [ col2id( x, host, port, db, return_field ) for x in cols ]
+		to_r= [ col2id( x, host, port, db, return_field = return_field ) for x in cols ]
 	
 	client.close()
 
@@ -231,7 +234,7 @@ def colResamplePval( rows = None, row_type = None, cols = None, col_type = None,
 
 	return pvals
 
-def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_output_type = None, logic = "and", host = "localhost", port = 27017, db = "",  verbose = False, gre_lim = 10, pval_cutoff = 0.05, translate = True ):
+def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_output_type = None, logic = "or", host = "localhost", port = 27017, db = "",  verbose = False, gre_lim = 10, pval_cutoff = 0.05, translate = True ):
 	"""
 	Determine enrichment of y given x through bicluster co-membership. 
 
@@ -247,6 +250,8 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 	''
 
 	"""
+
+	print "Using %s logic" % logic
 
 	def compute_p( i, M, N ):
 		#print i
@@ -467,7 +472,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 			to_r["pval"] = to_r.apply( compute_p, axis=1, M = client[db].bicluster_info.count(),  N = query.shape[ 0 ] )
 			to_r["qval_BH"] = multipletests( to_r.pval, method='fdr_bh' )[1]
 			to_r["qval_bonferroni"] = multipletests( to_r.pval, method='bonferroni' )[1]
-			to_r = to_r.sort( "pval", ascending=True )
+			to_r = to_r.sort( ["pval","counts"], ascending=True )
 			# only return below pval cutoff
 			to_r = to_r.loc[ to_r.pval <= pval_cutoff, : ]
 
@@ -478,7 +483,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 		print "Could not find any biclusters matching your criteria"
 		return None
 
-def fimoFinder( start = None, stop = None, locusId = None, strand = None, mot_pval_cutoff = None, filterby = None, filter_type = None, filterby_input_type = None, host = "localhost", port = 27017, db = None, use_fimo_small = True, logic = "or", return_format = "file" ):
+def fimoFinder( start = None, stop = None, locusId = None, strand = None, mot_pval_cutoff = None, filterby = None, filter_type = None, filterby_input_type = None, host = "localhost", port = 27017, db = None, use_fimo_small = True, logic = "or", return_format = "file", outfile = None, tosingle = True ):
 	"""Find motifs/GREs that fall within a specific range. Filter by biclusters/genes/conditions/etc."""
 	
 	def getBCs( x, x_type ):
@@ -597,6 +602,21 @@ def fimoFinder( start = None, stop = None, locusId = None, strand = None, mot_pv
 			tmp_df[ "id" ] = "GRE_" + str(i)
 			tmp_gre_scans.append( tmp_df )
 		gre_scans = pd.concat( tmp_gre_scans, ignore_index=True )
+
+		if outfile is not None:
+			def dfsave( df, fname ):
+				fname = list( set( df.id ) )[ 0 ]  + "_" + fname
+				print "Writing file %s" % fname
+				df = df.drop('id', 1)
+				df.to_csv( fname, sep="\t", index=False )
+				return None
+			if tosingle:
+				gre_scans_grouped = gre_scans.groupby( "id" )
+				tmp = [ dfsave( gre_scans_grouped.get_group( i ), fname=outfile ) for i in gre_scans_grouped.groups.keys( ) ]
+				return None
+			else:
+				gres_scans.to_csv(  outfile, sep="\t", index=False )
+				return None
 
 	client.close()
 
@@ -846,6 +866,36 @@ def expressionFinder( rows = None, cols = None, standardized = True, host = "loc
 	client.close()
 
 	return data
+
+def ggbwebModule( genes = None, outfile = None, host = "localhost", port = 27017, db = "" ):
+	
+	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
+
+	if genes is None:
+		print "Please provide a gene or list of genes"
+		return None
+
+	if type( genes ) == str or type( genes ) == int:
+		# single
+		genes = [ genes ]
+
+	def locFormat(x):
+    		return( "chromosome" + x.strand + ":" + str( x.start ) + "-" + str( x.stop ) )
+	
+	gene_info = pd.DataFrame( row2id_batch( genes, host=host, port=port, db=db,  return_field = "all", verbose = False ) )
+
+	to_r = pd.DataFrame( gene_info.loc[ :, "egrin2_row_name" ] )
+	to_r[ "loc" ] = [ locFormat( gene_info.iloc[ i ] ) for i in range( gene_info.shape[ 0 ] ) ]
+	to_r[ "name2" ] = gene_info[ "name" ]
+
+	if outfile is not None:
+		print "Module written to: %s" % os.path.abspath( outfile )
+		to_r.to_csv( os.path.abspath( outfile ), sep="\t", index=False, header=False)
+		return None
+
+	client.close()
+
+	return to_r
 
 if __name__ == '__main__':
 	print "yuuuup"
