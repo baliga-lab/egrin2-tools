@@ -23,8 +23,7 @@ import gzip
 import time
 from urllib2 import urlopen, URLError, HTTPError
 from zipfile import ZipFile
-
-import pdb
+import itertools
 
 import numpy as np
 import pandas as pd
@@ -33,7 +32,6 @@ import sqlite3
 import pymongo
 from pymongo import MongoClient
 from bson.objectid import ObjectId
-import gridfs
 from Bio import SeqIO
 
 
@@ -47,7 +45,7 @@ from Bio import SeqIO
 
 class sql2mongoDB:
     
-	def __init__( self, organism = None, host = None, port = None, e_dir = None, targetdir = None, prefix = None,ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None , db_run_override = None, genome_file = None, row_annot = None, row_annot_match_col = None ):
+	def __init__( self, organism = None, host = None, port = None, ensembledir = None, targetdir = None, prefix = None,ratios_raw = None, gre2motif = None, col_annot = None, ncbi_code = None, dbname = None , db_run_override = None, genome_file = None, row_annot = None, row_annot_match_col = None ):
 		
 		# connect to database
 		# make sure mongodb is running
@@ -91,21 +89,25 @@ class sql2mongoDB:
 			self.prefix = organism+'-out-'
 		else:
 			self.prefix = prefix
-		if e_dir is None:
-			self.e_dir = './'
+		if ensembledir is None:
+			self.ensembledir = './'
 		else:
-			self.e_dir = e_dir
+			self.ensembledir = ensembledir
 		if targetdir is None:
 			self.targetdir = './'
 		else:
 			self.targetdir = targetdir
 		if gre2motif == None:
 			# default file name?
-			self.gre2motif = self.e_dir + "out.mot_metaclustering.txt.I45.txt"
+			if os.path.isfile( self.ensembledir + "out.mot_metaclustering.txt.I45.txt" ):
+				self.gre2motif = self.ensembledir + "out.mot_metaclustering.txt.I45.txt"
+			else:
+				print "I cannot find a GRE clustering file. If you want to assign GREs, please specify this file."
+				self.gre2motif = None
 		else:
 			self.gre2motif = gre2motif
 
-	    	self.db_files = np.sort( np.array( glob.glob( self.e_dir + self.prefix + "???/cmonkey_run.db" ) ) ) # get all cmonkey_run.db files
+	    	self.db_files = np.sort( np.array( glob.glob( self.ensembledir + self.prefix + "???/cmonkey_run.db" ) ) ) # get all cmonkey_run.db files
 	    	self.db_run_override = db_run_override
 	    	
 	    	if ncbi_code == None:
@@ -127,8 +129,8 @@ class sql2mongoDB:
     		self.row_annot_match_col = row_annot_match_col
 
     		if len(self.db_files) < 1:
-	    		print "I cannot find any cMonkey SQLite databases in the current directory: %s\nMake sure 'e_dir' variable points to the location of your cMonkey-2 ensemble results." % os.getcwd()
-
+	    		print "I cannot find any cMonkey SQLite databases in the current directory: %s\nMake sure 'ensembledir' variable points to the location of your cMonkey-2 ensemble results." % os.getcwd()
+	    		return None
     		return None
 
 	def dlfile( self, url, save_name=None):
@@ -160,23 +162,29 @@ class sql2mongoDB:
 		to_keep = []
 		ensemble_info_collection = db.ensemble_info
 		for i in db_files:
-			conn = sqlite3.connect( i )
-			c = conn.cursor()
-			c.execute("SELECT * FROM run_infos;")
-			run_info = c.fetchone()
-			if run_info is None:
-				pass
-			else:
-				if db_run_override == None:
-					# do not include runs that are already in the database
-					# check for existence
-					run_name = i.split("/")[-2]
-					if ensemble_info_collection.find( { "run_name": run_name } ).count() > 0:
-						pass
+			try:
+				conn = sqlite3.connect( i )
+				c = conn.cursor()
+				c.execute("SELECT num_iterations FROM run_infos;")
+				run_info = c.fetchone()
+				if run_info is None:
+					pass
+				elif run_info[0] < 1000:
+					# incomplete runs
+					pass
+				else:
+					if db_run_override == None:
+						# do not include runs that are already in the database
+						# check for existence
+						run_name = i.split("/")[-2]
+						if ensemble_info_collection.find( { "run_name": run_name } ).count() > 0:
+							pass
+						else:
+							to_keep.append( i )
 					else:
 						to_keep.append( i )
-				else:
-					to_keep.append( i )
+			except Exception:
+				pass
 		return to_keep
 
 	def get_run2id( self, dbfiles, db ):
@@ -214,8 +222,8 @@ class sql2mongoDB:
 			print "No custom genome annotation file supplied by 'genome_file' parameter. Attempting automated download from MicrobesOnline"
 			# download genome from microbes online. store in MongoDB collection
 			# 
-			url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId="+ncbi_code+";export=genome"
-			save_name=ncbi_code+"_genome.fa"
+			url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId="+str( ncbi_code )+";export=genome"
+			save_name= str( ncbi_code )+"_genome.fa"
 			self.dlfile( url, save_name)
 			
 			seqs_b = []
@@ -231,28 +239,37 @@ class sql2mongoDB:
 		else:
 			# TBD
 			seqs_b = []
-		
+
 		genome_collection = self.db.genome
-	    
-	    	# Check whether documents are already present in the collection before insertion
-	    	seqs_f = filter( None, [ self.check4existence( genome_collection, i ) for i in seqs_b ] )
 
-	    	print "%s new records to write" % len( seqs_f )
-	    	if len(seqs_f) > 0:
-	    		genome_collection.insert( seqs_f )
+		# Check whether documents are already present in the collection before insertion
+		if genome_collection.count() > 0:
+			seqs_f = filter( None, [ self.check4existence( genome_collection, i ) for i in seqs_b ] )
+		else:
+			seqs_f = seqs_b
 
-	    	return genome_collection
+		print "%s new records to write" % len( seqs_f )
+		if len(seqs_f) > 0:
+			genome_collection.insert( seqs_f )
+
+		return genome_collection
 	
 	def loadRatios( self, file_in ):
 		"""Loads ratios from individual cMonkey runs (unfinished) or single flat file (gzip compressed)."""
 		if file_in == None:
 			# compile from individual runs
 			# do be done
-			file_in = np.sort( np.array( glob.glob( e_dir + prefix + "???/ratios.tsv.gz" ) ) )
+			file_in = np.sort( np.array( glob.glob( ensembledir + prefix + "???/ratios.tsv.gz" ) ) )
 		else:
 			print "Loading gene expression file from %s" % file_in
 			# load directly from gzip file
-			ratios= pd.read_csv( gzip.open( file_in, 'rb' ), index_col=0, sep="\t" ) 
+			ratios= pd.read_csv( gzip.open( file_in, 'rb' ), index_col=0, sep="\t" )
+			if ratios.shape[1] == 0:
+				# wrong delimiter? try comma
+				 ratios= pd.read_csv( gzip.open( file_in, 'rb' ), index_col=0, sep="," )
+			if ratios.shape[1] == 0:
+				# still wrong delimiter 
+				print "Cannot read ratios file. Check delimiter. Should be '\t' or ',' "
 		return ratios
 
 	def standardizeRatios( self, ratios ):
@@ -328,15 +345,19 @@ class sql2mongoDB:
 		# write to mongoDB collection 
 		row_info_collection = self.db.row_info
 		# Check whether documents are already present in the collection before insertion
-		d = row_table.to_dict( orient='records' )
-	    	d_f = filter( None, [ self.check4existence( row_info_collection, i ) for i in d ] )
+		d = row_table.to_dict( 'records' )
 
-	    	print "%s new records to write" % len( d_f )
-	    	
-	    	if len(d_f) > 0:
-	    		row_info_collection.insert( d_f )
+		if row_info_collection.count() > 0:
+			d_f = filter( None, [ self.check4existence( row_info_collection, i ) for i in d ] )
+		else:
+			d_f = d
 
-	    	return row_info_collection
+		print "%s new records to write" % len( d_f )
+
+		if len(d_f) > 0:
+			row_info_collection.insert( d_f )
+
+		return row_info_collection
 
 	def get_col2id( self, ratios_standardized, db ):
 		"""make cond2id and id2cond dicts for lookup"""
@@ -375,8 +396,9 @@ class sql2mongoDB:
 		if  col_annot != None:
 			# assumes default microbes online schema
 			col_annot = pd.read_csv( gzip.open( col_annot, 'rb' ), sep="\t" )	
-
-		col_table = pd.merge( col_info, col_annot, left_on="egrin2_col_name", right_on="experiment_name" )
+			col_table = pd.merge( col_info, col_annot, left_on="egrin2_col_name", right_on="experiment_name" )
+		else:
+			col_table = col_info
 		col_info_4_mongoDB = []
 		for i in range( 0, len( col_info.egrin2_col_name ) ):
 			col_info_4_mongoDB.append( self.condInfo2Dict( col_table, col_info.egrin2_col_name[i] ) )
@@ -385,20 +407,24 @@ class sql2mongoDB:
 		col_info_collection = self.db.col_info
 		
 		# Check whether documents are already present in the collection before insertion
-	    	d_f = filter( None, [ self.check4existence( col_info_collection, i ) for i in col_info_4_mongoDB ] )
+		if col_info_collection.count() > 0:
+			d_f = filter( None, [ self.check4existence( col_info_collection, i ) for i in col_info_4_mongoDB ] )
+		else:
+			d_f = col_info_4_mongoDB
+		
+		print "%s new records to write" % len( d_f )
 
-	    	print "%s new records to write" % len( d_f )
-	    	
-	    	if len(d_f) > 0:
-	    		col_info_collection.insert( d_f )
+		if len(d_f) > 0:
+			col_info_collection.insert( d_f )
 
 		return col_info_collection
 	    	 	
 	def condInfo2Dict( self, col_table, cond_name):
 		cond_data = col_table[col_table.egrin2_col_name==cond_name]
 		cond_dict = { "col_id": np.unique( cond_data.col_id )[0], "egrin2_col_name": np.unique( cond_data.egrin2_col_name )[0], "additional_info": [] }
-		for i in range(0,cond_data.shape[0]):
-			cond_dict[ "additional_info" ].append( { "name": cond_data.irow(i)["feature_name" ], "value": cond_data.irow(i)["value"], "units": cond_data.irow(i)["feature_units"] } )
+		if "feature_name" in cond_data.columns and "value" in cond_data.columns and "feature_units" in cond_data.columns:
+			for i in range(0,cond_data.shape[0]):
+				cond_dict[ "additional_info" ].append( { "name": cond_data.irow(i)["feature_name" ], "value": cond_data.irow(i)["value"], "units": cond_data.irow(i)["feature_units"] } )
 		return cond_dict
 
 	def parseRatios( self, ratios_files ):
@@ -432,7 +458,7 @@ class sql2mongoDB:
 					{
 				    	"row_id": row2id.loc[i].row_id,
 				    	"col_id": col2id.loc[j].col_id,
-			 		"normalized_expression": ratios.loc[i,j],
+			 		"raw_expression": ratios.loc[i,j],
 			 		"standardized_expression": ratios_standardized.loc[i,j]
 				    	} )
 			counter = counter + 1
@@ -441,12 +467,15 @@ class sql2mongoDB:
 		gene_expression_collection = db.gene_expression
 		
 		# Check whether documents are already present in the collection before insertion
-	    	d_f = filter( None, [ self.check4existence( gene_expression_collection, i ) for i in exp_data ] )
+		if gene_expression_collection.count() > 0:
+			d_f = filter( None, [ self.check4existence( gene_expression_collection, i ) for i in exp_data ] )
+		else:
+			d_f = exp_data 
 
-	    	print "%s new records to write" % len( d_f )
-	    	
-	    	if len(d_f) > 0:
-	    		gene_expression_collection.insert( d_f )
+		print "%s new records to write" % len( d_f )
+
+		if len(d_f) > 0:
+			gene_expression_collection.insert( d_f )
 
 		return gene_expression_collection
 
@@ -483,42 +512,53 @@ class sql2mongoDB:
 
 	def insert_ensemble_info( self, db_files, db, run2id, row2id, col2id ):
 		"""Compile and insert ensemble_info collection into MongoDB collection"""
-	    	to_insert = [ self.assemble_ensemble_info( i, run2id, row2id, col2id ) for i in db_files ]
-	    	ensemble_info_collection = db.ensemble_info
-	    	
-	    	# Check whether documents are already present in the collection before insertion
-	    	d_f = filter( None, [ self.check4existence( ensemble_info_collection, i, "run_name", i["run_name"] ) for i in to_insert ] )
+		to_insert = [ self.assemble_ensemble_info( i, run2id, row2id, col2id ) for i in db_files ]
+		ensemble_info_collection = db.ensemble_info
 
-	    	print "%s new records to write" % len( d_f )
-	    	
-	    	if len(d_f) > 0:
-	    		ensemble_info_collection.insert( d_f )
+		# Check whether documents are already present in the collection before insertion
+		if ensemble_info_collection.count() > 0:
+			d_f = filter( None, [ self.check4existence( ensemble_info_collection, i, "run_name", i["run_name"] ) for i in to_insert ] )
+		else:
+			d_f = to_insert
 
-	    	return ensemble_info_collection
+		print "%s new records to write" % len( d_f )
+
+		if len(d_f) > 0:
+			ensemble_info_collection.insert( d_f )
+
+		return ensemble_info_collection
 
  	def loadGREMap( self, gre2motif ):
- 		count = 1
- 		mots = {}
- 		with open(gre2motif, 'r') as f: 
- 			for line in f:
- 				for motif in line.strip("\n").split( "\t" ):
- 					elements = motif.split("_")
- 					elements[1] = int(elements[1])
- 					elements[2] = int(elements[2])
- 					if elements[0] in mots.keys():
- 						if elements[1] in mots[elements[0]].keys():
- 							mots[elements[0]][elements[1]][elements[2]] = count
- 						else:
- 							mots[elements[0]][elements[1]] = {}
- 							mots[elements[0]][elements[1]][elements[2]] = count
- 					else:
-						mots[elements[0]] = {}
-						mots[elements[0]][elements[1]] = {}
-						mots[elements[0]][elements[1]][elements[2]] = count
-				count = count + 1
- 		return mots
+ 		if gre2motif is not None:
+	 		count = 1
+	 		mots = {}
+	 		with open(gre2motif, 'r') as f: 
+	 			for line in f:
+	 				# only consider motif clusters with > 3 motifs
+	 				if len( line.strip("\n").split( "\t" ) ) > 3:
+		 				for motif in line.strip("\n").split( "\t" ):
+		 					elements = motif.split("_")
+		 					# cluster
+		 					elements[1] = int(elements[1])
+		 					# motif_num
+		 					elements[2] = int(elements[2])
+		 					# elements[0] = run_name
+		 					if elements[0] in mots.keys():
+		 						if elements[1] in mots[elements[0]].keys():
+		 							mots[elements[0]][elements[1]][elements[2]] = count
+		 						else:
+		 							mots[elements[0]][elements[1]] = {}
+		 							mots[elements[0]][elements[1]][elements[2]] = count
+		 					else:
+								mots[elements[0]] = {}
+								mots[elements[0]][elements[1]] = {}
+								mots[elements[0]][elements[1]][elements[2]] = count
+						count = count + 1
+	 		return mots
+		else:
+			return None
 
-	def insert_bicluster_info( self, db, e_dir, db_file, run2id, row2id, col2id, motif2gre, row_info_collection ): 
+	def insert_bicluster_info( self, db, db_file, run2id, row2id, col2id ): 
 		"""Find all biclusters in a cMonkey run, process and add as documents to bicluster collection
 
 		example queries
@@ -533,19 +573,24 @@ class sql2mongoDB:
 	    	last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!! 
 	    	w = (last_run,)
 	    	c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?;",w)
-		biclusters = [self.assemble_bicluster_info_single( db, e_dir, db_file, c, last_run, i[0], run2id, row2id, col2id, motif2gre, row_info_collection ) for i in c.fetchall()]
+		biclusters = [self.assemble_bicluster_info_single( db, db_file, c, last_run, i[0], run2id, row2id, col2id ) for i in c.fetchall()]
 		bicluster_info_collection = self.db.bicluster_info
-	    	# Check whether documents are already present in the collection before insertion
-	    	d_f = filter( None, [ self.check4existence( bicluster_info_collection, i, "run_id", i["run_id"], "cluster", i["cluster"] ) for i in biclusters ] )
 
-	    	print "%s new records to write" % len( d_f )
-	    	
-	    	if len(d_f) > 0:
-	    		bicluster_info_collection.insert( d_f )
-	    	
-	    	return bicluster_info_collection
+		# Check whether documents are already present in the collection before insertion
+		if bicluster_info_collection.count() > 0:
+			d_f = filter( None, [ self.check4existence( bicluster_info_collection, i, "run_id", i["run_id"], "cluster", i["cluster"] ) for i in biclusters ] )
+		else:
+			d_f = biclusters
+		
 
-	def assemble_bicluster_info_single( self, db, e_dir, db_file, cursor, iteration, cluster, run2id, row2id, col2id, motif2gre, row_info_collection ):
+		print "%s new records to write" % len( d_f )
+
+		if len(d_f) > 0:
+			bicluster_info_collection.insert( d_f )
+
+		return bicluster_info_collection
+
+	def assemble_bicluster_info_single( self, db, db_file, cursor, iteration, cluster, run2id, row2id, col2id ):
 		"""Create python ensemble_info dictionary for bulk import into MongoDB collections"""
 		#print cluster
 		run_name = db_file.split("/")[-2]
@@ -556,19 +601,56 @@ class sql2mongoDB:
 	    	rows = [ row2id.loc[ str(i[0]) ].row_id for i in cursor.fetchall() ]
 	    	cursor.execute("SELECT name FROM column_members JOIN column_names ON column_members.order_num = column_names.order_num WHERE column_members.cluster = ? AND column_members.iteration = ?;", w )
 	    	cols = [ col2id.loc[ str(i[0]) ].col_id for i in cursor.fetchall() ]
-	    	cursor.execute("SELECT motif_num FROM motif_infos WHERE cluster = ? AND iteration = ?;", w )
-	    	motif_nums = [ i[0] for i in cursor.fetchall() ]
+	    
 	    	d = {
 	    	"run_id": run2id.loc[run_name].run_id,
 	    	"cluster": cluster,
 	    	"rows": rows,
 	    	"columns": cols,
 	    	"residual": residual,
-	    	"motif": [ self.get_motif_info_single( db, e_dir, cursor, iteration, run_name, cluster, i, motif2gre, row_info_collection) for i in motif_nums ]
 	    	}
+
 	    	return d
 
-	def get_motif_info_single( self, db, e_dir, cursor, iteration, run_name, cluster, motif_num, motif2gre, row_info_collection):
+	def insert_motif_info( self, db, db_file, run2id, motif2gre, row_info_collection ): 
+		"""
+		"""
+		# Get all biclusters from cmonkey run
+		conn = sqlite3.connect(db_file)
+	    	c = conn.cursor()
+	    	c.execute("SELECT max(iteration) FROM cluster_stats;")
+	    	last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!! 
+	    	w = (last_run,)
+	    	
+	    	c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?;",w)
+		d_f = [ self.assemble_motif_info_single( db, db_file, c, last_run, i[ 0 ], run2id, motif2gre, row_info_collection )  for i in c.fetchall() ]
+		d_f = list( itertools.chain( *d_f ) ) 
+		d_f = filter( None, d_f )
+
+	    	if len(d_f) > 0:
+	    		db.motif_info.insert( d_f )
+	    	
+	    	return None
+
+    	def assemble_motif_info_single( self, db, db_file, cursor, iteration, cluster, run2id, motif2gre, row_info_collection ):
+    		
+    		run_name = db_file.split("/")[-2]
+    		cluster_id = list( db.bicluster_info.find( { "run_id": run2id.loc[ run_name ].run_id, "cluster": cluster}, { "_id":1 } ) )
+    		if len(cluster_id) > 1:
+    			print "Cluster %s from run %s matches more than one entry in MongoDB. You have a problem. Refusing to add motif_info." % ( cluster,run_name )
+    			return None
+		else:
+			cluster_id = ObjectId( cluster_id[ 0 ][ "_id" ] )
+    		
+	    	w = (cluster,iteration)
+    		cursor.execute("SELECT motif_num FROM motif_infos WHERE cluster = ? AND iteration = ?;", w )
+	    	motif_nums = [ i[0] for i in cursor.fetchall() ]
+
+    		motif_info = [ self.get_motif_info_single( db, cursor, iteration, run_name, cluster, i, motif2gre, row_info_collection, cluster_id) for i in motif_nums ]
+    		
+    		return motif_info
+
+	def get_motif_info_single( self, db, cursor, iteration, run_name, cluster, motif_num, motif2gre, row_info_collection, cluster_id):
 		w = (cluster, iteration, motif_num)
 		cursor.execute("SELECT seqtype, evalue FROM motif_infos WHERE cluster = ? AND iteration = ? AND motif_num = ?;", w )
 		motif_data = cursor.fetchone()
@@ -583,6 +665,7 @@ class sql2mongoDB:
 			gre_id = "NaN"
 
 		d = {
+		"cluster_id": cluster_id,
 		"gre_id": gre_id,
 		"motif_num": motif_num,
 		"seqtype": motif_data[0],
@@ -636,19 +719,15 @@ class sql2mongoDB:
 		}
 		return d
 
-	def tmp_fcn( self, i, e_dir ):
-		print i.cluster, i.run_id, e_dir
-		return None
-
 	def assemble_fimo( self ):
 
-		def get_fimo_scans_single( i, db, e_dir, run2id ):
+		def get_fimo_scans_single( i, db, ensembledir, run2id ):
 			cluster = i.cluster
 			run_name =run2id[ run2id[ "run_id" ]==i.run_id ][ "run_name" ][ 0 ]
 			cluster_id = i._id
 			try:
 				# get all fimo scans in the dir
-				f = e_dir + run_name + "/fimo-outs/fimo-out-" + "%04d" % (cluster,) + ".bz2" 
+				f = ensembledir + run_name + "/fimo-outs/fimo-out-" + "%04d" % (cluster,) + ".bz2" 
 				#print motif_num
 
 				fimo = pd.read_csv( f, sep="\t", compression = "bz2" )
@@ -667,29 +746,45 @@ class sql2mongoDB:
 				#fimo["cluster"] = cluster
 
 				# only keep specific columns
-				fimo = fimo.loc[ : , [ 'scaffoldId', 'start', 'stop', 'strand', 'score', 'p-value', 'in_coding_rgn', 'cluster_id' ] ]
+				fimo = fimo.loc[ : , [ 'scaffoldId', 'start', 'stop', 'strand', 'score', 'p-value', 'in_coding_rgn', 'cluster_id', 'motif_num' ] ]
+				# only store hits with p-value lte 1e-5
+				fimo = fimo.loc[ fimo[ "p-value" ] <= 1e-5, ]
 
-				d_f = fimo.to_dict( orient='records' )
+				d_f = fimo.to_dict( 'records' )
+
 
 				db.fimo.insert( d_f )
 
+				# insert into fimo_small only if the motif maps to a GRE and the pval is less than 1e-5
+
+				mot2gre = pd.DataFrame( list( db.motif_info.find( { "cluster_id": cluster_id },{ "motif_num": 1,"gre_id":1 } ) ) )
+				#print mot2gre
+				for x in range( mot2gre.shape[ 0 ] ):
+					#print "Doing fimo_small! : %s" % x
+					if mot2gre.iloc[ x ].gre_id != "NaN":
+						tmp_fimo = fimo.loc[ fimo[ "motif_num" ] == mot2gre.iloc[ x ].motif_num, ]
+						d_f = tmp_fimo.to_dict( 'records' )
+						db.fimo_small.insert( d_f )
 		    		return None
 			except Exception:
 				return None
 
 		# get all biclusters
 		bcs = pd.DataFrame( list( self.db.bicluster_info.find( {}, { "cluster" : 1, "run_id": 1 } ) ) )
-		tmp = bcs.apply( get_fimo_scans_single, axis=1, db = self.db, e_dir = self.e_dir, run2id = self.run2id  )
+		tmp = bcs.apply( get_fimo_scans_single, axis=1, db = self.db, ensembledir = self.ensembledir, run2id = self.run2id  )
 		return None
 
-	def mongoDump( self, db, outfile ):
+	def mongoDump( self, db, outfile, add_files = None ):
 		"""Write contents from MongoDB instance to binary file"""
 		print "Dumping MongoDB to BSON"
 		outfile_wdir = os.path.abspath( os.path.join( self.targetdir,outfile ) )
 		sys_command = "mongodump --db " + db + " --out " + outfile_wdir + " --host " + self.host + " --port " + str( self.port )
 		os.system( sys_command )
 		print "Compressing MongoDB BSON docs"
-		sys_command2 = "tar -czvf " + outfile + ".tgz " + "-C " + os.path.abspath( self.targetdir ) + " " +outfile
+		if add_files is not None:
+			sys_command2 = "tar -czvf " + outfile + ".tgz " + "-C " + os.path.abspath( self.targetdir ) + " " + outfile + " " + add_files
+		else:
+			sys_command2 = "tar -czvf " + outfile + ".tgz " + "-C " + os.path.abspath( self.targetdir ) + " " + outfile
 		os.system( sys_command2 )
 		print "Cleaning up..."
 		sys_command3 = "rm -rf " + outfile_wdir
@@ -723,6 +818,8 @@ class sql2mongoDB:
 
 		print "Inserting gene expression into database"
 		self.gene_expression_collection = self.insert_gene_expression( self.db, self.row2id, self.col2id, self.expression, self.expression_standardized )
+		self.gene_expression_collection.ensure_index( "row_id" )
+		self.gene_expression_collection.ensure_index( "col_id" )
 
 		print "Inserting into ensemble_info collection"
 		self.ensemble_info_collection = self.insert_ensemble_info( self.db_files, self.db, self.run2id, self.row2id, self.col2id )
@@ -731,27 +828,30 @@ class sql2mongoDB:
 		print "Inserting into bicluster collection"
 		for i in self.db_files:
 			print i
-			self.bicluster_info_collection = self.insert_bicluster_info( self.db, self.e_dir, i, self.run2id, self.row2id, self.col2id, self.motif2gre, self.row_info_collection )
+			self.bicluster_info_collection = self.insert_bicluster_info( self.db, i, self.run2id, self.row2id, self.col2id )
+			self.insert_motif_info( self.db, i, self.run2id, self.motif2gre, self.row_info_collection ) 
 
 		print "Indexing bicluster collection"
 		self.bicluster_info_collection.ensure_index( "rows" )
 		self.bicluster_info_collection.ensure_index( "columns" )
-		self.bicluster_info_collection.ensure_index( "motif.gre_id" ) 
+		self.db.motif_info.ensure_index( "cluster_id" )
+		self.db.motif_info.ensure_index( "gre_id" ) 
 
 		print "Inserting into fimo collection. This might take awhile..."
 		self.assemble_fimo( )
 
 		print "Indexing fimo collection"
 		self.db.fimo.ensure_index( [ ( "scaffoldId", pymongo.ASCENDING ), ( "start", pymongo.ASCENDING ), ( "stop", pymongo.ASCENDING ),( "p-value", pymongo.ASCENDING ), ( "cluster_id", pymongo.ASCENDING ) ] ) 
-
+		self.db.fimo_small.ensure_index( [ ( "scaffoldId", pymongo.ASCENDING ), ( "start", pymongo.ASCENDING ), ( "stop", pymongo.ASCENDING ),( "p-value", pymongo.ASCENDING ), ( "cluster_id", pymongo.ASCENDING ) ] ) 
 
 		#outfile =  self.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
 
-		# print "Writing EGRIN2 MongoDB to %s" % self.targetdir + outfile   		
+		# print "Writing EGRIN2 MongoDB to %s" % self.targetdir + outfile   		h
+
 		# self.mongoDump( self.dbname, outfile )
 		return None
 
 if __name__ == '__main__':
-	self = sql2mongoDB( ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz",  col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz", ncbi_code = "511145", e_dir = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/eco-ens-m3d/", organism="eco", host = "localhost")
+	self = sql2mongoDB( ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz",  col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz", ncbi_code = "511145", ensembledir = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/eco-ens-m3d/", organism="eco", host = "localhost")
 
 

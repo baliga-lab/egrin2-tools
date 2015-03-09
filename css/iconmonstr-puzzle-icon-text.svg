@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 14.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 43363)  -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.1"
+   id="Layer_1"
+   x="0px"
+   y="0px"
+   width="591.40381"
+   height="498.56482"
+   viewBox="0 0 591.40381 498.56482"
+   enable-background="new 0 0 512 512"
+   xml:space="preserve"
+   inkscape:version="0.48.4 r9939"
+   sodipodi:docname="iconmonstr-puzzle-icon-text.png"><metadata
+     id="metadata10"><rdf:RDF><cc:Work
+         rdf:about=""><dc:format>image/svg+xml</dc:format><dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" /><dc:title></dc:title></cc:Work></rdf:RDF></metadata><defs
+     id="defs8" /><sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="862"
+     inkscape:window-height="738"
+     id="namedview6"
+     showgrid="false"
+     fit-margin-left="20"
+     fit-margin-top="20"
+     fit-margin-right="20"
+     fit-margin-bottom="19.8"
+     inkscape:zoom="0.4609375"
+     inkscape:cx="257.44529"
+     inkscape:cy="241.36383"
+     inkscape:window-x="450"
+     inkscape:window-y="315"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="Layer_1" /><path
+     id="puzzle-1"
+     d="m 133.73317,289.88305 c 14.712,0 19.691,-7.888 25.684,-13.867 12.236,-12.28 27.278,-7.051 27.278,12.736 v 91.381 h 91.381 c 19.786,0 25.014,-15.042 12.744,-27.277 -5.986,-5.993 -13.875,-10.974 -13.875,-25.692 0,-16.35 16.671,-37.28 45.124,-37.28 28.453,0 45.125,20.931 45.125,37.28 0,14.719 -7.888,19.699 -13.866,25.692 -12.28,12.235 -7.051,27.277 12.735,27.277 h 91.381 v -91.381 c 0,-19.787 -15.042,-25.017 -27.277,-12.736 -5.993,5.979 -10.973,13.867 -25.691,13.867 -16.35,0 -37.281,-16.674 -37.281,-45.125 0,-28.455 20.932,-45.129 37.281,-45.129 14.719,0 19.698,7.889 25.691,13.876 12.235,12.274 27.277,7.044 27.277,-12.746 v -91.38 h -91.381 c -19.786,0 -25.016,-15.042001 -12.735,-27.277001 5.979,-5.993 13.866,-10.973 13.866,-25.684 0,-16.357 -16.672,-37.289 -45.125,-37.289 -28.452,0 -45.124,20.932 -45.124,37.289 0,14.711 7.888,19.691 13.875,25.683 12.271,12.236 7.042,27.278001 -12.744,27.278001 h -91.381 v 91.38 c 0,19.79 -15.042,25.02 -27.277,12.746 -5.994,-5.987 -10.973,-13.876 -25.685,-13.876 -16.356,0 -37.287998,16.674 -37.287998,45.129 -0.001,28.451 20.931998,45.125 37.287998,45.125 z"
+     inkscape:connector-curvature="0" /><text
+     font-size="105"
+     id="text2989"
+     x="157.31747"
+     y="473.19174"
+     style="font-size:105px;font-family:MyriadPro-BoldCond">BUILD</text>
+</svg>
