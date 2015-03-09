@@ -39,6 +39,10 @@ import glob
 import csv
 
 import time
+import bz2
+
+import pandas as pd
+import numpy as np
 
 # Templates for Bourne Shell
 QSUB_TEMPLATE_HEADER = """#!/bin/bash
@@ -57,7 +61,7 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -pe serial %s
 #$ -l mem_free=8G
 
-python egrin2-tools/postproc/run_coding_fracs.py --cache_dir %s --features_file %s --organism_name %s --input_dir %s > %s/coding_fracs.out
+python egrin2-tools/postproc/coding_fracs.py --cache_dir %s --features_file %s --organism_name %s --input_dir %s > %s/coding_fracs.out
 """
 
 
@@ -79,8 +83,45 @@ QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -pe serial %s
 #$ -l mem_free=8G
 
-python egrin2-tools/postproc/run_coding_fracs.py --cache_dir %s --features_file %s --organism_name %s --input_dir %s >& %s/coding_fracs.out
+python egrin2-tools/postproc/coding_fracs.py --cache_dir %s --features_file %s --organism_name %s --input_dir %s >& %s/coding_fracs.out
 """
+
+def get_in_coding_rgn( input_dir, features_file ):
+    fimo_files = np.sort( np.array( glob.glob(os.path.join(input_dir, "fimo-outs/fimo-out-*")) ) )
+    print 'Number of fimo files = ', str(len(fimo_files))
+
+    #  Get coding regions from features file (e.g. Escherichia_coli_K12_features)
+    f = open(features_file, 'r')
+    skip = 1
+    line = f.readline()
+    while 'header' not in line:
+        line = f.readline()
+        skip += 1
+    f.close()
+
+    features = pd.read_table(features_file,skiprows=skip) ## engine='python',
+    features = features[ features.type != 'SEQ_END' ]
+    start_pos = np.core.defchararray.replace(features.start_pos.values.astype(str),'<','').astype(int)
+    end_pos = np.core.defchararray.replace(features.end_pos.values.astype(str),'>','').astype(int)
+
+    for f in fimo_files:
+        print f
+        fimo = pd.read_table( bz2.BZ2File(f) )
+        if np.in1d('in_coding_rgn', fimo.columns)[0]:
+            print 'SKIPPING', f, '; already done'
+            continue
+        is_bad = np.zeros( fimo.shape[0], dtype=bool )
+        for i in xrange(fimo.shape[0]):
+            row = fimo.ix[i]
+            hits = np.sum( (start_pos <= row.start) & (end_pos >= row.start) )
+            if hits <= 0:
+                hits = np.sum( (start_pos <= row.stop) & (end_pos >= row.stop) )
+            if hits > 0:
+                is_bad[i] = True
+
+        fimo['in_coding_rgn'] = is_bad
+        fimo.to_csv( bz2.BZ2File( f, 'w' ), sep='\t', index=False )
+
 
 def main():
     #  Collect & check args
@@ -93,6 +134,10 @@ def main():
     op.add_option('-o', '--organism_name', help='The organism name (e.g. eco or hal)')
     op.add_option('-u', '--user', help='User name on cluster')
     op.add_option('-s', '--csh', help='If c-shell indicate with this flag', action='store_true')
+
+    ## option for actually doing the computation. if this is None then we're only writing out the qsub script
+    op.add_option('-i', '--input_dir', help='The cmonkey run input dir where the fimo files live (e.g. eco-out-001)')
+
     opt, args = op.parse_args()
 
     if not opt.cache_dir:
@@ -104,30 +149,36 @@ def main():
     if not opt.num_runs:
         op.error('need --num_runs option.  Use -h for help.')
 
-    if opt.csh:
-        header = QSUB_TEMPLATE_HEADER_CSH
-        template = QSUB_TEMPLATE_CSH
+    if opt.input_dir:
+        ## do the coding rgns calc, append column to fimo files
+        get_in_coding_rgn( opt.input_dir, opt.features_file )
+
     else:
-        header = QSUB_TEMPLATE_HEADER
-        template = QSUB_TEMPLATE
-
-    with open(os.path.join(os.getcwd(), 'qsub_coding_fracs.sh'), 'w') as outfile:
-        if opt.user is not None:
-            login = opt.user
+        ## write out qsub script
+        if opt.csh:
+            header = QSUB_TEMPLATE_HEADER_CSH
+            template = QSUB_TEMPLATE_CSH
         else:
-            login = os.getlogin()
+            header = QSUB_TEMPLATE_HEADER
+            template = QSUB_TEMPLATE
 
-        outfile.write(header)
-        outfile.write(template % (login, 
-                                  int(opt.num_runs), 
-                                  login,
-                                  opt.num_cores, 
-                                  opt.cache_dir, 
-                                  opt.features_file,
-                                  opt.organism_name,
-                                  "%s-out-${BATCHNUM}" % (opt.organism_name),
-                                  "%s-out-${BATCHNUM}" % (opt.organism_name)))
+        with open(os.path.join(os.getcwd(), 'qsub_coding_fracs.sh'), 'w') as outfile:
+            if opt.user is not None:
+                login = opt.user
+            else:
+                login = os.getlogin()
 
+            outfile.write(header)
+            outfile.write(template % (login, 
+                                      int(opt.num_runs), 
+                                      login,
+                                      opt.num_cores, 
+                                      opt.cache_dir, 
+                                      opt.features_file,
+                                      opt.organism_name,
+                                      "%s-out-${BATCHNUM}" % (opt.organism_name),
+                                      "%s-out-${BATCHNUM}" % (opt.organism_name)))
+            
 
 if __name__ == '__main__':
     main()
