@@ -251,7 +251,7 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 
 	"""
 
-	print "Using %s logic" % logic
+	print 'Using "%s" logic' % logic
 
 	def compute_p( i, M, N ):
 		#print i
