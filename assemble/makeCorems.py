@@ -38,7 +38,7 @@ from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-from egrin2_query import *
+from query.egrin2_query import *
 
 
 class makeCorems:
@@ -501,7 +501,6 @@ class makeCorems:
 			"corem_id": corem,
 			"rows": rows,
 			"cols": [],
-			"gres": [],
 			"edges": edges,
 			"density": sub_m.Community_Density.unique()[0],
 			"weighted_density": sub_m.Community_Weighted_Density.unique()[0]
@@ -523,16 +522,17 @@ class makeCorems:
 	def finishCorems( self ):
 		"""Finish adding corem info (cols) after resampling. Assumes corem docs already exist"""
 		# get all the corems
-		corems = pd.DataFrame( list( self.db["corem"].find( { }, { "_id":1, "rows": 1 } ) ) )
+		corems = pd.DataFrame( list( self.db["corem"].find( { }, { "_id":1, "rows": 1, "corem_id":1 } ) ) )
 		# get all of the conditions
 		cols = pd.DataFrame( list( self.db["col_info"].find( { }, { "_id":0, "col_id": 1 } ) ) ).col_id.tolist()
 
 		def computeANDwriteCol( x ):
 			#print x._id
-			pvals = colResamplePval( rows = x.rows, cols = cols, n_resamples = self.n_resamples, host = self.host, port = self.port, db = self.db.name, standardized = True, sig_cutoff = 0.05, sort = True, add_override = False, n_jobs = 4, keepP = 0.05, verbose = False )
-			pvals.index = [ self.col2id[ i ] for i in pvals.index.tolist() ]
+			print "Adding conditions for corem %s" % x.corem_id
+			pvals = colResamplePval( rows = x.rows, row_type = "row_id", cols = cols, col_type = "col_id", n_resamples = self.n_resamples, host = self.host, port = self.port, db = self.db.name, standardized = True, sig_cutoff = 0.05, sort = True, add_override = False, n_jobs = 4, keepP = 0.05, verbose = False )
+			#pvals.index = [ self.col2id[ i ] for i in pvals.index.tolist() ]
 			pvals[ "col_id" ] = pvals.index
-			d = pvals.to_dict( orient='records' )
+			d = pvals.to_dict( 'records' )
 			self.db.corem.update( { "_id": x._id }, { "$set": { "cols": d } } )
 			return None
 

@@ -222,7 +222,7 @@ class cMonkeyIniGen:
 
 
 		# [MEME]
-		BGORDER = [ 0, 1, 2, 3, 4, 5]
+		#BGORDER = [ 0, 1, 2, 3, 4, 5 ]
 
 		if "meme_global_background" not in params.keys():
 			params[ "meme_global_background" ] = True
@@ -234,8 +234,8 @@ class cMonkeyIniGen:
 			params[ "use_revcomp" ] = True
 		if "max_width" not in params.keys():
 			params[ "max_width" ] = random.randint(12, 30)
-		if "background_order" not in params.keys():
-			params[ "background_order" ] = BGORDER[ random.randint( 0, 6 ) ]
+		if "background_order" not in params.keys():	
+			params[ "background_order" ] = random.randint(0,5)
 		if "arg_mod" not in params.keys():
 			params[ "arg_mod" ] = "zoops"
 		
