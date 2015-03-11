@@ -1,4 +1,4 @@
-![cMonkey2 Logo](https://github.com/scalefreegan/egrin2-tools/blob/master/egrin2_logo_80px.png "EGRIN2.0 Logo")
+![cMonkey2 Logo](https://github.com/baliga-lab/egrin2-tools/blob/master/egrin2_logo_80px.png "EGRIN2.0 Logo")
 
 # egrin2-tools 
 
@@ -8,7 +8,7 @@ Utilities and scripts for generating, assembling, and querying EGRIN**2.0** ense
 
 ## Documentation
 
-Documentation is available on the [wiki](http://nbviewer.ipython.org/github/scalefreegan/egrin2-tools/blob/master/doc/index.ipynb). [Developers](https://groups.google.com/d/forum/cmonkey-dev) and [users](https://groups.google.com/d/forum/cmonkey-users) may also refer to the cMonkey2 discussion groups for additional information. 
+Documentation is available on the [wiki](http://nbviewer.ipython.org/github/baliga-lab/egrin2-tools/blob/master/doc/index.ipynb). [Developers](https://groups.google.com/d/forum/cmonkey-dev) and [users](https://groups.google.com/d/forum/cmonkey-users) may also refer to the cMonkey2 discussion groups for additional information. 
 
 ## System requirements
 
@@ -26,7 +26,7 @@ Documentation is available on the [wiki](http://nbviewer.ipython.org/github/scal
 
 These can be installed easily using [`pip`](https://pip.pypa.io/en/latest/index.html).
 
-In addition, you must compile the C++ code provided in the [`src directory`](./src/). Instructions for compiling this code are available on the [wiki](http://nbviewer.ipython.org/github/scalefreegan/egrin2-tools/blob/master/doc/cpp_scripts.ipynb).
+In addition, you must compile the C++ code provided in the [`src directory`](./src/). Instructions for compiling this code are available on the [wiki](http://nbviewer.ipython.org/github/baliga-lab/egrin2-tools/blob/master/doc/cpp_scripts.ipynb).
 
 
 
