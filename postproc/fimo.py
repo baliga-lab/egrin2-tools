@@ -20,8 +20,8 @@ Note:  if you are using c-shell make sure to use the --csh flag when running thi
 
 Example:
 
-python fimo.py --seqs_file cache/Escherichia_coli_K12_NC_000913.2 --user mharris --base_dir . 
-                --target_dir . --qsub_script fimo_batch_script.sh --num_cores 1  --csh --organism_name eco
+python fimo.py --genome cache/Escherichia_coli_K12_NC_000913.2 --user mharris 
+                --qsub_script fimo_batch_script.sh --csh --organism eco
 
 Output will be in subdirectory to input directory (<prefix>001/fimo_outs/ for example will have all fimo 
 files associated with the meme files).
@@ -136,33 +136,31 @@ def fix_meme_file(meme_files):
 def main():
     #  Collect & check args
     op = optparse.OptionParser()
-    op.add_option('-g', '--seqs_file', help='The sequence file (genome) (found in cache/<organism name>')
-    op.add_option('-o', '--organism_name', help='KEGG name for organism (e.g. eco, hal')
+    op.add_option('-g', '--genome', help='The sequence file (genome) (found in cache/<organism name>')
+    op.add_option('-o', '--organism', help='KEGG name for organism (e.g. eco, hal')
     op.add_option('-u', '--user', help='User name on cluster')
-    op.add_option('-i', '--base_dir', default='.', help='Cmonkey-python base directory.')
-    op.add_option('-t', '--target_dir', default='.', help='The output directory name')
+    #op.add_option('-i', '--base_dir', default='.', help='Cmonkey-python base directory.')
+    #op.add_option('-t', '--target_dir', default='.', help='The output directory name')
     op.add_option('-q', '--qsub_script', default='qsub_fimo.sh', help='The script name for running fimo on cmonkey results')
-    op.add_option('-n', '--num_cores', default=1, help='Number of cores to use on cluster')
+    ##op.add_option('-n', '--num_cores', default=1, help='Number of cores to use on cluster')
     op.add_option('-s', '--csh', help='If c-shell indicate with this flag', action='store_true')
     op.add_option('-f', '--fix', default=False, help='Fix meme files', action='store_true')
     opt, args = op.parse_args()
 
-    if not opt.seqs_file:
-        op.error('need --seqs_file option.  Use -h for help.')
-    if not opt.target_dir:
-        op.error('need --target_dir option.  Use -h for help.')
-    if not opt.base_dir:
-        op.error('need --base_dir option.  Use -h for help.')
-    if not opt.num_cores:
-        op.error('need --num_cores option.  Use -h for help.')
+    if not opt.genome:
+        op.error('need --genome option.  Use -h for help.')
+    #if not opt.target_dir:
+    #    op.error('need --target_dir option.  Use -h for help.')
+    #if not opt.base_dir:
+    #    op.error('need --base_dir option.  Use -h for help.')
+    ##if not opt.num_cores:
+    ##    op.error('need --num_cores option.  Use -h for help.')
     if not opt.qsub_script:
         op.error('need --qsub_script option.  Use -h for help.')
-    if not opt.organism_name:
-        op.error('need --organism_name option.  Use -h for help.')
+    if not opt.organism:
+        op.error('need --organism option.  Use -h for help.')
     if not opt.user:
         op.error('need --user option.  Use -h for help.')
-    if not opt.num_cores:
-        op.error('need --num_cores option.  Use -h for help.')
 
     if opt.csh:
         header = QSUB_TEMPLATE_HEADER_CSH
@@ -174,18 +172,18 @@ def main():
         shellheader = SHELL_HEADER
 
     # Fix genome seqs file for fimo (to upper and add header), ouput to new file, put in input dir (might be better way)
-    seqsfile_in = open(opt.seqs_file, 'rb')
+    seqsfile_in = open(opt.genome, 'rb')
     lines = seqsfile_in.readlines()
     genomeseq = lines[0].upper() # to upper may not be necessary
 
-    seqsfile_out = os.path.join(opt.seqs_file)+'_fimo'
+    seqsfile_out = os.path.join(opt.genome)+'_fimo'
     out = open(seqsfile_out, 'wb')
-    out.write(">"+os.path.basename(opt.seqs_file)+"\n") # The short little header needed by fimo
+    out.write(">"+os.path.basename(opt.genome)+"\n") # The short little header needed by fimo
     out.write(genomeseq)
     out.close()
 
     #  Create a dict of run output dirs with array of meme file names
-    org_out_dirs = glob.glob(os.path.join(opt.base_dir,"%s-out-*" % opt.organism_name))
+    org_out_dirs = glob.glob("%s-out-*" % opt.organism)
     ##out_dir_dict = {}
 
     for org_dir in sorted(org_out_dirs):
@@ -237,7 +235,7 @@ def main():
         os.chmod(outfile_name,0744)
 
     #  Create master script
-    with open(os.path.join(opt.base_dir, opt.qsub_script), 'w') as outfile:
+    with open(opt.qsub_script, 'w') as outfile:
         if opt.user is not None:
             login = opt.user
         else:
@@ -245,15 +243,15 @@ def main():
 
         ##num_runs = len(org_out_dirs)
 	max_run = max( [int(i.split('-')[2]) for i in org_out_dirs] )
-        subscript = "%s-out-${BATCHNUM}/fimo_script.sh >& %s-out-${BATCHNUM}/fimo_script.sh.out" % (opt.organism_name, \
-                                                                                                    opt.organism_name)
-
+        subscript = "%s-out-${BATCHNUM}/fimo_script.sh >& %s-out-${BATCHNUM}/fimo_script.sh.out" % (opt.organism, \
+                                                                                                    opt.organism)
+        num_cores = 1 ## dont need more
         outfile.write(header + '\n')
         outfile.write(template % (login, 
             login,
             ##num_runs,
 	    max_run,
-            opt.num_cores, 
+            num_cores, 
             subscript))
 
     outfile.close()

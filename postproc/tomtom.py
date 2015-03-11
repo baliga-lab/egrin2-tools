@@ -54,7 +54,7 @@ export PATH=/tools/bin:${PATH}
 #$ -pe serial %d
 #$ -l mem_free=8G
 
-python ./egrin2-tools/postproc/tomtom.py --dir . --prefix %s --targetdir tomtom_out --gene %s
+python ./egrin2-tools/postproc/tomtom.py --prefix %s --gene %s
 
 tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s | bzip2 -c  > %s
 """
@@ -73,7 +73,7 @@ setenv PATH /tools/bin:${PATH}
 #$ -pe serial %d
 #$ -l mem_free=8G
 
-python ./egrin2-tools/postproc/tomtom.py --dir . --prefix %s --targetdir tomtom_out --gene %s
+python ./egrin2-tools/postproc/tomtom.py --prefix %s --gene %s
 
 tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s | bzip2 -c > %s
 """
@@ -121,9 +121,9 @@ def run_tomtom(targetdir, targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_meth
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="tomtom.py - run tomtom on cmonkey results")
-    parser.add_argument('--dir', help="directory holding the ensemble run results", default='.')
+    ##parser.add_argument('--dir', help="directory holding the ensemble run results", default='.')
     parser.add_argument('--prefix', required=True, help='a common prefix of the result directories')
-    parser.add_argument('--targetdir', required=True, help='the directory to store the results', default='tomtom_out')
+    ##parser.add_argument('--targetdir', required=True, help='the directory to store the results', default='tomtom_out')
     parser.add_argument('--csh', action='store_true')
     parser.add_argument('--user', default=None, help='username for qsub')
     parser.add_argument('--gene', default=None, help='run tomtom only on motifs from clusters containing this gene')
@@ -139,15 +139,20 @@ if __name__ == '__main__':
     if args.csh:
       QSUB_TEMPLATE = QSUB_TEMPLATE_CSH
 
-    if not os.path.exists(args.targetdir):
-        os.mkdir(args.targetdir)
+    #if not os.path.exists(args.targetdir):
+    #    os.mkdir(args.targetdir)
+    target_dir = 'tomtom_out'
+    try:
+        os.mkdir(target_dir)
+    except:
+        None
 
     if args.gene is not None:
         ##if args.meme_file_only:
-        export_motifs.make_meme_files(args.dir, args.prefix, args.targetdir, args.gene)
+        export_motifs.make_meme_files('.', args.prefix, target_dir, args.gene)
         ##emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, '%s.meme' % args.gene), args.gene)
     else:
-        genes, dbpaths, max_iteration = export_motifs.get_all_genes(args.dir, args.prefix)
+        genes, dbpaths, max_iteration = export_motifs.get_all_genes('.', args.prefix)
         for gene in genes:
             print gene
-            emit_tomtom_script(args.targetdir, os.path.join(args.targetdir, '%s.meme' % gene), args.prefix, gene, login)
+            emit_tomtom_script(target_dir, os.path.join(target_dir, '%s.meme' % gene), args.prefix, gene, login)

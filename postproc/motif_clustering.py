@@ -19,6 +19,7 @@ def system( cmd ):
 
 op = optparse.OptionParser()
 op.add_option('-i', '--input_dir', default='tomtom_out', help="The location of tomtom results, bzip'd")
+op.add_option('-f', '--filter_motifs', default=True, action='store_true', help="Pre-filter motifs to include; see comments")
 op.add_option('-o', '--option', default=2, help="Filtering option, 1 or 2; see comments")
 opt, args = op.parse_args()
 if not opt.input_dir:
@@ -27,8 +28,14 @@ if not opt.input_dir:
 ## if option == 1, then we SUM all the log-pvals for multiple occurrences of the same motif pair, 
 ## then filter the sums to only those that are < -10 (same as done for original Halo ensemble)
 ## if option == 2, then we take the LOWEST log-pval over multiple occurrences of the same motif 
-## pair, with no additional filtering
+## pair, with no additional filtering. Note, option (1) was used for Eco and (2) for Halo in MSB EGRIN2 paper.
 option = 2
+
+## pre-filter motifs, not implemented yet. (1) remove motifs that are in coding regions (from fimo table);
+## (2) filter by motif E-value (3) filter by bicluster residual?
+pre_filter = True
+if opt.filter_motifs:
+    pre_filter = opt.filter_motifs
 
 input_dir = 'tomtom_out'
 input_dir = opt.input_dir
