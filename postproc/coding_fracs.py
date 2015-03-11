@@ -26,8 +26,8 @@ A script must be made for each cmonkey run.
 Note:  if you are using c-shell make sure to use the --csh flag when running this program.
 
 Example:  
-python coding_fracs.py --cache_dir cache --features_file cache/Escherichia_coli_K12_features --num_runs 3 
-                       --num_cores 1 --organism_name eco --user mharris --csh
+python coding_fracs.py --features cache/Escherichia_coli_K12_features
+                       --organism eco --user mharris --csh
 
 Output will be in each <prefix> directory named coding_fracs.tsv.
 """
@@ -61,7 +61,7 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -pe serial %s
 #$ -l mem_free=8G
 
-python egrin2-tools/postproc/coding_fracs.py --cache_dir %s --features_file %s --organism_name %s --input_dir %s > %s/coding_fracs.out
+python egrin2-tools/postproc/coding_fracs.py --features %s --organism %s --input_dir %s > %s/coding_fracs.out
 """
 
 
@@ -83,15 +83,15 @@ QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -pe serial %s
 #$ -l mem_free=8G
 
-python egrin2-tools/postproc/coding_fracs.py --cache_dir %s --features_file %s --organism_name %s --input_dir %s >& %s/coding_fracs.out
+python egrin2-tools/postproc/coding_fracs.py --features %s --organism %s --input_dir %s >& %s/coding_fracs.out
 """
 
-def get_in_coding_rgn( input_dir, features_file ):
+def get_in_coding_rgn( input_dir, features ):
     fimo_files = np.sort( np.array( glob.glob(os.path.join(input_dir, "fimo-outs/fimo-out-*")) ) )
     print 'Number of fimo files = ', str(len(fimo_files))
 
     #  Get coding regions from features file (e.g. Escherichia_coli_K12_features)
-    f = open(features_file, 'r')
+    f = open(features, 'r')
     skip = 1
     line = f.readline()
     while 'header' not in line:
@@ -99,16 +99,18 @@ def get_in_coding_rgn( input_dir, features_file ):
         skip += 1
     f.close()
 
-    features = pd.read_table(features_file,skiprows=skip) ## engine='python',
+    features = pd.read_table(features,skiprows=skip) ## engine='python',
     features = features[ features.type != 'SEQ_END' ]
     start_pos = np.core.defchararray.replace(features.start_pos.values.astype(str),'<','').astype(int)
     end_pos = np.core.defchararray.replace(features.end_pos.values.astype(str),'>','').astype(int)
 
+    total_coding_fracs = []
     for f in fimo_files:
         print f
         fimo = pd.read_table( bz2.BZ2File(f) )
         if np.in1d('in_coding_rgn', fimo.columns)[0]:
             print 'SKIPPING', f, '; already done'
+            total_coding_fracs.append( np.nanmean( fimo.in_coding_rgn ) )
             continue
         is_bad = np.zeros( fimo.shape[0], dtype=bool )
         for i in xrange(fimo.shape[0]):
@@ -121,17 +123,47 @@ def get_in_coding_rgn( input_dir, features_file ):
 
         fimo['in_coding_rgn'] = is_bad
         fimo.to_csv( bz2.BZ2File( f, 'w' ), sep='\t', index=False )
+        total_coding_fracs.append( np.nanmean( is_bad ) )
+    
+    ff = np.array([os.path.basename(f) for f in fimo_files])
+    coding_fracs = pd.DataFrame({'fimo_out':ff, 'coding_fracs':total_coding_fracs})
+    coding_fracs.to_csv( bz2.BZ2File( os.path.join(input_dir, "coding_fracs.tsv.bz2" ), 'w' ), 
+                         sep='\t', index=False )
 
+def get_total_coding_rgn( features ):
+    """get total fraction of genome that is covered by coding region. 
+       Not currently used in EGRIN2 pipeline but can be used to assess validity of cis-regulatory motifs."""
+    #  Get coding regions from features file (e.g. Escherichia_coli_K12_features)
+    f = open(features, 'r')
+    skip = 1
+    line = f.readline()
+    while 'header' not in line:
+        line = f.readline()
+        skip += 1
+    f.close()
+
+    features = pd.read_table(features,skiprows=skip)
+    genome_len = int(features.ix[0].end_pos)
+    features = features[ features.type != 'SEQ_END' ]
+
+    start_pos = np.core.defchararray.replace(features.start_pos.values.astype(str),'<','').astype(int)
+    end_pos = np.core.defchararray.replace(features.end_pos.values.astype(str),'>','').astype(int)
+
+    hits = np.zeros( genome_len + 1, dtype=bool ) ## tbd: use bitarray? (package bitarray https://pypi.python.org/pypi/bitarray)
+    for i in xrange(len(start_pos)):
+        hits[ start_pos[i]:end_pos[i] ] = True
+
+    return np.mean( hits )
 
 def main():
     #  Collect & check args
 
     op = optparse.OptionParser()
-    op.add_option('-c', '--cache_dir', default='cache', help='The cmpython cache directory where the genome features and info live')
-    op.add_option('-f', '--features_file', help='The features file (with coding regions) (found in cache/<organism name>features')
-    op.add_option('-m', '--num_runs', default=100, help='The number of cmonkey runs')
-    op.add_option('-n', '--num_cores', default=2, help='Number of cores to use on cluster')
-    op.add_option('-o', '--organism_name', help='The organism name (e.g. eco or hal)')
+    ##op.add_option('-c', '--cache_dir', default='cache', help='The cmpython cache directory where the genome features and info live')
+    op.add_option('-f', '--features', help='The features file (with coding regions) (found in cache/<organism name>features')
+    ##op.add_option('-m', '--num_runs', default=100, help='The number of cmonkey runs')
+    ##op.add_option('-n', '--num_cores', default=2, help='Number of cores to use on cluster')
+    op.add_option('-o', '--organism', help='The organism name (e.g. eco or hal)')
     op.add_option('-u', '--user', help='User name on cluster')
     op.add_option('-s', '--csh', help='If c-shell indicate with this flag', action='store_true')
 
@@ -140,18 +172,20 @@ def main():
 
     opt, args = op.parse_args()
 
-    if not opt.cache_dir:
-        op.error('need --cache_dir option.  Use -h for help.')
-    if not opt.features_file:
-        op.error('need --features_file option.  Use -h for help.')
-    if not opt.organism_name:
-        op.error('need --organism_name option.  Use -h for help.')
-    if not opt.num_runs:
-        op.error('need --num_runs option.  Use -h for help.')
+    #if not opt.cache_dir:
+    #    op.error('need --cache_dir option.  Use -h for help.')
+    if not opt.features:
+        op.error('need --features option.  Use -h for help.')
+    if not opt.organism:
+        op.error('need --organism option.  Use -h for help.')
+    ##if not opt.num_runs:
+    ##    op.error('need --num_runs option.  Use -h for help.')
+
+    org_out_dirs = glob.glob("%s-out-*" % opt.organism)
 
     if opt.input_dir:
         ## do the coding rgns calc, append column to fimo files
-        get_in_coding_rgn( opt.input_dir, opt.features_file )
+        get_in_coding_rgn( opt.input_dir, opt.features )
 
     else:
         ## write out qsub script
@@ -168,16 +202,18 @@ def main():
             else:
                 login = os.getlogin()
 
+            num_cores = 2
+            max_run = max( [int(i.split('-')[2]) for i in org_out_dirs] )
             outfile.write(header)
             outfile.write(template % (login, 
-                                      int(opt.num_runs), 
+                                      max_run, ##int(opt.num_runs), 
                                       login,
-                                      opt.num_cores, 
-                                      opt.cache_dir, 
-                                      opt.features_file,
-                                      opt.organism_name,
-                                      "%s-out-${BATCHNUM}" % (opt.organism_name),
-                                      "%s-out-${BATCHNUM}" % (opt.organism_name)))
+                                      num_cores, 
+                                      #opt.cache_dir, 
+                                      opt.features,
+                                      opt.organism,
+                                      "%s-out-${BATCHNUM}" % (opt.organism),
+                                      "%s-out-${BATCHNUM}" % (opt.organism)))
             
 
 if __name__ == '__main__':
