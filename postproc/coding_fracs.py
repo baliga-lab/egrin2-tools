@@ -1,5 +1,18 @@
 #!/tools/bin/python
 
+import optparse
+import sys
+import os
+import glob
+import csv
+
+import time
+import bz2
+
+import pandas as pd
+import numpy as np
+import numpy.core.defchararray as npstr
+
 """ coding_fracs.py
 Author:  Micheleen M. Harris, David J Reiss
 Description:  Coding fractions step of the EGRIN2 pipeline.  This program makes a script which can be 
@@ -31,18 +44,6 @@ python coding_fracs.py --features cache/Escherichia_coli_K12_features
 
 Output will be in each <prefix> directory named coding_fracs.tsv.
 """
-
-import optparse
-import sys
-import os
-import glob
-import csv
-
-import time
-import bz2
-
-import pandas as pd
-import numpy as np
 
 # Templates for Bourne Shell
 QSUB_TEMPLATE_HEADER = """#!/bin/bash
@@ -101,34 +102,50 @@ def get_in_coding_rgn( input_dir, features ):
 
     features = pd.read_table(features,skiprows=skip) ## engine='python',
     features = features[ features.type != 'SEQ_END' ]
-    start_pos = np.core.defchararray.replace(features.start_pos.values.astype(str),'<','').astype(int)
-    end_pos = np.core.defchararray.replace(features.end_pos.values.astype(str),'>','').astype(int)
+    start_pos = npstr.replace(features.start_pos.values.astype(str),'<','').astype(int)
+    end_pos = npstr.replace(features.end_pos.values.astype(str),'>','').astype(int)
 
-    total_coding_fracs = []
+    total_coding_fracs = {}
     for f in fimo_files:
         print f
-        fimo = pd.read_table( bz2.BZ2File(f) )
+        fimo = pd.read_table( bz2.BZ2File(f), sep='\t' )
         if np.in1d('in_coding_rgn', fimo.columns)[0]:
             print 'SKIPPING', f, '; already done'
-            total_coding_fracs.append( np.nanmean( fimo.in_coding_rgn ) )
-            continue
-        is_bad = np.zeros( fimo.shape[0], dtype=bool )
-        for i in xrange(fimo.shape[0]):
-            row = fimo.ix[i]
-            hits = np.sum( (start_pos <= row.start) & (end_pos >= row.start) )
-            if hits <= 0:
-                hits = np.sum( (start_pos <= row.stop) & (end_pos >= row.stop) )
-            if hits > 0:
-                is_bad[i] = True
+            #total_coding_fracs.append( np.nanmean( fimo.in_coding_rgn ) )
+            #continue
+        else:
+            is_bad = np.zeros( fimo.shape[0], dtype=bool )
+            for i in xrange(fimo.shape[0]):
+                row = fimo.ix[i]
+                hits = np.sum( (start_pos <= row.start) & (end_pos >= row.start) )
+                if hits <= 0:
+                    hits = np.sum( (start_pos <= row.stop) & (end_pos >= row.stop) )
+                if hits > 0:
+                    is_bad[i] = True
+            
+            ## write out fimo file with new column
+            fimo['in_coding_rgn'] = is_bad
+            fimo.to_csv( bz2.BZ2File( f, 'w' ), sep='\t', index=False )
 
-        fimo['in_coding_rgn'] = is_bad
-        fimo.to_csv( bz2.BZ2File( f, 'w' ), sep='\t', index=False )
-        total_coding_fracs.append( np.nanmean( is_bad ) )
+        if fimo.shape[0] <= 0:
+            continue
+        ## write out summary for each motif in the run
+        grpd = fimo.groupby('#pattern name').mean()
+        mean_is_bad = grpd['in_coding_rgn'].values
+        mot_ind = grpd.index.values
+        mean_is_bad[ mean_is_bad == True ] = 1.0
+        mean_is_bad[ mean_is_bad == False ] = 0.0
+        ff = os.path.basename(f).replace('fimo-out-','').replace('.bz2','')
+        for i in range(len(mean_is_bad)):
+            total_coding_fracs[ff+'_'+str(mot_ind[i])] = round(mean_is_bad[i], 4)
     
-    ff = np.array([os.path.basename(f) for f in fimo_files])
-    coding_fracs = pd.DataFrame({'fimo_out':ff, 'coding_fracs':total_coding_fracs})
+    coding_fracs = {'motif':[a for a in sorted(total_coding_fracs.keys())], \
+                        'coding_frac':[total_coding_fracs[a] for a in sorted(total_coding_fracs.keys())]}
+    coding_fracs = pd.DataFrame(coding_fracs)
     coding_fracs.to_csv( bz2.BZ2File( os.path.join(input_dir, "coding_fracs.tsv.bz2" ), 'w' ), 
                          sep='\t', index=False )
+    return coding_fracs
+
 
 def get_total_coding_rgn( features ):
     """get total fraction of genome that is covered by coding region. 
@@ -146,8 +163,8 @@ def get_total_coding_rgn( features ):
     genome_len = int(features.ix[0].end_pos)
     features = features[ features.type != 'SEQ_END' ]
 
-    start_pos = np.core.defchararray.replace(features.start_pos.values.astype(str),'<','').astype(int)
-    end_pos = np.core.defchararray.replace(features.end_pos.values.astype(str),'>','').astype(int)
+    start_pos = npstr.replace(features.start_pos.values.astype(str),'<','').astype(int)
+    end_pos = npstr.replace(features.end_pos.values.astype(str),'>','').astype(int)
 
     hits = np.zeros( genome_len + 1, dtype=bool ) ## tbd: use bitarray? (package bitarray https://pypi.python.org/pypi/bitarray)
     for i in xrange(len(start_pos)):
