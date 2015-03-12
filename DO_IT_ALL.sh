@@ -30,7 +30,8 @@ echo $tt_jobid
 set ntomtomjobs = `qstat -f -u dreiss -j '*tomtom*' | grep job_number | wc -l`
 while ( $ntomtomjobs != "0" )
   echo "waiting... $ntomtomjobs ..."
-  sleep 10
+  sleep 30
+  set ntomtomjobs = `qstat -f -u dreiss -j '*tomtom*' | grep job_number | wc -l`
 end
 
 ## This is NOT run on the SGE cluster -- it is run locally so run it on osiris, not aegir!
