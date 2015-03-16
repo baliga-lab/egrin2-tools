@@ -808,7 +808,9 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 			to_r_new.append( "-".join( i_trans ) )
 		to_r = to_r_new
 		to_r.sort()
-
+	elif y_type == "gre_id":
+		print "GREs detection is not currently supported for corems. Please use the `agglom` function to find GREs enriched in biclusters containing corem genes instead."
+		to_r = None
 	else:
 		print "Could not find corems matching your query"
 		to_r = None
