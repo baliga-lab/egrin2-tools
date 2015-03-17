@@ -817,6 +817,9 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 
 	client.close()
 
+	if to_r is not None:
+		to_r = pd.DataFrame(to_r)
+
 	return to_r
 
 def expressionFinder( rows = None, cols = None, standardized = True, host = "localhost", port = 27017, db = "" ):
