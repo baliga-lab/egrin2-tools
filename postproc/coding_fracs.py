@@ -108,12 +108,14 @@ def get_in_coding_rgn( input_dir, features ):
     total_coding_fracs = {}
     for f in fimo_files:
         print f
-        fimo = pd.read_table( bz2.BZ2File(f), sep='\t' )
-        if np.in1d('in_coding_rgn', fimo.columns)[0]:
-            print 'SKIPPING', f, '; already done'
-            #total_coding_fracs.append( np.nanmean( fimo.in_coding_rgn ) )
-            #continue
-        else:
+        fimo = None
+        try:
+            fimo = pd.read_table( bz2.BZ2File(f), sep='\t' )
+            #if np.in1d('in_coding_rgn', fimo.columns)[0]:
+            #    print 'SKIPPING', f, '; already done'
+            #    #total_coding_fracs.append( np.nanmean( fimo.in_coding_rgn ) )
+            #    #continue
+            #else:
             is_bad = np.zeros( fimo.shape[0], dtype=bool )
             for i in xrange(fimo.shape[0]):
                 row = fimo.ix[i]
@@ -123,21 +125,25 @@ def get_in_coding_rgn( input_dir, features ):
                 if hits > 0:
                     is_bad[i] = True
             
-            ## write out fimo file with new column
+            ## write out fimo file with new column, now we save it to new subdirectory, 'coding_fracs/'
             fimo['in_coding_rgn'] = is_bad
-            fimo.to_csv( bz2.BZ2File( f, 'w' ), sep='\t', index=False )
+            ff = os.path.basename(f).replace('fimo-out-','').replace('.bz2','')
+            coding_frac_f = os.path.join(input_dir, 'coding_fracs/' + \
+                            'coding-fracs-' + ff + '.tsv.bz2' )
+            fimo.to_csv( bz2.BZ2File( coding_frac_f, 'w' ), sep='\t', index=False )
 
-        if fimo.shape[0] <= 0:
-            continue
-        ## write out summary for each motif in the run
-        grpd = fimo.groupby('#pattern name').mean()
-        mean_is_bad = grpd['in_coding_rgn'].values
-        mot_ind = grpd.index.values
-        mean_is_bad[ mean_is_bad == True ] = 1.0
-        mean_is_bad[ mean_is_bad == False ] = 0.0
-        ff = os.path.basename(f).replace('fimo-out-','').replace('.bz2','')
-        for i in range(len(mean_is_bad)):
-            total_coding_fracs[ff+'_'+str(mot_ind[i])] = round(mean_is_bad[i], 4)
+            if fimo.shape[0] <= 0:
+                continue
+            ## write out summary for each motif in the run
+            grpd = fimo.groupby('#pattern name').mean()
+            mean_is_bad = grpd['in_coding_rgn'].values
+            mot_ind = grpd.index.values
+            mean_is_bad[ mean_is_bad == True ] = 1.0
+            mean_is_bad[ mean_is_bad == False ] = 0.0
+            for i in range(len(mean_is_bad)):
+                total_coding_fracs[ff+'_'+str(mot_ind[i])] = round(mean_is_bad[i], 4)
+        except:
+            print 'SKIPPING -- cannot read fimo output'
     
     coding_fracs = {'motif':[a for a in sorted(total_coding_fracs.keys())], \
                         'coding_frac':[total_coding_fracs[a] for a in sorted(total_coding_fracs.keys())]}
@@ -201,6 +207,11 @@ def main():
     org_out_dirs = glob.glob("%s-out-*" % opt.organism)
 
     if opt.input_dir:
+        try:
+            os.mkdir(os.path.join(opt.input_dir, "coding_fracs")) ## location of output files
+        except:
+            None
+
         ## do the coding rgns calc, append column to fimo files
         get_in_coding_rgn( opt.input_dir, opt.features )
 
