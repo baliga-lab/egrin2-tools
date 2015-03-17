@@ -690,7 +690,7 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 			return None 
 
 	# Check output types
-
+	y_type_o = y_type
 	if y_type == "rows" or y_type == "row" or y_type == "gene" or y_type == "genes":
 		y_type = "rows"
 	elif y_type == "columns" or y_type == "column" or y_type == "col" or y_type == "cols" or y_type == "condition" or y_type == "conditions" or y_type == "conds":
@@ -728,7 +728,7 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 						print "No genes found"
 						return None
 				else:
-					to_r = to_r[ to_r > query.shape[0] ].index.tolist()
+					to_r = to_r[ to_r >= query.shape[0] ].index.tolist()
 					if len( to_r ):
 						to_r = row2id_batch( to_r, host, port, db, return_field = y_return_field, input_type = "row_id" )
 						to_r.sort()
@@ -819,6 +819,7 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 
 	if to_r is not None:
 		to_r = pd.DataFrame(to_r)
+		to_r.columns = [ y_type_o ]
 
 	return to_r
 
