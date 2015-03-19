@@ -22,6 +22,8 @@ op = optparse.OptionParser()
 op.add_option('-i', '--input_dir', default='tomtom_out', help="The location of tomtom results, bzip'd")
 op.add_option('-f', '--filter_motifs', default=False, action='store_true', 
               help="Pre-filter motifs to include; see comments")
+op.add_option('--plot_motifs', default=False, action='store_true', 
+              help="Plot motif clusters in separate PDFs")
 op.add_option('-o', '--option', default=1, help="Filtering option, 1 or 2; see comments")
 opt, args = op.parse_args()
 if not opt.input_dir:
@@ -228,6 +230,11 @@ clust_dfs.to_csv( bz2.BZ2File('motif_clusts.tsv.bz2', 'w'), sep='\t', index=Fals
 ## Not ready yet.
 
 if False:
+    try: ## necessary to import cmonkey.meme
+        os.symlink('cmonkey2/cmonkey', 'cmonkey')
+    except:
+        None
+
     from Bio.Seq import Seq
     from Bio.SeqRecord import SeqRecord
     from Bio.Alphabet import IUPAC
@@ -235,12 +242,8 @@ if False:
     #from Bio import motifs
     #import StringIO
     import weblogolib as wl
-
-    try: ## necessary to import cmonkey.meme
-        os.symlink('cmonkey2/cmonkey', 'cmonkey')
-    except:
-        None
     import cmonkey.meme as meme ## use Wei-Ju's meme parser - much better than BioPython!
+    import utils as ut
 
     try:
         os.mkdir("motif_clusters") ## location of output files
@@ -253,9 +256,11 @@ if False:
         SeqIO.write(tmp, handle, "fasta")
         handle.close()
 
-    def plot_motif_from_sites( sites, img_format='png' ):
+    def plot_motif_from_sites( sites, img_format='png', smallText=None ):
         ldata = wl.LogoData.from_seqs(wl.SeqList(sites, wl.unambiguous_dna_alphabet))
         options = wl.LogoOptions()
+        if smallText is not None:
+            options.fineprint = smallText ##os.path.dirname(self.dbfile) + ' ' + self.organism
         format = wl.LogoFormat(ldata, options) 
         format.color_scheme = wl.classic
         format.resolution = 150
@@ -273,52 +278,111 @@ if False:
             tmp = wl.pdf_formatter( ldata, format )
             return tmp
 
+    def plot_multiple_motifs( cluster_ind, max_plot=16, outPdf=None ):
+        from matplotlib import pyplot as plt
+        pdf = None
+        if outPdf is not None:
+            from matplotlib.backends.backend_pdf import PdfPages
+            pdf = PdfPages(outPdf)
+
+        clust = clusters[ cluster_ind ]
+        out = []
+        plotted = 0
+        for c in np.sort(clust):
+            print c
+            tmp = c.split('_')
+            cm_ind = tmp[0] + '/cmonkey_run.db'
+            cl = int(tmp[1])
+            mot = int(tmp[2])
+            cm = cms[ cm_ind ]
+            plt.subplot(4, 4, plotted+1)
+            cm.plot_motif( cl, mot )
+            plotted += 1
+            if plotted >= max_plot:
+                if outPdf is not None:
+                    pdf.savefig()
+                break
+        if outPdf is not None:
+            pdf.close()
+
     from cmonkeyobj import cMonkey2 as cm2
     ## pre-read in all cmonkey database objects for speed
     cmdbs = sorted( glob.glob( 'mtu-out-*/cmonkey_run.db' ) )
     cms = { db:cm2(db) for db in cmdbs }
     
-    for iii in xrange( 1,len(clusters) ):
+    for iii in xrange( 0,len(clusters) ):
         ##df = clust_dfs.ix[iii]  # dont need for this?
-        all_pssms = {}
-        all_sites = {} ## maybe use the actual seqs and run meme on them?
-        for mot in clusters[iii]:
-            print iii, mot, len(clusters[iii])
-            tmp = np.array( mot.split('-')[2].split('_'), np.int )
-            dbfile = 'mtu-out-%03d/cmonkey_run.db' % (tmp[0])
-            cm = cms[ dbfile ] ##cm2( dbfile )
-            ## if use get_biop_motif(), then can do e.g., utils.plot_pssm(all_pssms['eco-out-009_312_02'])
-            ##all_pssms[mot] = utils.get_biop_motif( dbfile, tmp[1], tmp[2], 'pfm' ) ## doesnt work well w 'N's
-            ## or can do cm.plot_motif(tmp[1],tmp[2])
-            all_pssms[mot] = cm.get_motif_pssm( tmp[1], tmp[2] )
-            sites = cm.get_motif_sites( tmp[1], tmp[2] )
-            all_sites[mot] = sites[['flank_left','seq','flank_right']]
+        if len(clusters[iii]) < 10:
+            break
+        memeOut = None
+        if not os.path.exists( 'motif_clusters/%04d_memeOut.txt'%(iii) ):
+            all_pssms = {}
+            all_sites = {} ## maybe use the actual seqs and run meme on them?
+            for mot in clusters[iii]:
+                print iii, mot, len(clusters[iii])
+                tmp = np.array( mot.split('-')[2].split('_'), np.int )
+                dbfile = 'mtu-out-%03d/cmonkey_run.db' % (tmp[0])
+                cm = cms[ dbfile ] ##cm2( dbfile )
+                ## if use get_biop_motif(), then can do e.g., utils.plot_pssm(all_pssms['eco-out-009_312_02'])
+                ##all_pssms[mot] = utils.get_biop_motif( dbfile, tmp[1], tmp[2], 'pfm' ) ## doesnt work well w 'N's
+                ## or can do cm.plot_motif(tmp[1],tmp[2])
+                all_pssms[mot] = cm.get_motif_pssm( tmp[1], tmp[2] )
+                sites = cm.get_motif_sites( tmp[1], tmp[2] )
+                all_sites[mot] = sites ##[['flank_left','seq','flank_right']]
 
-        sites = pd.concat( all_sites, axis=0 )
-        sites[ pd.isnull(sites) ] = ""
-        maxlen = max( [len(i) for i in sites.seq.values] )
-        minlen = min( [len(i) for i in sites.seq.values] )
-        seqs = np.unique( [ ( sites.flank_left[i] + sites.seq[i] + sites.flank_right[i] ).strip('X').replace('X','N') \
-                            for i in range(sites.shape[0]) ] )
-        print len(seqs)
-        seqs = { str(i): ('N'*20)+seqs[i].strip('X').replace('X','N')+('N'*20) for i in range(len(seqs)) }
-        writeFasta( seqs, 'motif_clusters/%04d.fna'%(iii) )
-        cmd = './progs/meme %s -time 600 -dna -revcomp -maxsize 9999999 -nmotifs %d -evt 999999 ' \
-              '-minw %d -maxw %d -mod oops -nostatus -text' % ('motif_clusters/%04d.fna'%(iii), 1, minlen, maxlen)
-        print cmd
-        memeOut = os.popen( cmd ).read()
+            sites = pd.concat( all_sites, axis=0 )
+            #sites[ pd.isnull(sites) ] = ""
+            sites['tmp'] = np.log10(sites.pvalue.values) / np.array([len(i) for i in sites.seq.values]).astype(float)
+            sites.sort( ['tmp'], inplace=True )
+            tmp = sites.groupby('names')
+            firsts = tmp.first() ## get first row of each group
+            sizes = tmp.size()
+            firsts.fillna('', inplace=True)
+            if len(clusters[iii]) > 100:
+                firsts = firsts[ sizes > len(clusters[iii])/10. ]
+            else:
+                firsts = firsts[ sizes >= 2 ]
+            maxlen = max( [len(i) for i in firsts.seq.values] )
+            minlen = min( [len(i) for i in firsts.seq.values] )
+            seqs = [ ( firsts.flank_left[i] + firsts.seq[i] + \
+                                  firsts.flank_right[i] ).strip('X').replace('X','N') \
+                                for i in range(firsts.shape[0]) ]
+            print len(seqs)
+            seqs = { firsts.index.values[i]: ('N'*20)+seqs[i].strip('X').replace('X','N')+('N'*20) \
+                     for i in range(len(seqs)) }
+            writeFasta( seqs, 'motif_clusters/%04d.fna'%(iii) )
+            cmd = './progs/meme %s -time 600 -dna -revcomp -maxsize 9999999 -nmotifs %d -evt 999999 ' \
+                  '-minw %d -maxw %d -mod oops -nostatus -text -time 600' \
+                  % ('motif_clusters/%04d.fna'%(iii), 1, minlen, maxlen)
+            print cmd
+            try:
+                memeOut = os.popen( cmd ).read()
+            except:
+                print 'MEME DID NOT COMPLETE WITHIN 10 MINUTES'
+                continue
+        else:
+            fo = open( 'motif_clusters/%04d_memeOut.txt'%(iii), 'r' )
+            memeOut = fo.read()
+            fo.close()
         #handle = StringIO.StringIO(memeOut)
         #record = motifs.parse(handle, "meme")
         #handle.close()
-        record = meme.read_meme_output(memeOut, 1)[0]
+        try:
+            record = meme.read_meme_output(memeOut, 1)[0]
+        except:
+            print 'COULD NOT PARSE MEME OUTPUT'
+            continue
         
         sites = pd.DataFrame(record.sites)[5].values
-        pdf_data = plot_motif_from_sites( sites, 'pdf' )
-        import utils as ut
+        smallText = str( iii ) + ' ' + str(len(clusters[iii])) + ' ' + str(record.num_sites) + \
+                    ' E=' + str(record.evalue) 
+        pdf_data = plot_motif_from_sites( sites, 'pdf', smallText )
         ut.writeLines( pdf_data.split( '\n' ), 'motif_clusters/%04d.pdf'%(iii) )
-        ut.writeLines( memeOut.split( '\n' ), 'motif_clusters/memeOut_%04d.txt'%(iii) )
-        print i, 'DONE'
+        ut.writeLines( memeOut.split( '\n' ), 'motif_clusters/%04d_memeOut.txt'%(iii) )
+        print iii, 'DONE'
         
+    os.popen( 'pdftk motif_clusters/????.pdf cat output motif_clusters/ALL.pdf' ).read()
+    os.popen( 'pdfnup --landscape --suffix nup --nup 6x6 motif_clusters/ALL.pdf' ).read()
 
 #     widths = np.array( [ pssm.shape[0] for pssm in all_pssms.values() ] )
 #     max_width = np.max( widths )
