@@ -484,7 +484,31 @@ def agglom( x = [ 0,1 ], x_type = None, y_type = None, x_input_type = None, y_ou
 		return None
 
 def fimoFinder( start = None, stop = None, locusId = None, strand = None, mot_pval_cutoff = None, filterby = None, filter_type = None, filterby_input_type = None, host = "localhost", port = 27017, db = None, use_fimo_small = True, logic = "or", return_format = "file", outfile = None, tosingle = True ):
-	"""Find motifs/GREs that fall within a specific range. Filter by biclusters/genes/conditions/etc."""
+	"""
+	Find motifs/GREs that fall within a specific range. Filter by biclusters/genes/conditions/etc. Optionally write to GGBweb compatible .gsif format.
+
+	IMPORTANT!!!! Only filtering by GREs currently supported
+
+	Parameters:
+
+	-- start: genomic start, chromosome start if None
+	-- stop: genomic start, chromosome end if None
+	-- locusId: chromosome Id, (i.e. MicrobesOnline scaffoldId or NCBI_RefSeq)
+	-- strand: fetch stand specific predictions (not supported currently)
+	-- mot_pval_cutoff: only retrieve fimo scan matches below this pval_cutoff
+	-- filterby: elements through which to filter fimo scans, e.g. gres
+	-- filter_type: type of filterby, e.g. gres
+	-- filterby_input_type: name format of filterby. Speeds up name translation
+	-- host: location of EGRIN 2 MongoDB 
+	-- port: port on which MongoDB is listening
+	-- db: name of MongoDB database
+	-- use_fimo_small: use fimo_small collection (highly significant matches only). Speed up query.
+	-- logic: logcal operation to apply to filterby, ie and, or, nor 
+	-- return_format: how should the fimo tracks be returned, only "file" currently support (for upload to GGBweb)
+	-- outfile: path and name of output file in .gsif format
+	-- tosingle: return one filter per filterby object (eg GRE) or all in a single file (for early GGBweb dev support)
+
+	"""
 	
 	def getBCs( x, x_type ):
 		if x is None:
@@ -824,7 +848,18 @@ def coremFinder( x, x_type = "corem_id", x_input_type = None, y_type = "genes", 
 	return to_r
 
 def expressionFinder( rows = None, cols = None, standardized = True, host = "localhost", port = 27017, db = "" ):
-	"""Fetch gene expression given rows and columns."""
+	"""
+	Fetch gene expression given rows and columns.
+
+	Parameters:
+	-- rows: list of rows/genes in format recognized by row2id_batch (i.e. some name present in MicrobesOnline)
+	-- cols: list of columns/conditions in format recognized by col2id_batch (i.e. name in ratios matrix)
+	-- standardized: fetch standardized data if True, otherwise raw (normalized) data
+	-- host: location of EGRIN 2 MongoDB 
+	-- port: port on which MongoDB is listening
+	-- db: name of MongoDB database
+
+	"""
 	
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 
@@ -874,7 +909,16 @@ def expressionFinder( rows = None, cols = None, standardized = True, host = "loc
 	return data
 
 def ggbwebModule( genes = None, outfile = None, host = "localhost", port = 27017, db = "" ):
-	
+	"""
+	Write gene module in GGBweb .gsif format
+
+	Parameters:
+	-- genes: list of genes in format recognized by row2id_batch (some name present in MicrobesOnline)
+	-- outfile: path/name of module file to write
+	-- host: location of EGRIN 2 MongoDB 
+	-- port: port on which MongoDB is listening
+	-- db: name of MongoDB database
+	"""
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 
 	if genes is None:
@@ -903,21 +947,78 @@ def ggbwebModule( genes = None, outfile = None, host = "localhost", port = 27017
 
 	return to_r
 
-if __name__ == '__main__':
-	print "yuuuup"
-	# host = "primordial"
-	# port = 27017
-	# db = "egrin2_db"
+def motifFinder( x, x_type, output_type = [ "data_frame", "array" ][ 0 ], host = "localhost", port = 27017, db = "" ):
+	"""
+	Find, retrieve, and format motif PWM
+
+	Parameters:
+	-- x: list of motifs to retrieve. Can be combined name separated by `_`, eg to return motif #1 from bicluster #10 in run #3 supply x = "3_10_1". See below for x_type.
+	-- x_type: format of x, e.g. gre. Can be combined name separated by `_`, eg to return motif #1 from bicluster #10 in run #3 supply x_type = "run_cluster_motif"
+	-- output_type: format of output. `data_frame` for pretty printing, `array` for viz by weblogo
+	-- host: location of EGRIN 2 MongoDB 
+	-- port: port on which MongoDB is listening
+	-- db: name of MongoDB database
+
+	Returns DataFrame (or list of DataFrames) containing PWM (more precisely PPMs)
+	"""
 
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
-	# test rows
-	corem = client[db].corem.find_one({"corem_id":1})["rows"]
-	# bicluster_ids = x2bicluster( x = corem, x_type = "rows", logic = "or", count = False, host = host, port = port, db = db,  verbose = False, return_field = [ "_id" ] )._id.tolist()
 
-	# # test cols
-	# cols = range(5)
-	# bicluster_ids = x2bicluster( x = cols, x_type = "cols", logic = "or", count = False, host = host, port = port, db = db,  verbose = False, return_field = [ "_id" ] )._id.tolist()
+	if type( x ) == str or type( x ) == int:
+		# single
+		x = [ x ]
 
-	# # test gres
-	# gre = [2]
-	# bicluster_ids = x2bicluster( x = gre, x_type = "gre", logic = "or", count = False, host = host, port = port, db = db,  verbose = False, return_field = [ "_id" ] )._id.tolist()
+	if len( x_type.split("_") ) > 1:
+		print "You have indicated a combined name type: %s.\n\nIf this is not your intent, I suggest you remove the `_`" % (", ").join( x_type_split )
+		x_type_split = x_type.split( "_" )
+
+		# change input names
+		for i in range( len( x_type_split ) ):
+			if x_type_split[ i ] == "run" or x_type_split[ i ] == "runs" :
+				x_type_split[ i ] = "run_id"
+			elif x_type_split[ i ] == "bicluster" or x_type_split[ i ] == "cluster" :
+				x_type_split[ i ] = "cluster"
+			elif x_type_split[ i ] == "motif" or x_type_split[ i ] == "gre" :
+				x_type_split[ i ] = "motif_num"
+			else:
+				print "Could not match x_type: %s" % x_type_split[ i ]
+				#return None
+
+		# format query
+		q1 = {}
+		q1[ "$or" ] = []
+		q2 = {}
+		q2 = []
+		# makes sure lengths of x and x_type are the same
+		for i in x:
+			i_split = [ int( j ) for j in i.split( "_" ) ]
+			if len( i_split ) != len(x_type_split ):
+				print "Number of combined x_types does not match x"
+				#return None
+			else:
+				i_dict = dict( zip( x_type_split, i_split ) ) 
+				q2.append( { "motif_num" : i_dict.pop( "motif_num" ) } )
+				q1[ "$or" ].append(  i_dict )
+
+		o = { "_id":1, "run_id":1, "cluster":1 }
+		# get biclusters
+		prequery = list( client[db].bicluster_info.find( q1, o ) )
+		prequery = [ { "cluster_id": i[ "_id" ] } for i in prequery ]
+		
+	elif x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motifs" or x_type == "gres" or x_type == "motcs":
+		x_type = "gre_id"
+		q = { x_type : { "$in": x } }
+		o = { "_id":0, "pwm": 1 }
+		query = pd.DataFrame( list( client[db].corem.find( q, o ) ) )
+	else:
+		"Cannot recognize x_type = %s" % x_type
+		#return None
+
+	client.close()
+	
+	
+		
+		
+
+
+	
