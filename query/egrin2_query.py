@@ -929,14 +929,12 @@ def ggbwebModule( genes = None, outfile = None, host = "localhost", port = 27017
 		# single
 		genes = [ genes ]
 
-	def locFormat(x):
-    		return( "chromosome" + x.strand + ":" + str( x.start ) + "-" + str( x.stop ) )
+	def locFormat(x, gene):
+    		return( pd.DataFrame( [ gene, "E.colik-12" , str( x.start ), str( x.stop ) ] ) )
 	
 	gene_info = pd.DataFrame( row2id_batch( genes, host=host, port=port, db=db,  return_field = "all", verbose = False ) )
 
-	to_r = pd.DataFrame( gene_info.loc[ :, "egrin2_row_name" ] )
-	to_r[ "loc" ] = [ locFormat( gene_info.iloc[ i ] ) for i in range( gene_info.shape[ 0 ] ) ]
-	to_r[ "name2" ] = gene_info[ "name" ]
+	to_r = pd.concat( [ locFormat( gene_info.iloc[ i ], gene_info.loc[ i, "egrin2_row_name" ] ) for i in range( gene_info.shape[ 0 ] ) ], 2).T
 
 	if outfile is not None:
 		print "Module written to: %s" % os.path.abspath( outfile )
@@ -962,6 +960,16 @@ def motifFinder( x, x_type, output_type = [ "data_frame", "array" ][ 0 ], host =
 	Returns DataFrame (or list of DataFrames) containing PWM (more precisely PPMs)
 	"""
 
+	def reshapePWM( x ):
+		"""
+		x is PWM list from MongoDB to be converted to DataFrame
+		"""
+		to_r = pd.DataFrame( x )
+		to_r = to_r.set_index( "row" ).sort_index( )
+		# make sure order is consistent with weblogo
+		to_r = to_r.loc[ : , ["a","c","g","t" ] ]
+		return to_r
+
 	client = MongoClient( 'mongodb://'+host+':'+str(port)+'/' )
 
 	if type( x ) == str or type( x ) == int:
@@ -969,8 +977,11 @@ def motifFinder( x, x_type, output_type = [ "data_frame", "array" ][ 0 ], host =
 		x = [ x ]
 
 	if len( x_type.split("_") ) > 1:
-		print "You have indicated a combined name type: %s.\n\nIf this is not your intent, I suggest you remove the `_`" % (", ").join( x_type_split )
+
 		x_type_split = x_type.split( "_" )
+
+
+		print "You have indicated a combined name type: %s.\n\nIf this is not your intent, I suggest you remove the `_`" % (", ").join( x_type_split )
 
 		# change input names
 		for i in range( len( x_type_split ) ):
@@ -987,8 +998,7 @@ def motifFinder( x, x_type, output_type = [ "data_frame", "array" ][ 0 ], host =
 		# format query
 		q1 = {}
 		q1[ "$or" ] = []
-		q2 = {}
-		q2 = []
+		q2 = pd.DataFrame()
 		# makes sure lengths of x and x_type are the same
 		for i in x:
 			i_split = [ int( j ) for j in i.split( "_" ) ]
@@ -997,14 +1007,32 @@ def motifFinder( x, x_type, output_type = [ "data_frame", "array" ][ 0 ], host =
 				#return None
 			else:
 				i_dict = dict( zip( x_type_split, i_split ) ) 
-				q2.append( { "motif_num" : i_dict.pop( "motif_num" ) } )
+				q2 = pd.concat( [ q2, pd.DataFrame.from_dict( i_dict,orient="index" ).T ] )
+				if "motif_num" in x_type_split:
+					i_dict.pop("motif_num")
 				q1[ "$or" ].append(  i_dict )
-
-		o = { "_id":1, "run_id":1, "cluster":1 }
+		# doesn't matter that "motif_info" is here
+		o = { i:1 for i in x_type_split }
 		# get biclusters
-		prequery = list( client[db].bicluster_info.find( q1, o ) )
-		prequery = [ { "cluster_id": i[ "_id" ] } for i in prequery ]
-		
+		prequery = pd.DataFrame( list( client[db].bicluster_info.find( q1, o ) ) )
+		prequery = prequery.merge( q2, on = list( set( prequery.columns.tolist( ) ) & set( x_type_split ) ) )
+		prequery = prequery.rename( columns = { '_id' : 'cluster_id' } )
+		if "motif_num" in x_type_split:
+			# specific bc motifs requested
+			q = { "$or" : prequery.loc[ :, [ "cluster_id","motif_num" ] ].to_dict( "records" ) }
+		else:
+			q = { "$or" : prequery.loc[ :, [ "cluster_id"] ].to_dict( "records" ) }
+
+		query = pd.DataFrame( list( client[db].motif_info.find( q ) ) )
+		query = query.merge( prequery, on = list( set( query.columns.tolist( ) ) & set( prequery.columns.tolist( ) ) ) )
+
+		query["x_type"] = ""
+		for i in range( query.shape[ 0 ] ):
+			query.loc[ i,"x_type" ] = ("_").join( [ str(j) for j in query.loc[ i, x_type_split ].tolist() ] )
+		query = query.set_index("x_type")
+		# REORDER!!!
+		query = query.loc[x,:]
+	
 	elif x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motifs" or x_type == "gres" or x_type == "motcs":
 		x_type = "gre_id"
 		q = { x_type : { "$in": x } }
@@ -1014,9 +1042,17 @@ def motifFinder( x, x_type, output_type = [ "data_frame", "array" ][ 0 ], host =
 		"Cannot recognize x_type = %s" % x_type
 		#return None
 
+	if output_type == "array":
+		to_r = { query.index[i]: reshapePWM( query.iloc[ i ].pwm ).as_matrix() for i in range( query.shape[ 0 ] ) }
+	else:
+		to_r = { query.index[i]: reshapePWM( query.iloc[ i ].pwm ) for i in range( query.shape[ 0 ] ) }
+
+	if len( to_r ) == 1:
+		to_r = to_r.values()[0]
+
 	client.close()
 	
-	
+	return to_r	
 		
 		
 
