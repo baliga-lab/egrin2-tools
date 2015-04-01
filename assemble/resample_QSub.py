@@ -6,16 +6,6 @@ for submission to SGE cluster
 python resample_QSub.py --name resample_55 --host primordial --db mtu_db --n_rows 55 --user abrooks
 
 """
-
-__author__ = "Aaron Brooks"
-__copyright__ = "Copyright 2014, cMonkey2"
-__credits__ = ["Aaron Brooks"]
-__license__ = "GPL"
-__version__ = "1.0.1"
-__maintainer__ = "Aaron Brooks"
-__email__ = "brooksan@uw.edu"
-__status__ = "Development"
-
 import argparse
 import os
 import itertools
@@ -46,7 +36,6 @@ python resample.py --host %(host)s --db %(db)s --n_rows %(n_rows)i --n_resamples
 """
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument( '--host', required=True, type=str, help="Host for MongoDB" )
     parser.add_argument('--db', required=True, type=str, help="Database name")
@@ -54,8 +43,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_resamples', default=1000, type=int, help="Number of resamples to compute")
     parser.add_argument('--port', default=27017, help="MongoDB port", type=int )
     parser.add_argument('--cols', default=None, help="Columns (experiments) for resampling. Should be path to tab-delimited file containing column names that map to egrin2_col_names in MongoDB database, eg experiment names.", type=str )
-    parser.add_argument('--user', default=None)
-    parser.add_argument('--targetdir', default="./", help="Directory to store Qsub scripts")
+    parser.add_argument('--user', default=os.getlogin())
+    parser.add_argument('--targetdir', default=".", help="Directory to store Qsub scripts")
     parser.add_argument('--n_cores', default=1, help="Number of cores to reserve on cluster")
 
     args = parser.parse_args()
@@ -67,10 +56,7 @@ if __name__ == '__main__':
     args_d["name"] = "r.%s" % args_d["n_rows"]
 
     with open(os.path.join(args.targetdir, "%s.sh" % args.name), 'w') as outfile:
-        if args.user is not None:
-            login = args.user
-        else:
-            login = os.getlogin()
+        login = args.user
 
         outfile.write(header)
-        outfile.write(template % vars(args) )
+        outfile.write(template % vars(args))
