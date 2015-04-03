@@ -13,6 +13,7 @@ import argparse
 import os
 import itertools
 import math
+import logging
 
 from pymongo import MongoClient
 import numpy as np
@@ -63,7 +64,7 @@ def choose_n(col, vals, n, add, client, db, n_rows, n_resamples, old_records, ke
 def colResampleInd( host, db, n_rows, cols, n_resamples = 1000, keepP = 0.1, port = 27017):
     """Resample gene expression for a given number of genes in a particular condition using RSD, brute force."""
 
-    print "Adding brute force resample document for gene set size %i " % (n_rows)
+    logging.info("Adding brute force resample document for gene set size %d", n_rows)
 
     # make connection
     client = MongoClient(host=host, port=port)
@@ -79,7 +80,7 @@ def colResampleInd( host, db, n_rows, cols, n_resamples = 1000, keepP = 0.1, por
     toAdd = [i for i in cols if i not in old_records.keys()]
 
     if len(toAdd) == 0 and len(toUpdate) == 0:
-        print "Nothing to add"
+        logging.info("Nothing to add")
         client.close()
         return None
 
@@ -92,10 +93,10 @@ def colResampleInd( host, db, n_rows, cols, n_resamples = 1000, keepP = 0.1, por
 
     # toAdd
     if len(toAdd) > 0:
-        print "Computing resamples for new MongoDB documents"
+        logging.info("Computing resamples for new MongoDB documents")
 
         # do in batches of 100 so memory usage doesn't get too high
-        nbins = int(math.ceil( len(toAdd) / 100.0))
+        nbins = int(math.ceil(len(toAdd) / 100.0))
         bins = split_list(toAdd, nbins)
         for b in bins:
             df = pd.DataFrame(list(client[db].gene_expression.find({"col_id": {"$in": b}},
@@ -105,13 +106,13 @@ def colResampleInd( host, db, n_rows, cols, n_resamples = 1000, keepP = 0.1, por
                 df_rsd = pd.concat([df.aggregate(resample, n_rows) for i in range(0, n_resamples)])
                 df_rsd = df_rsd.groupby(df_rsd.index)
 
-                print "Adding new documents to MongoDB"
+                logging.info("Adding new documents to MongoDB")
                 tmp = [choose_n(int(i), df_rsd.get_group(i), n2keep, True, client, db, n_rows,
                                 n_resamples, old_records, keepP) for i in df_rsd.groups.keys()]
 
     # toUpdate
     if len(toUpdate) > 0:
-        print "Computing resamples for updated MongoDB documents"
+        logging.info("Computing resamples for updated MongoDB documents")
 
         # do in batches of 500 so memory usage doesn't get too high
         nbins = int(math.ceil(len(toUpdate) / 100.0))
@@ -128,7 +129,7 @@ def colResampleInd( host, db, n_rows, cols, n_resamples = 1000, keepP = 0.1, por
                     df_rsd = pd.concat([df.aggregate(resample, n_rows) for i in range(0, resamples)])
                     df_rsd = df_rsd.groupby(df_rsd.index)
 
-                    print "Updating MongoDB documents"
+                    logging.info("Updating MongoDB documents")
                     tmp = [choose_n(int(i), df_rsd.get_group(i), n2keep, False, client, db, n_rows,
                                     resamples, old_records, keepP) for i in df_rsd.groups.keys()]
     client.close()
@@ -157,10 +158,10 @@ if __name__ == '__main__':
         cols = pd.DataFrame(list(client[args.db]["col_info"].find({}, {"col_id": 1}))).col_id.tolist()
     else:
         # not supported yet
-        print "Not supported yet"
+        logging.error("Not supported yet")
         cols = None
 
-    print "Starting resample for n_rows = %s" % args.n_rows
+    logging.info("Starting resample for n_rows = %d", args.n_rows)
 
     colResampleInd(host = args.host, db = args.db, n_rows = args.n_rows, cols = cols, n_resamples = args.n_resamples, keepP = args.keep_p, port = args.port)
     client.close()

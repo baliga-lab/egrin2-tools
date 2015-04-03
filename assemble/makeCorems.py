@@ -16,6 +16,7 @@ import shutil
 import decimal
 from math import ceil
 import random
+import logging
 
 import pdb
 import numpy as np
@@ -51,9 +52,11 @@ class makeCorems:
             self.db = db
 
         if self.db in client.database_names():
-            print "Found ensemble database: %s" % self.db
+            logging.info("Found ensemble database: '%s'", self.db)
         else:
-            print "Could not locate a MongoDB database with name: %s\nAttempting to perform DB import at: %s" % (self.db, dbfiles)
+            logging.warn("""Could not locate a MongoDB database with name: %s
+Attempting to perform DB import at: %s""", self.db, str(dbfiles))
+
             if dbfiles != None:
                 try:
                     self.mongoRestore(self.db, dbfiles)
@@ -82,20 +85,20 @@ class makeCorems:
             self.backbone_pval = backbone_pval
 
         self.cFail = False
-        if subprocess.call( [ "which", "adjmat2wpairs" ],stdout=open( os.devnull, 'wb')) != 0:
-            print "WARNING!!! You need to compile adjmat2wpairs.cpp to adjmat2wpairs and add its location to your path to detect corems"
+        if subprocess.call(["which", "adjmat2wpairs"], stdout=open(os.devnull, 'wb')) != 0:
+            logging.warn("You need to compile adjmat2wpairs.cpp to adjmat2wpairs and add its location to your path to detect corems")
             self.cFail = True
 
-        if subprocess.call( [ "which", "compute_tanimoto" ],stdout=open( os.devnull, 'wb')) != 0:
-            print "WARNING!!! You need to compile compute_tanimoto.cpp to compute_tanimoto and add its location to your path to detect corems"
+        if subprocess.call(["which", "compute_tanimoto"], stdout=open(os.devnull, 'wb')) != 0:
+            logging.warn("You need to compile compute_tanimoto.cpp to compute_tanimoto and add its location to your path to detect corems")
             self.cFail = True
 
-        if subprocess.call( [ "which", "cluster_communities" ],stdout=open( os.devnull, 'wb')) != 0:
-            print "WARNING!!! You need to compile cluster_communities.cpp to cluster_communities and add its location to your path to detect corems"
+        if subprocess.call(["which", "cluster_communities"], stdout=open(os.devnull, 'wb')) != 0:
+            logging.warn("You need to compile cluster_communities.cpp to cluster_communities and add its location to your path to detect corems")
             self.cFail = True
 
-        if subprocess.call( [ "which", "getting_communities" ],stdout=open( os.devnull, 'wb')) != 0:
-            print "WARNING!!! You need to compile getting_communities.cpp to getting_communities and add its location to your path to detect corems"
+        if subprocess.call(["which", "getting_communities"], stdout=open(os.devnull, 'wb')) != 0:
+            logging.warn("You need to compile getting_communities.cpp to getting_communities and add its location to your path to detect corems")
             self.cFail = True
 
         if out_dir is None:
@@ -106,7 +109,7 @@ class makeCorems:
             self.out_dir = os.path.abspath( os.path.join(out_dir,"corem_data"))
             if not os.path.isdir(self.out_dir):
                 os.makedirs(self.out_dir)
-        print "Corem data will be output to:", self.out_dir
+        logging.info("Corem data will be output to '%s'", self.out_dir)
 
         if n_subs is None:
             # number of subprocesses to spawn
@@ -148,7 +151,7 @@ class makeCorems:
     def mongoRestore(self, db, infile):
         """Read contents of binary MongoDB dump into MongoDB instance"""
         sys_command = "mongorestore --db " + db + " " + infile
-        print sys_command
+        logging.info("Executing %s", sys_command)
         os.system(sys_command)
 
     def getRowCo( self, row_id ):
@@ -183,9 +186,10 @@ class makeCorems:
 
         # remove existing edgeList file if it exists
         if os.path.exists(os.path.abspath(os.path.join(self.out_dir,"edgeList"))):
-            print "Found edgeList file at %s. Removing it." % os.path.abspath(os.path.join( self.out_dir,"edgeList"))
-            os.remove (os.path.abspath(os.path.join(self.out_dir,"edgeList")))
-            print "Dropping row_row MongoDB collection as a precaution."
+            logging.info("Found edgeList file at '%s'. Removing it.",
+                         os.path.abspath(os.path.join(self.out_dir,"edgeList")))
+            os.remove(os.path.abspath(os.path.join(self.out_dir, "edgeList")))
+            logging.info("Dropping row_row MongoDB collection as a precaution.")
             row_row_collection.drop()
 
         def addToD(d, ind1, ind2, val):
@@ -226,12 +230,15 @@ class makeCorems:
         # make a dictionary to keep track of rows in db and their weights
         # was too slow using mongoDB lookups...
         self.rowrow_ref = {}
-        print "Constructing row-row co-occurrence matrix. This will take some time..."
+        logging.info("Constructing row-row co-occurrence matrix. This will take some time...")
+
         for i in self.row2id.keys():
             if counter % 250 == 0:
-                print "%s percent done" % str(round(float(counter) / len(self.row2id.keys()), 2) * 100)
+                logging.info("%.2f percent done", round(float(counter) / len(self.row2id.keys()), 2) * 100.0)
+
             # check if already exists in DB
             data_counts = self.getRowCo(i)
+
             # set self counts to 0 and normalize other counts
             data_counts[i] = 0
             data_counts = data_counts[data_counts > 0]
@@ -241,7 +248,8 @@ class makeCorems:
             # only keep values > 0
             backbone_data_counts = self.extractBackbone(data_counts_norm)
 
-            to_write = [structureRowRow(i, j, data_counts[j], data_counts_norm[j], backbone_data_counts[j], row_row_collection) for j in data_counts.index]
+            to_write = [structureRowRow(i, j, data_counts[j], data_counts_norm[j], backbone_data_counts[j], row_row_collection)
+                        for j in data_counts.index]
             to_write = [i for i in to_write if i is not None]
 
             # write edgeList file
@@ -287,7 +295,8 @@ class makeCorems:
                     yield float(start + step*i)
 
         if self.cFail:
-            print "Cannot detect corems because one or more community detection C++ scrips are either (1) not compiled, (2) not in the $PATH variable, or (3) incorrectly named. Resolve previous warning."
+            logging.info("""Cannot detect corems because one or more community detection C++ scrips are either
+(1) not compiled, (2) not in the $PATH variable, or (3) incorrectly named. Resolve previous warning.""")
             return None
         else:
             p = subprocess.Popen(["adjmat2wpairs", "edgeList", "0", "0"], cwd=os.path.abspath(self.out_dir))
@@ -309,7 +318,7 @@ class makeCorems:
                 commands.append(cmd)
 
             # run in parallel
-            processes = [subprocess.Popen(cmd, cwd=os.path.abspath( self.out_dir ) ) for cmd in commands]
+            processes = [subprocess.Popen(cmd, cwd=os.path.abspath(self.out_dir)) for cmd in commands]
 
             # wait for completion
             for p in processes:
@@ -323,7 +332,7 @@ class makeCorems:
             p = subprocess.Popen(["rm edgeList.tanimoto_*"], cwd=os.path.abspath(self.out_dir), shell=True)
             p.wait()
 
-            print "Clustering link communities across thresholds defined by increment:", self.link_comm_increment
+            logging.info("Clustering link communities across thresholds defined by increment: %s", str(self.link_comm_increment))
             command_template = ['cluster_communities', 'edgeList', 1]
             commands = []
 
@@ -345,7 +354,7 @@ class makeCorems:
 
                 count_1 = count_2
                 if count_2 < len(commands):
-                    print "%s percent done" % (round(float(count_2) / len(commands), 2) * 100)
+                    logging.info("%.2f percent done", round(float(count_2) / len(commands), 2) * 100)
 
             # clean up
             with open(os.path.join(os.path.abspath(self.out_dir), "edgeList.density"), 'w') as outfile:
@@ -411,12 +420,13 @@ class makeCorems:
                 plt.savefig(pp, format='pdf')
                 pp.close()
 
-                print "Threshold density plots written to:", os.path.join( os.path.abspath( self.out_dir ),"density_stats.pdf" )
+                logging.info("Threshold density plots written to: %s",
+                             os.path.join(os.path.abspath(self.out_dir), "density_stats.pdf"))
 
             except Exception:
-                print "Could not produce density plot. Check matplotlib."
+                logging.error("Could not produce density plot. Check matplotlib.")
 
-            print "Threshold is", round(maxT, 5), "at cutoff =", maxT_ind
+            logging.info("Threshold is %.5f at cutoff = %.5f", round(maxT, 5), maxT_ind)
             self.cutoff = maxT_ind
 
             # end plot
@@ -430,7 +440,8 @@ class makeCorems:
                 self.cutoff = cutoff
 
         if self.cFail:
-            print "Cannot detect corems because one or more community detection C++ scrips are either (1) not compiled, (2) not in the $PATH variable, or (3) incorrectly named. Resolve previous warning."
+            logging.error("""Cannot detect corems because one or more community detection C++ scrips are either
+(1) not compiled, (2) not in the $PATH variable, or (3) incorrectly named. Resolve previous warning.""")
             return None
 
         # get communities at selected cutoff
@@ -466,7 +477,7 @@ class makeCorems:
 
         def coremStruct(corem, table):
             """MongoDB corem template"""
-            print "%i of %i corems completed" % (corem, len(table.Community_ID.unique()))
+            logging.info("%d of %d corems completed", corem, len(table.Community_ID.unique()))
 
             sub_m = table.loc[table.Community_ID==corem, :]
             # translate names
@@ -496,7 +507,7 @@ class makeCorems:
         corems = pd.read_csv(os.path.join(os.path.abspath(self.out_dir),
                                           "edgeList.communities_" + str(self.cutoff) + "_FINAL.txt"),
                              sep="\t", header=False)
-        print "Adding basic corem information to MongoDB"
+        logging.info("Adding basic corem information to MongoDB")
 
         to_write = [coremStruct(i, corems) for i in corems.Community_ID.unique()]
         self.db.corem.insert(to_write)
@@ -510,7 +521,7 @@ class makeCorems:
         cols = pd.DataFrame(list(self.db["col_info"].find({}, {"_id": 0, "col_id": 1}))).col_id.tolist()
 
         def computeANDwriteCol(x):
-            print "Adding conditions for corem %s" % x.corem_id
+            logging.info("Adding conditions for corem %s", str(x.corem_id))
             pvals = colResamplePval(rows=x.rows, row_type="row_id", cols=cols, col_type="col_id",
                                     n_resamples=self.n_resamples, host=self.host, port=self.port,
                                     db=self.db.name, standardized=True, sig_cutoff=0.05,

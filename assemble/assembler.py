@@ -13,8 +13,9 @@ python assembler.py --organism mtu --ratios ./20141130.MTB.all.ratios.csv.gz --t
 import argparse
 import os, sys, stat
 import itertools
+import logging
 
-from assemble.sql2mongoDB import *
+import assemble.sql2mongoDB as rdb
 from assemble.makeCorems import *
 from assemble.resample import *
 
@@ -69,11 +70,17 @@ n_resamples: %(n_resamples)s
 """
 
 DESCRIPTION = """assemble.py - prepare cluster runs"""
+LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
+LOG_LEVEL = logging.DEBUG
+LOG_FILE = None # "assembler.log"
 
 if __name__ == '__main__':
     import argparse
     import os
     import itertools
+
+    logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
+                        level=LOG_LEVEL, filename=LOG_FILE)
 
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('--organism', required=True, type=str, help="3 letter organism code")
@@ -103,7 +110,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    db = args.db if args.db is None else "%s_db" % args.organism
+    db = args.db if args.db is not None else "%s_db" % args.organism
     targetdir = args.targetdir
     user = args.user
 
@@ -127,13 +134,13 @@ if __name__ == '__main__':
         outfile.write(RUN_INFO_TEMPLATE % info_d)
 
     if args.finish_only:
-        sql2mongo = sql2mongoDB(organism=args.organism, host=args.host, port=args.port,
-                                ensembledir=args.ensembledir, prefix=args.prefix,
-                                ratios_raw=args.ratios, gre2motif=args.gre2motif,
-                                col_annot=args.col_annot, ncbi_code=args.ncbi_code,
-                                dbname=args.db, db_run_override=None,
-                                genome_file=args.genome_annot, row_annot=args.row_annot,
-                                row_annot_match_col=args.row_annot_matchCol)
+        resultdb = rdb.ResultDatabase(organism=args.organism, host=args.host, port=args.port,
+                                      ensembledir=args.ensembledir, prefix=args.prefix,
+                                      ratios_raw=args.ratios, gre2motif=args.gre2motif,
+                                      col_annot=args.col_annot, ncbi_code=args.ncbi_code,
+                                      dbname=args.db, db_run_override=None,
+                                      genome_file=args.genome_annot, row_annot=args.row_annot,
+                                      row_annot_match_col=args.row_annot_matchCol)
 
         corems = makeCorems(organism=args.organism, host=args.host, port=args.port,
                             db=db, dbfiles=None, backbone_pval=args.backbone_pval,
@@ -145,8 +152,8 @@ if __name__ == '__main__':
 
         corems.finishCorems()
 
-        outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
-        print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile
+        outfile =  resultdb.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
+        logging.info("Writing EGRIN2 MongoDB to %s", os.path.join(resultdb.targetdir, outfile))
         add_files = " "
         info = os.path.abspath(os.path.join( targetdir, "ensemble.info"))
 
@@ -156,20 +163,20 @@ if __name__ == '__main__':
         pdf = os.path.join(corems.out_dir, "density_stats.pdf")
         if os.path.isfile(pdf):
             add_files = add_files + pdf
-        sql2mongo.mongoDump(sql2mongo.dbname, outfile, add_files=add_files.strip())
+        resultdb.mongoDump(resultdb.dbname, outfile, add_files=add_files.strip())
 
-        print "Done"
+        logging.info("Done.")
     else:
         # Initialize to find problems early!!
-        sql2mongo = sql2mongoDB(organism=args.organism, host=args.host, port=args.port, ensembledir=args.ensembledir,
-                                prefix=args.prefix, ratios_raw=args.ratios, gre2motif=args.gre2motif,
-                                col_annot=args.col_annot, ncbi_code=args.ncbi_code, dbname=args.db,
-                                db_run_override=None, genome_file=args.genome_annot, row_annot=args.row_annot,
-                                row_annot_match_col=args.row_annot_matchCol)
+        resultdb = rdb.ResultDatabase(organism=args.organism, host=args.host, port=args.port, ensembledir=args.ensembledir,
+                                      prefix=args.prefix, ratios_raw=args.ratios, gre2motif=args.gre2motif,
+                                      col_annot=args.col_annot, ncbi_code=args.ncbi_code, dbname=args.db,
+                                      db_run_override=None, genome_file=args.genome_annot, row_annot=args.row_annot,
+                                      row_annot_match_col=args.row_annot_matchCol)
 
-        if len(sql2mongo.db_files) > 0:
+        if len(resultdb.db_files) > 0:
             # Merge sql into mongoDB
-            sql2mongo.compile()
+            resultdb.compile()
             corems = makeCorems(organism=args.organism, host=args.host, port=args.port, db=db, dbfiles=None,
                                 backbone_pval=args.backbone_pval, out_dir=targetdir, n_subs=args.cores,
                                 link_comm_score=args.link_comm_score, link_comm_increment=args.link_comm_increment,
@@ -184,7 +191,9 @@ if __name__ == '__main__':
 
             if args.cluster:
                 client = MongoClient(host=args.host, port=args.port)
+                logging.debug("connecting to db: '%s'", db)
                 corem_sizes = list(set([len(i["rows"] ) for i in client[db]["corem"].find({}, {"rows": 1})]))
+                logging.debug("corem sizes: '%s'", str(corem_sizes))
 
                 if not os.path.isdir(os.path.abspath(os.path.join( targetdir, "qsub"))):
                     os.makedirs(os.path.abspath(os.path.join(targetdir, "qsub")))
@@ -207,31 +216,33 @@ if __name__ == '__main__':
                 with open(os.path.join( os.path.abspath( os.path.join(targetdir, "qsub")), "resample.sh"), 'w') as outfile:
                     outfile.write(RUN_ALL_TEMPLATE % args.organism + "_r_" )
 
-                print "Output Qsub scripts to %s.\n\nTransfer these documents to the cluster. Run 'resample.sh' with resample.py in your working directory to compute all resamples. \n\nOnce this is done, return here to finish processing corems.\n" % os.path.abspath(os.path.join(targetdir, "qsub"))
+                logging.info("""Output Qsub scripts to %s.
+Transfer these documents to the cluster. Run 'resample.sh' with resample.py in your working directory to compute all resamples.
+Once this is done, return here to finish processing corems.""", os.path.abspath(os.path.join(targetdir, "qsub")))
                 ready = None
 
                 while ready != "Done":
                     ready = raw_input("Please type: 'Done' to continue\n")
             else:
-                print "Consider running resamples on a cluster. This will dramatically speed up this step."
+                logging.info("Consider running resamples on a cluster. This will dramatically speed up this step.")
 
             corems.finishCorems()
 
-            outfile =  sql2mongo.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
-            print "Writing EGRIN2 MongoDB to %s" % sql2mongo.targetdir + outfile
+            outfile =  resultdb.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
+            logging.info("Writing EGRIN2 MongoDB to %s", os.path.join(resultdb.targetdir, outfile))
             add_files = " "
             info = os.path.abspath(os.path.join(targetdir, "ensemble.info"))
 
             if os.path.isfile(info):
                 add_files = add_files + info
 
-            pdf = os.path.join( corems.out_dir, "density_stats.pdf")
+            pdf = os.path.join(corems.out_dir, "density_stats.pdf")
 
             if os.path.isfile(pdf):
                 add_files = add_files + pdf
 
-            sql2mongo.mongoDump(sql2mongo.dbname, outfile, add_files=add_files.strip())
+            resultdb.mongoDump(resultdb.dbname, outfile, add_files=add_files.strip())
 
-            print "Done"
+            logging.info("Done.")
         else:
-            print "No cMonkey2 DB files. Please specify --ensembledir"
+            logging.error("No cMonkey2 DB files. Please specify --ensembledir")
