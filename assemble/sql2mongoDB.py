@@ -417,21 +417,36 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
                                                        "units": cond_data.irow(i)["feature_units"]})
         return cond_dict
 
-    def insert_gene_expression(self, db, row2id, col2id, ratios, ratios_standardized):
+    def insert_gene_expression(self, db, row2id, col2id, ratios, ratios_std):
         """
         Insert gene_expression into mongoDB database
         """
         exp_data = []
         num_rows = 0
-        for i in ratios.index.values:
+
+        # speed up the lookups by putting this into a dictionary by replacing row/column
+        # lookups with dictionaries and pulling out per-row lookups out of the inner loop
+
+        # TODO: Pandas dataframes are probably not a good idea for lookup tables
+        # ----- get rid of them for row2id/col2id altogether
+        row_map = {row: row2id.loc[row].row_id for row in ratios.index.values}
+        col_map = {col: col2id.loc[col].col_id for col in ratios.columns.values}
+        
+        for row_name in ratios.index.values:
             if num_rows % 200 == 0:
                 logging.info("%.2f percent done (%d rows)", round((float(num_rows) / ratios.shape[0]) * 100, 1), num_rows)
+            
+            raw_row = ratios.loc[row_name]
+            std_row = ratios_std.loc[row_name]
+            row_id = row_map[row_name]
 
-            for j in ratios.columns.values:
-                exp_data.append({"row_id": row2id.loc[i].row_id,
-                                 "col_id": col2id.loc[j].col_id,
-                                 "raw_expression": ratios.loc[i, j],
-                                 "standardized_expression": ratios_standardized.loc[i, j]
+            for col_name in ratios.columns.values:
+                raw_exp = raw_row[col_name]
+                std_exp = std_row[col_name]
+                exp_data.append({"row_id": row_id,
+                                 "col_id": col_map[col_name],
+                                 "raw_expression": raw_exp,
+                                 "standardized_expression": std_exp
                                  })
             num_rows += 1
 

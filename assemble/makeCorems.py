@@ -73,11 +73,11 @@ Attempting to perform DB import at: %s""", self.db, str(dbfiles))
             self.row2id[i["egrin2_row_name"]] = i["row_id"]
             self.id2row[i["row_id"]] = i["egrin2_row_name"]
 
-        self.col2id =  {}
-        self.id2col =  {}
+        self.col2id = {}
+        self.id2col = {}
         for i in self.db.col_info.find({}, {"egrin2_col_name": "1", "col_id": "1"}):
-            self.col2id[i[ "egrin2_col_name"]] = i["col_id"]
-            self.id2col[i[ "col_id"]] = i["egrin2_col_name"]
+            self.col2id[i["egrin2_col_name"]] = i["col_id"]
+            self.id2col[i["col_id"]] = i["egrin2_col_name"]
 
         if backbone_pval is None:
             self.backbone_pval = 0.05
@@ -185,9 +185,9 @@ Attempting to perform DB import at: %s""", self.db, str(dbfiles))
         row_row_collection = self.db.row_row
 
         # remove existing edgeList file if it exists
-        if os.path.exists(os.path.abspath(os.path.join(self.out_dir,"edgeList"))):
+        if os.path.exists(os.path.abspath(os.path.join(self.out_dir, "edgeList"))):
             logging.info("Found edgeList file at '%s'. Removing it.",
-                         os.path.abspath(os.path.join(self.out_dir,"edgeList")))
+                         os.path.abspath(os.path.join(self.out_dir, "edgeList")))
             os.remove(os.path.abspath(os.path.join(self.out_dir, "edgeList")))
             logging.info("Dropping row_row MongoDB collection as a precaution.")
             row_row_collection.drop()
