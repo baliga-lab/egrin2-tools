@@ -1082,14 +1082,18 @@ def motifFinder(x, x_type, output_type=["data_frame", "array"][0], host="localho
     return to_r
 
 
-def gre_motifs(gre_id, database='mtu_db', host='baligadev', port=27017):
+def gre_motifs(gre_id, evalue=None, database='mtu_db', host='baligadev', port=27017):
+    """Returns a list of PSSMs for the given GRE id.
+    If evalue is specified, only the motifs with a smaller evalue are returned
+    """
     result = []
-
     client = MongoClient(host=host, port=port)
     try:
-        pwms = client[database].motif_info.find({'gre_id': gre_id,
-                                                 'evalue': {'$lt': 0.1}},
-                                                {'pwm': 1, '_id': 0})
+        query = {'gre_id': gre_id}
+        if evalue is not None: 
+            query['evalue'] = {'$lt': evalue}
+
+        pwms = client[database].motif_info.find(query, {'pwm': 1, '_id': 0})
 
         for i, pwm in enumerate(pwms):
             rows = pwm['pwm']
