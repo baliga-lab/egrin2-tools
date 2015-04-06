@@ -11,6 +11,7 @@ import time
 from urllib2 import urlopen, URLError, HTTPError
 import random
 import itertools
+import logging
 
 import pdb
 
@@ -36,43 +37,45 @@ from Bio import SeqIO
 # tmp.pickCols_all()
 
 class ensemblePicker:
-    """Pick conditions for an ensemble run, biasing towards inclusion of blocks of conditions in the inclusion blocks while making sure that conditions in exclusion blocks are excluded together in at least some percentage of runs"""
+    """Pick conditions for an ensemble run, biasing towards inclusion of
+    blocks of conditions in the inclusion blocks while making sure that conditions
+    in exclusion blocks are excluded together in at least some percentage of runs"""
     def __init__(self, ratios, blocks, exclusion, inclusion, avg_col_size=None,
                  sd_col_size=None, inclusion_weight=None, tfblocks=None, nruns=None,
                  exclusion_percentage=None, n_rand_exclusion=None, report_file=None,
                  random_blocks=None, ratios_file=None):
 
-        if nruns == None:
+        if nruns is None:
             self.nruns = 100
         else:
             self.nruns = nruns
 
-        if exclusion_percentage == None:
+        if exclusion_percentage is None:
             self.exclusion_percentage = 25
         else:
             self.exclusion_percentage = exclusion_percentage
 
-        if inclusion_weight == None:
+        if inclusion_weight is None:
             self.inclusion_weight = 2
         else:
             self.inclusion_weight = inclusion_weight
 
-        if avg_col_size == None:
+        if avg_col_size is None:
             self.avg_col_size = 150
         else:
             self.avg_col_size = avg_col_size
 
-        if sd_col_size == None:
+        if sd_col_size is None:
             self.sd_col_size = 50
         else:
             self.sd_col_size = sd_col_size
 
-        if report_file == None:
+        if report_file is None:
             self.report_file = None
         else:
             self.report_file = report_file
 
-        if random_blocks == None:
+        if random_blocks is None:
             self.random_blocks = True
         else:
             self.random_blocks = random_blocks
@@ -123,7 +126,9 @@ class ensemblePicker:
             self.n_rand_exclusion = n_rand_exclusion
 
         if self.n_rand_exclusion < 0:
-            print "You have defined more exclusion blocks than can be excluded given the number of runs at the requested exclusion rate. Maximum exclusion rate for %s runs is %s percent!" % (self.nruns, self.nruns / self.exclusion.shape[0])
+            logging.info("""You have defined more exclusion blocks than can be excluded given the number
+of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %d percent!""",
+                         self.nruns, self.nruns / self.exclusion.shape[0])
 
         self.run_composition = {}
 
@@ -244,14 +249,14 @@ class ensemblePicker:
         return None
 
     def writeRatios(self, file=None):
-        print "Writing ratio files"
+        logging.info("Writing ratio files")
 
         if file == None:
             file = "."
 
         for i in self.run_composition.iterkeys():
             if int(i) % 100 == 0:
-                print str(round(float(i) / float(self.nruns) * 100)) + "% done"
+                logging.info("%.2f % done", float(i) / float(self.nruns) * 100)
 
             cols = list(set(self.run_composition[i]["cols"]) & set(self.ratios.columns))
             to_write = self.ratios.loc[:, cols]
@@ -261,9 +266,9 @@ class ensemblePicker:
     def report(self, file=None):
 
         if file == None:
-            file ="./ensembleReport_"
+            file = "./ensembleReport_"
 
-        print "Writing reports"
+        logging.info("Writing reports")
 
         self.findBlockInclusionFreq()
         self.findColInclusionFreq()
@@ -272,10 +277,10 @@ class ensemblePicker:
         run_df = pd.DataFrame(0, index = range(1, self.nruns + 1), columns=["ncols", "excluded", "blocks", "cols"])
 
         for i in self.run_composition.iterkeys():
-            run_df.loc[i,"ncols"] = len( self.run_composition[i]["cols"])
-            run_df.loc[i,"excluded"] = self.run_composition[i]["excluded"]
-            run_df.loc[i,"blocks"] = (":::").join(self.run_composition[i]["blocks"])
-            run_df.loc[i,"cols"] = (":::").join(self.run_composition[i]["cols"])
+            run_df.loc[i, "ncols"] = len( self.run_composition[i]["cols"])
+            run_df.loc[i, "excluded"] = self.run_composition[i]["excluded"]
+            run_df.loc[i, "blocks"] = (":::").join(self.run_composition[i]["blocks"])
+            run_df.loc[i, "cols"] = (":::").join(self.run_composition[i]["cols"])
 
         run_df.to_csv(path_or_buf=open(file + "runs.csv", mode = "w"), columns=["ncols", "excluded", "blocks", "cols"], index_label="run_num")
         self.exclusion.to_csv(path_or_buf=open(file + "exclusionBlocks.csv", mode = "w"),
@@ -300,9 +305,9 @@ class ensemblePicker:
                 self.chooseRandomBlocks()
         for i in range(1, self.nruns + 1):
             if i % 100 == 0:
-                print str(round(float(i) / float(self.nruns) * 100)) + "% done"
+                logging.info("%.2f % done", float(i) / float(self.nruns) * 100)
             self.pickCols_single(i)
 
         self.report(self.report_file)
         self.writeRatios(self.ratios_file)
-        print 'Done'
+        logging.info('Done')

@@ -17,11 +17,12 @@ python cMonkeyQSub.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targ
 import argparse
 import os
 import itertools
+import logging
 
 #import cmonkey.datamatrix as dm
 # need to be in python path!!!
-from cMonkeyIniGen import *
-from ensemblePicker import *
+import cMonkeyIniGen
+import ensemblePicker
 
 DESCRIPTION = """cMonkeyQSub.py - prepare cluster runs"""
 
@@ -76,7 +77,14 @@ python cmonkey.py --organism %s --ratios %s --config %s --out %s --minimize_io
 bzip2 -f %s/*.pkl
 """
 
+LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
+LOG_LEVEL = logging.DEBUG
+LOG_FILE = None  # "make_ensemble.log"
+
 if __name__ == '__main__':
+    logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
+                        level=LOG_LEVEL, filename=LOG_FILE)
+
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('--organism', required=True, help="3 letter organism code")
     parser.add_argument('--ratios', required=True, help="Path to ratios file")
@@ -107,22 +115,23 @@ if __name__ == '__main__':
         os.makedirs(args.targetdir)
 
     # write ratios files
-    print "Choosing ensemble conditions"
+    logging.info("Choosing ensemble conditions")
     if args.blocks is None:
         # if inclusion/exlcusion blocks are not defined, simply choose at random
-        #
-        # I don't think this is right! - needs to be fixed
-        #
         dm.prepare_ensemble_matrix(args.ratios, args.targetdir, args.numfiles,
-                                    args.mincols)
+                                   args.mincols)
     else:
-      cols = ensemblePicker(ratios=args.ratios, blocks=args.blocks, inclusion=args.inclusion, exclusion=args.exclusion, nruns=args.numruns, ratios_file=args.targetdir)
+      cols = ensemblePicker.ensemblePicker(ratios=args.ratios, blocks=args.blocks,
+                                           inclusion=args.inclusion,
+                                           exclusion=args.exclusion,
+                                           nruns=args.numruns,
+                                           ratios_file=args.targetdir)
       cols.pickCols_all()
 
     # write config files
     config_params = {"num_cores": args.num_cores}
 
-    print "Writing ensemble config files"
+    logging.info("Writing ensemble config files")
     for i in range(1, args.numruns + 1):
         if args.setenrich is not None:
             # combine all possible setenrichment modes
@@ -142,18 +151,18 @@ if __name__ == '__main__':
             # choose a set enrichment mode
             set_choice = random.sample(setcombinations,1)[0]
             if set_choice is None:
-                ini = cMonkeyIniGen( dict(config_params.items() + [("random_seed", i)]))
+                ini = cMonkeyIniGen.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i)]))
                 ini.writeIni(os.path.join(args.targetdir, "config-%03d.ini" % i))
             else:
                 set_choice_files = (",").join([set_file_ref[x] for x in set_choice.split(",")])
-                ini = cMonkeyIniGen(dict(config_params.items() + [("random_seed", i),
-                                                                  ("set_types", set_choice),
-                                                                  ("set_file", set_choice_files),
-                                                                  ("pipeline_file", args.pipeline)]))
+                ini = cMonkeyIniGen.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i),
+                                                                                ("set_types", set_choice),
+                                                                                ("set_file", set_choice_files),
+                                                                                ("pipeline_file", args.pipeline)]))
                 ini.writeIni(os.path.join(args.targetdir, "config-%03d.ini" % i))
         else:
-            ini = cMonkeyIniGen(dict(config_params.items() + [("random_seed", i)]))
-            ini.writeIni(os.path.join( args.targetdir, "config-%03d.ini" % i))
+            ini = cMonkeyIniGen.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i)]))
+            ini.writeIni(os.path.join(args.targetdir, "config-%03d.ini" % i))
 
     with open(os.path.join(args.targetdir, "%s.sh" % args.organism), 'w') as outfile:
         if args.user is not None:
@@ -172,4 +181,4 @@ if __name__ == '__main__':
                                   os.path.join(args.targetdir, "config-$BATCHNUM.ini"),
                                   "%s-out-$BATCHNUM" % (args.organism),
                                   "%s-out-$BATCHNUM" % (args.organism)))
-        print "Done"
+        logging.info("Done")
