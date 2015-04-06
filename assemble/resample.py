@@ -137,10 +137,18 @@ def colResampleInd( host, db, n_rows, cols, n_resamples = 1000, keepP = 0.1, por
     return None
 
 
+LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
+LOG_LEVEL = logging.DEBUG
+LOG_FILE = None # "resample.log"
+
+
 if __name__ == '__main__':
     import argparse
     import os
     import itertools
+
+    logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
+                        level=LOG_LEVEL, filename=LOG_FILE)
 
     parser = argparse.ArgumentParser( description=DESCRIPTION )
     parser.add_argument( '--host', required=True, type=str, help="Host for MongoDB" )

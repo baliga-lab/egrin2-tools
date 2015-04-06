@@ -224,7 +224,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         else:
             seqs_f = seqs_b
 
-        logging.info("%d new records to write", len(seqs_f))
+        logging.info("%d new genome sequence records to write", len(seqs_f))
         if len(seqs_f) > 0:
             genome_collection.insert(seqs_f)
 
@@ -337,7 +337,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         else:
             d_f = d
 
-        logging.info("%d new records to write", len(d_f))
+        logging.info("%d new row info records to write", len(d_f))
 
         if len(d_f) > 0:
             row_info_collection.insert(d_f)
@@ -399,7 +399,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         else:
             d_f = col_info_4_mongoDB
 
-        logging.info("%d new records to write", len(d_f))
+        logging.info("%d new col info records to write", len(d_f))
 
         if len(d_f) > 0:
             col_info_collection.insert(d_f)
@@ -459,7 +459,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         else:
             d_f = exp_data
 
-        logging.info("%d new records to write", len(d_f))
+        logging.info("%d new gene expression records to write", len(d_f))
 
         if len(d_f) > 0:
             gene_expression_collection.insert(d_f)
@@ -471,31 +471,33 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         run_name = db_file.split("/")[-2]
         logging.info("Assembling run info for cMonkey run: %s", run_name)
         conn = sqlite3.connect(db_file)
-        c = conn.cursor()
-        c.execute("SELECT start_time, finish_time, num_iterations, organism, species, num_rows, num_columns, num_clusters, git_sha FROM run_infos")
-        run_info = c.fetchone()
-        c.execute("SELECT name FROM row_names")
-        rows = [row2id.loc[ str(i[0])].row_id for i in c.fetchall()]
-        c.execute("SELECT name FROM column_names")
-        cols = [col2id.loc[ str(i[0])].col_id for i in c.fetchall()]
+        try:
+            c = conn.cursor()
+            c.execute("SELECT start_time, finish_time, num_iterations, organism, species, num_rows, num_columns, num_clusters, git_sha FROM run_infos")
+            run_info = c.fetchone()
+            c.execute("SELECT name FROM row_names")
+            rows = [row2id.loc[str(row[0])].row_id for row in c.fetchall()]
+            c.execute("SELECT name FROM column_names")
+            cols = [col2id.loc[str(row[0])].col_id for row in c.fetchall()]
 
-        d = {
-            "run_id": run2id.loc[run_name].run_id,
-            "run_name": run_name,
-            "start_time": str(run_info[0]),
-            "finish_time": str(run_info[1]),
-            "num_iterations": int(run_info[2]),
-            "organism": str(run_info[3]),
-            "species": str(run_info[4]),
-            "num_rows": int(run_info[5]),
-            "rows": rows,
-            "num_columns": int(run_info[6]),
-            "cols": cols,
-            "num_clusters": int(run_info[7]),
-            "git_sha": str(run_info[8]),
-            "added_to_ensemble": datetime.datetime.utcnow()
-        }
-        conn.close()
+            d = {
+                "run_id": run2id.loc[run_name].run_id,
+                "run_name": run_name,
+                "start_time": str(run_info[0]),
+                "finish_time": str(run_info[1]),
+                "num_iterations": int(run_info[2]),
+                "organism": str(run_info[3]),
+                "species": str(run_info[4]),
+                "num_rows": int(run_info[5]),
+                "rows": rows,
+                "num_columns": int(run_info[6]),
+                "cols": cols,
+                "num_clusters": int(run_info[7]),
+                "git_sha": str(run_info[8]),
+                "added_to_ensemble": datetime.datetime.utcnow()
+            }
+        finally:
+            conn.close()
         return d
 
     def insert_ensemble_info(self, db_files, db, run2id, row2id, col2id):
@@ -510,7 +512,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         else:
             d_f = to_insert
 
-        logging.info("%d new records to write", len(d_f))
+        logging.info("%d new ensemble info records to write", len(d_f))
 
         if len(d_f) > 0:
             ensemble_info_collection.insert(d_f)
@@ -542,7 +544,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
                                 mots[elements[0]] = {}
                                 mots[elements[0]][elements[1]] = {}
                                 mots[elements[0]][elements[1]][elements[2]] = count
-                        count = count + 1
+                        count += 1
             return mots
         else:
             return None
@@ -552,28 +554,31 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         example queries
         ------------------------------
-
         bicluster_info_collection.find({"rows":{"$all":[26,27]}}).count()
         """
         # Get all biclusters from cmonkey run
         conn = sqlite3.connect(db_file)
-        c = conn.cursor()
-        c.execute("SELECT max(iteration) FROM cluster_stats")
-        last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!!
-        w = (last_run, )
-        c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?", w)
-        biclusters = [self.assemble_bicluster_info_single(db, db_file, c, last_run, i[0], run2id, row2id, col2id)
-                      for i in c.fetchall()]
+        try:
+            c = conn.cursor()
+            c.execute("SELECT max(iteration) FROM cluster_stats")
+            last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!!
+            w = (last_run, )
+            c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?", w)
+            biclusters = [self.assemble_bicluster_info_single(db, db_file, c, last_run, i[0], run2id, row2id, col2id)
+                          for i in c.fetchall()]
+        finally:
+            conn.close()
+
         bicluster_info_collection = self.db.bicluster_info
 
         # Check whether documents are already present in the collection before insertion
         if bicluster_info_collection.count() > 0:
-            d_f = filter( None, [self.check4existence(bicluster_info_collection, i, "run_id",
-                                                      i["run_id"], "cluster", i["cluster"]) for i in biclusters])
+            d_f = filter(None, [self.check4existence(bicluster_info_collection, i, "run_id",
+                                                     i["run_id"], "cluster", i["cluster"]) for i in biclusters])
         else:
             d_f = biclusters
 
-        logging.info("%d new records to write", len(d_f))
+        logging.info("%d new bicluster info records to write", len(d_f))
         if len(d_f) > 0:
             bicluster_info_collection.insert(d_f)
 
@@ -603,14 +608,18 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
     def insert_motif_info(self, db, db_file, run2id, motif2gre, row_info_collection):
         # Get all biclusters from cmonkey run
         conn = sqlite3.connect(db_file)
-        c = conn.cursor()
-        c.execute("SELECT max(iteration) FROM cluster_stats")
-        last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!!
-        w = (last_run, )
+        try:
+            c = conn.cursor()
+            c.execute("SELECT max(iteration) FROM cluster_stats")
+            last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!!
+            w = (last_run, )
 
-        c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?", w)
-        d_f = [self.assemble_motif_info_single(db, db_file, c, last_run, i[0], run2id, motif2gre, row_info_collection)
-               for i in c.fetchall()]
+            c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?", w)
+            d_f = [self.assemble_motif_info_single(db, db_file, c, last_run, i[0], run2id, motif2gre, row_info_collection)
+                   for i in c.fetchall()]
+        finally:
+            conn.close()
+
         d_f = list(itertools.chain(*d_f))
         d_f = filter(None, d_f)
 
