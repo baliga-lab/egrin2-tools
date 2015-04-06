@@ -33,7 +33,7 @@ from Bio import SeqIO
 # inclusion = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141202.MTB.EGRIN2.inclusion.blocks.csv"
 # tfblocks = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/TF.blocks.csv"
 
-# tmp = ensemblePicker( ratios, blocks, exclusion, inclusion, tfblocks = None, nruns=500, exclusion_percentage=25 )
+# tmp = ensemblePicker(ratios, blocks, exclusion, inclusion, tfblocks = None, nruns=500, exclusion_percentage=25)
 # tmp.pickCols_all()
 
 class ensemblePicker:
@@ -93,7 +93,7 @@ class ensemblePicker:
 
         self.ratios = pd.read_csv(ratios, index_col=0, sep=",")
         self.blocks2col = pd.read_csv(blocks, sep=",", names=["sample", "block"],
-                                      converters = {'sample': strip, 'block': strip}).icol([0, 1])
+                                      converters={'sample': strip, 'block': strip}).icol([0, 1])
         self.blocks =  pd.DataFrame(zip(self.blocks2col.block.value_counts().keys(),
                                         self.blocks2col.block.value_counts()), columns=["block", "block.sample.num"])
         self.blocks["p"] = 1
@@ -103,10 +103,10 @@ class ensemblePicker:
         self.blocks2col = self.blocks2col.set_index(keys="block")
         self.blocks2col["r_in"] = 0
 
-        self.exclusion = pd.read_csv(exclusion, sep=",", converters = {"exclusion.blocks": strip}, index_col=0)
+        self.exclusion = pd.read_csv(exclusion, sep=",", converters={"exclusion.blocks": strip}, index_col=0)
         self.exclusion["p"] = 1
         self.exclusion["r_out"] = 0
-        self.inclusion = pd.read_csv(inclusion, sep=",", converters = {"inclusion.blocks": strip}, index_col=0)
+        self.inclusion = pd.read_csv(inclusion, sep=",", converters={"inclusion.blocks": strip}, index_col=0)
         self.inclusion_matrix = pd.DataFrame(0, index=self.blocks.index, columns=self.blocks.index)
 
         # fill out inclusion matrix
@@ -155,7 +155,7 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
 
     def weightedReservoirSample(self, n_samples, sample_df):
         """Choose a block loosely based on weighted reservoir sampling - the easy way"""
-        k = pd.DataFrame([np.power(random.random(), 1.0/sample_df.loc[i] ) for i in sample_df.index],
+        k = pd.DataFrame([np.power(random.random(), 1.0 / sample_df.loc[i]) for i in sample_df.index],
                          index=sample_df.index, columns=["p"]).sort("p", ascending=False)
         return k.iloc[0: n_samples].index.values
 
@@ -173,10 +173,11 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
         """Get col ids from blocks. Since a single condition can be assigned to multiple blocks, we need to make sure that conditions in a current exclusion block did not 'sneak in' to the run"""
         block_cols = self.blocks2col.loc[blocks.split(":::")]
         excluded_cols = self.blocks2col.loc[excluded.split(":::")]
-        return set( block_cols.sample ).difference(set(excluded_cols.sample))
+        return set(block_cols.sample).difference(set(excluded_cols.sample))
 
     def increment_column_count(self, col):
-        self.blocks2col.loc[col, "r_in"] = self.blocks2col.loc[col, "r_in"] + 1.0 / self.nruns
+        self.blocks2col.loc[self.blocks2col.sample == col, "r_in"] += 1.0 / self.nruns
+
 
     def findBlockInclusionFreq(self):
         blocks = self.inclusion.index
@@ -189,10 +190,10 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
                     if j in self.run_composition[i]["blocks"]:
                         co_freq.loc[j, i] = co_freq.loc[j, i] + 1
             block_stats.loc[block, "freq_single"] = round(sum(co_freq.sum(0) > 0) / float(co_freq.shape[1]), 2)
-            block_stats.loc[block, "freq_coinclusion"] = round(sum(co_freq.sum(1) )/ float((co_freq.shape[0] * sum(co_freq.sum(0) > 0))), 2)
+            block_stats.loc[block, "freq_coinclusion"] = round(sum(co_freq.sum(1))/ float((co_freq.shape[0] * sum(co_freq.sum(0) > 0))), 2)
             block_stats.loc[block, "max_coinclusion_all"] = round(sum(co_freq.sum(0) == co_freq.shape[0]) / float(co_freq.shape[1]), 2)
             block_stats.loc[block, "max_coinclusion_sub"] = round(sum(co_freq.sum(0) == co_freq.shape[0]) / float(sum(co_freq.sum(0) > 0)), 2)
-        self.inclusion = pd.merge( self.inclusion, block_stats, left_index=True, right_index=True)
+        self.inclusion = pd.merge(self.inclusion, block_stats, left_index=True, right_index=True)
 
     def findColInclusionFreq(self):
         self.blocks2col["block"] = self.blocks2col.index
@@ -256,7 +257,7 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
 
         for i in self.run_composition.iterkeys():
             if int(i) % 100 == 0:
-                logging.info("%.2f % done", float(i) / float(self.nruns) * 100)
+                logging.info("%.2f percent done", float(i) / float(self.nruns) * 100)
 
             cols = list(set(self.run_composition[i]["cols"]) & set(self.ratios.columns))
             to_write = self.ratios.loc[:, cols]
@@ -277,7 +278,7 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
         run_df = pd.DataFrame(0, index = range(1, self.nruns + 1), columns=["ncols", "excluded", "blocks", "cols"])
 
         for i in self.run_composition.iterkeys():
-            run_df.loc[i, "ncols"] = len( self.run_composition[i]["cols"])
+            run_df.loc[i, "ncols"] = len(self.run_composition[i]["cols"])
             run_df.loc[i, "excluded"] = self.run_composition[i]["excluded"]
             run_df.loc[i, "blocks"] = (":::").join(self.run_composition[i]["blocks"])
             run_df.loc[i, "cols"] = (":::").join(self.run_composition[i]["cols"])
@@ -305,7 +306,7 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
                 self.chooseRandomBlocks()
         for i in range(1, self.nruns + 1):
             if i % 100 == 0:
-                logging.info("%.2f % done", float(i) / float(self.nruns) * 100)
+                logging.info("%.2f percent done", float(i) / float(self.nruns) * 100)
             self.pickCols_single(i)
 
         self.report(self.report_file)
