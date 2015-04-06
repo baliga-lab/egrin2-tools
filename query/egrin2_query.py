@@ -1080,3 +1080,20 @@ def motifFinder(x, x_type, output_type=["data_frame", "array"][0], host="localho
     client.close()
 
     return to_r
+
+
+def gre_motifs(gre_id, database='mtu_db', host='baligadev', port=27017):
+    result = []
+
+    client = MongoClient(host=host, port=port)
+    try:
+        pwms = client[database].motif_info.find({'gre_id': gre_id,
+                                                 'evalue': {'$lt': 0.1}},
+                                                {'pwm': 1, '_id': 0})
+
+        for i, pwm in enumerate(pwms):
+            rows = pwm['pwm']
+            result.append([[row['a'], row['g'], row['c'], row['t']] for row in rows])
+        return result
+    finally:
+        client.close()
