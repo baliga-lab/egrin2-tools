@@ -47,7 +47,7 @@ def choose_n(col, vals, n, add, client, db, n_rows, n_resamples, old_records, ke
             "lowest_raw": raw.iloc[0:n].tolist(),
             "lowest_standardized": standardized.iloc[0:n].tolist()
         }
-        client[ db ][ "col_resample" ].insert( d )
+        client[db]["col_resample"].insert(d)
     else:
         # update
         resamples = n_resamples + old_records[col]["resamples"]
@@ -55,13 +55,13 @@ def choose_n(col, vals, n, add, client, db, n_rows, n_resamples, old_records, ke
         ran = raw.tolist() + old_records[col]["lowest_raw"]
         ran.sort()
         ran = ran[0: int(n2keep)]
-        ras = standardized.tolist() + old_records[ col ]["lowest_standardized"]
+        ras = standardized.tolist() + old_records[col]["lowest_standardized"]
         ras.sort()
         ras = ras[0: int(n2keep)]
         client[db]["col_resample"].update({"n_rows": n_rows, "col_id": col},
                                           {"$set": {"resamples": resamples, "lowest_raw": ran, "lowest_standardized": ras}})
 
-def colResampleInd( host, db, n_rows, cols, n_resamples = 1000, keepP = 0.1, port = 27017):
+def colResampleInd(host, db, n_rows, cols, n_resamples=1000, keepP=0.1, port=27017):
     """Resample gene expression for a given number of genes in a particular condition using RSD, brute force."""
 
     logging.info("Adding brute force resample document for gene set size %d", n_rows)
@@ -171,5 +171,5 @@ if __name__ == '__main__':
 
     logging.info("Starting resample for n_rows = %d", args.n_rows)
 
-    colResampleInd(host = args.host, db = args.db, n_rows = args.n_rows, cols = cols, n_resamples = args.n_resamples, keepP = args.keep_p, port = args.port)
+    colResampleInd(host=args.host, db=args.db, n_rows=args.n_rows, cols=cols, n_resamples=args.n_resamples, keepP=args.keep_p, port=args.port)
     client.close()

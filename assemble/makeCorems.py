@@ -30,8 +30,6 @@ from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-from query.egrin2_query import *
-
 
 class makeCorems:
 
@@ -511,28 +509,3 @@ Attempting to perform DB import at: %s""", self.db, str(dbfiles))
 
         to_write = [coremStruct(i, corems) for i in corems.Community_ID.unique()]
         self.db.corem.insert(to_write)
-
-    def finishCorems(self):
-        """Finish adding corem info (cols) after resampling. Assumes corem docs already exist"""
-        # get all the corems
-        corems = pd.DataFrame(list(self.db["corem"].find({}, {"_id": 1, "rows": 1, "corem_id": 1})))
-
-        # get all of the conditions
-        cols = pd.DataFrame(list(self.db["col_info"].find({}, {"_id": 0, "col_id": 1}))).col_id.tolist()
-
-        def computeANDwriteCol(x):
-            logging.info("Adding conditions for corem %s", str(x.corem_id))
-            pvals = colResamplePval(rows=x.rows, row_type="row_id", cols=cols, col_type="col_id",
-                                    n_resamples=self.n_resamples, host=self.host, port=self.port,
-                                    db=self.db.name, standardized=True, sig_cutoff=0.05,
-                                    sort=True, add_override=False, n_jobs=4, keepP=0.05,
-                                    verbose=False )
-
-            pvals[ "col_id" ] = pvals.index
-            d = pvals.to_dict('records')
-            self.db.corem.update({ "_id": x._id}, {"$set": {"cols": d}})
-            return None
-
-        corem_col_pvals = [computeANDwriteCol(corems.iloc[i]) for i in range(corems.shape[0])]
-
-        return None

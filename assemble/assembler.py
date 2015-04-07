@@ -98,11 +98,11 @@ if __name__ == '__main__':
     parser.add_argument('--gre2motif', default=None, help="Motif->GRE clustering file")
     parser.add_argument('--db', default=None, help="Optional ensemble MongoDB database name")
     parser.add_argument('--genome_annot', default=None, help="Optional genome annotation file. Automatically downloaded from MicrobesOnline using --ncbi_code")
-    parser.add_argument('--backbone_pval', default = 0.05, type=float, help="Significance pvalue for gene-gene backbone. Default = 0.05.")
-    parser.add_argument('--link_comm_score', default = 0, type=int, help="Scoring metric for link communities" )
-    parser.add_argument('--link_comm_increment', default = 0.1, type=float, help="Height increment for cutting agglomerative clustering of link communities" )
-    parser.add_argument('--link_comm_density_score', default = 5, type=int,  help="Density score for evaluating link communities")
-    parser.add_argument('--corem_size_threshold', default = 3, type=int, help="Defines minimum corem size. Default = 3." )
+    parser.add_argument('--backbone_pval', default=0.05, type=float, help="Significance pvalue for gene-gene backbone. Default = 0.05.")
+    parser.add_argument('--link_comm_score', default=0, type=int, help="Scoring metric for link communities" )
+    parser.add_argument('--link_comm_increment', default=0.1, type=float, help="Height increment for cutting agglomerative clustering of link communities" )
+    parser.add_argument('--link_comm_density_score', default=5, type=int,  help="Density score for evaluating link communities")
+    parser.add_argument('--corem_size_threshold', default=3, type=int, help="Defines minimum corem size. Default = 3." )
     parser.add_argument('--n_resamples', default=10000, type=int, help="Number resamples to compute for corem condition assignment. Default = 10,000")
     parser.add_argument('--cluster', default=True, help="Run re-samples on cluster? Boolean.")
     parser.add_argument('--finish_only', default=False, help="Finish corems only. In case session gets dropped")
@@ -130,7 +130,7 @@ if __name__ == '__main__':
         "n_resamples": args.n_resamples
     }
 
-    with open(os.path.abspath( os.path.join(targetdir, "ensemble.info")), 'w') as outfile:
+    with open(os.path.abspath(os.path.join(targetdir, "ensemble.info")), 'w') as outfile:
         outfile.write(RUN_INFO_TEMPLATE % info_d)
 
     if args.finish_only:
@@ -155,7 +155,7 @@ if __name__ == '__main__':
         outfile =  resultdb.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
         logging.info("Writing EGRIN2 MongoDB to %s", os.path.join(resultdb.targetdir, outfile))
         add_files = " "
-        info = os.path.abspath(os.path.join( targetdir, "ensemble.info"))
+        info = os.path.abspath(os.path.join(targetdir, "ensemble.info"))
 
         if os.path.isfile(info):
             add_files = add_files + info
@@ -219,13 +219,19 @@ if __name__ == '__main__':
                 logging.info("""Output Qsub scripts to %s.
 Transfer these documents to the cluster. Run 'resample.sh' with resample.py in your working directory to compute all resamples.
 Once this is done, return here to finish processing corems.""", os.path.abspath(os.path.join(targetdir, "qsub")))
+                logging.info("Done.")
+
+                # TODO: Split into 2 parts, because waiting makes this process interactive
+                """
                 ready = None
 
                 while ready != "Done":
                     ready = raw_input("Please type: 'Done' to continue\n")
+                    """
             else:
                 logging.info("Consider running resamples on a cluster. This will dramatically speed up this step.")
 
+            """
             corems.finishCorems()
 
             outfile =  resultdb.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
@@ -244,5 +250,6 @@ Once this is done, return here to finish processing corems.""", os.path.abspath(
             resultdb.mongoDump(resultdb.dbname, outfile, add_files=add_files.strip())
 
             logging.info("Done.")
+            """
         else:
             logging.error("No cMonkey2 DB files. Please specify --ensembledir")
