@@ -30,11 +30,11 @@ def findMatch(x, df, return_field):
         counter += 1
     return df.iloc[counter][return_field]
 
-def row2id(row, host="localhost", port=27017, db="", verbose=False, return_field="row_id"):
+def row2id(row, host="localhost", port=27017, dbname="", verbose=False, return_field="row_id"):
     """Check name format of rows. If necessary, translate."""
     client = MongoClient(host=host, port=port)
-    query = list(client[db].row_info.find({"$or": [{"row_id": row}, {"egrin2_row_name": row}, {"GI": row},
-                                                   {"accession": row}, {"name": row}, {"sysName": row}]}))
+    query = list(client[dbname].row_info.find({"$or": [{"row_id": row}, {"egrin2_row_name": row}, {"GI": row},
+                                                       {"accession": row}, {"name": row}, {"sysName": row}]}))
     client.close()
     if len(query) == 1:
         if return_field == "all":
@@ -56,7 +56,7 @@ def row2id(row, host="localhost", port=27017, db="", verbose=False, return_field
         return None
 
 
-def row2id_batch(rows, host="localhost", port=27017, db="",  verbose=True,
+def row2id_batch(rows, host="localhost", port=27017, dbname="", verbose=True,
                  return_field="row_id", input_type=None):
     """Check name format of rows. If necessary, translate."""
 
@@ -64,7 +64,7 @@ def row2id_batch(rows, host="localhost", port=27017, db="",  verbose=True,
         return rows
 
     client = MongoClient(host=host, port=port)
-    query = pd.DataFrame(list(client[db].row_info.find({"$or": [{"row_id": {"$in": rows}},
+    query = pd.DataFrame(list(client[dbname].row_info.find({"$or": [{"row_id": {"$in": rows}},
                                                                 {"egrin2_row_name": {"$in": rows}},
                                                                 {"GI": {"$in": rows}},
                                                                 {"accession": {"$in": rows}},
@@ -75,24 +75,24 @@ def row2id_batch(rows, host="localhost", port=27017, db="",  verbose=True,
                                                         "GI": 1, "accession": 1,
                                                         "name": 1})))
 
-    if input_type in [  "row_id", "egrin2_row_name", "GI", "accession", "name", "sysName" ]:
+    if input_type in ["row_id", "egrin2_row_name", "GI", "accession", "name", "sysName"]:
         query = query.set_index(input_type)
-        to_r = query.loc[ rows ][ return_field ].tolist()
+        to_r = query.loc[rows][return_field].tolist()
     else:
         #try to match input_type automatically
         if verbose:
             logging.info("Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query.")
-        to_r= [ row2id( x, host, port, db, return_field = return_field ) for x in rows ]
+        to_r = [row2id(x, host, port, dbname, return_field = return_field) for x in rows]
 
     client.close()
     return to_r
 
 
-def col2id(col, host="localhost", port=27017, db="",  verbose=False, return_field="col_id"):
+def col2id(col, host="localhost", port=27017, dbname="",  verbose=False, return_field="col_id"):
     """Check name format of rows. If necessary, translate."""
     client = MongoClient(host=host, port=port)
 
-    query = list(client[db].col_info.find({"$or": [{"col_id": col},
+    query = list(client[dbname].col_info.find({"$or": [{"col_id": col},
                                                    { "egrin2_col_name": col}]}))
     client.close()
     if len(query) == 1:
@@ -112,7 +112,7 @@ def col2id(col, host="localhost", port=27017, db="",  verbose=False, return_fiel
         return None
 
 
-def col2id_batch(cols, host="localhost", port=27017, db="",  verbose=True,
+def col2id_batch(cols, host="localhost", port=27017, dbname="", verbose=True,
                  return_field="col_id", input_type=None):
     """Check name format of rows. If necessary, translate."""
 
@@ -120,7 +120,7 @@ def col2id_batch(cols, host="localhost", port=27017, db="",  verbose=True,
         return cols
 
     client = MongoClient(host=host, port=port)
-    query = pd.DataFrame(list(client[db].col_info.find({ "$or": [{"col_id": {"$in": cols}},
+    query = pd.DataFrame(list(client[dbname].col_info.find({ "$or": [{"col_id": {"$in": cols}},
                                                                  {"egrin2_col_name": {"$in": cols}}]},
                                                        {"col_id": 1, "egrin2_col_name": 1})))
 
@@ -132,14 +132,14 @@ def col2id_batch(cols, host="localhost", port=27017, db="",  verbose=True,
         # try to match input_type automatically
         if verbose:
             logging.info("Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query.")
-        to_r = [col2id(x, host, port, db, return_field=return_field) for x in cols]
+        to_r = [col2id(x, host, port, dbname, return_field=return_field) for x in cols]
 
     client.close()
     return to_r
 
 
 def agglom(x=[0, 1], x_type=None, y_type=None, x_input_type=None, y_output_type=None,
-           logic="or", host="localhost", port=27017, db="", verbose=False, gre_lim=10,
+           logic="or", host="localhost", port=27017, dbname="", verbose=False, gre_lim=10,
            pval_cutoff=0.05, translate=True):
     """
     Determine enrichment of y given x through bicluster co-membership.
@@ -178,7 +178,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
     if x_type == "rows" or x_type == "row" or x_type == "gene" or x_type == "genes":
         x_type = "rows"
         x_o = x
-        x = row2id_batch( x, host, port, db, input_type=x_input_type, return_field="row_id")
+        x = row2id_batch(x, host, port, dbname, input_type=x_input_type, return_field="row_id")
         x = list(set(x))
         if len(x) == 0:
             logging.info("Cannot translate row names: %s", x_o)
@@ -187,7 +187,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
     elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type == "conds":
         x_type = "columns"
         x_o = x
-        x = col2id_batch(x, host, port, db, input_type=x_input_type, return_field="col_id")
+        x = col2id_batch(x, host, port, dbname, input_type=x_input_type, return_field="col_id")
         x = list(set(x))
         if len(x) == 0:
             logging.info("Cannot translate col names: %s", x_o)
@@ -224,15 +224,15 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
         o = {y_type: 1}
 
         if x_type == "gre_id":
-            queryPre = pd.DataFrame(list(client[db].motif_info.find(q, {"cluster_id" : 1})))["cluster_id"].tolist()
-            query = pd.DataFrame(list(client[db].bicluster_info.find({"_id": {"$in": queryPre}}, o)))
+            queryPre = pd.DataFrame(list(client[dbname].motif_info.find(q, {"cluster_id" : 1})))["cluster_id"].tolist()
+            query = pd.DataFrame(list(client[dbname].bicluster_info.find({"_id": {"$in": queryPre}}, o)))
 
         elif y_type == "gre_id":
-            queryPre = pd.DataFrame(list(client[db].bicluster_info.find(q, {"_id" : 1})))["_id"].tolist()
-            query = pd.DataFrame(list(client[db].motif_info.find({"cluster_id": {"$in": queryPre}}, {y_type: 1})))
+            queryPre = pd.DataFrame(list(client[dbname].bicluster_info.find(q, {"_id" : 1})))["_id"].tolist()
+            query = pd.DataFrame(list(client[dbname].motif_info.find({"cluster_id": {"$in": queryPre}}, {y_type: 1})))
 
         else:
-            query = pd.DataFrame(list(client[db].bicluster_info.find(q, o)))
+            query = pd.DataFrame(list(client[dbname].bicluster_info.find(q, o)))
     else:
         logging.error("I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'.")
         return None
@@ -276,28 +276,28 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
         else:
             if y_type == "rows":
 
-                if client[db].rowsCount_mapreduce.count() == 0:
+                if client[dbname].rowsCount_mapreduce.count() == 0:
                     logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                    client[db].bicluster_info.map_reduce(mapRows, reduce, "rowsCount_mapreduce")
+                    client[dbname].bicluster_info.map_reduce(mapRows, reduce, "rowsCount_mapreduce")
                 else:
                     # do spot check to make sure mapreduce is up to date
-                    random_id = random.randint(0, client[db].rowsCount_mapreduce.count())
-                    ref = client[db].rowsCount_mapreduce.find_one({"_id": random_id})["value"]
-                    test = client[db].bicluster_info.find({"rows": random_id}).count()
+                    random_id = random.randint(0, client[dbname].rowsCount_mapreduce.count())
+                    ref = client[dbname].rowsCount_mapreduce.find_one({"_id": random_id})["value"]
+                    test = client[dbname].bicluster_info.find({"rows": random_id}).count()
 
                     if ref != test:
                         logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                        client[db].bicluster_info.map_reduce(mapRows, reduce, "rowsCount_mapreduce")
+                        client[dbname].bicluster_info.map_reduce(mapRows, reduce, "rowsCount_mapreduce")
 
                 rows = pd.Series(list(itertools.chain(*query.rows.tolist()))).value_counts().to_frame("counts")
 
                 # filter out rows that aren't in the database - i.e. not annotated in MicrobesOnline
-                in_db = pd.DataFrame(list(client[db].row_info.find({}, {"_id": 0, "row_id": 1}))).row_id.tolist()
+                in_db = pd.DataFrame(list(client[dbname].row_info.find({}, {"_id": 0, "row_id": 1}))).row_id.tolist()
                 common_rows = list(set(rows.index).intersection(set(in_db)))
                 rows = rows.loc[common_rows]
 
                 # find all bicluster counts
-                all_counts = pd.DataFrame(list(client[db].rowsCount_mapreduce.find()))
+                all_counts = pd.DataFrame(list(client[dbname].rowsCount_mapreduce.find()))
                 all_counts = all_counts.set_index("_id")
 
                 # combine two data frames
@@ -305,37 +305,37 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 to_r.columns = ["counts","all_counts"]
 
                 if translate:
-                    to_r.index = row2id_batch(to_r.index.tolist(), host, port, db,
+                    to_r.index = row2id_batch(to_r.index.tolist(), host, port, dbname,
                                               return_field="egrin2_row_name", input_type="row_id")
 
             if y_type == "columns":
 
-                if client[db].columnsCount_mapreduce.count() == 0:
+                if client[dbname].columnsCount_mapreduce.count() == 0:
                     logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                    client[db].bicluster_info.map_reduce(mapColumns, reduce, "columnsCount_mapreduce")
+                    client[dbname].bicluster_info.map_reduce(mapColumns, reduce, "columnsCount_mapreduce")
 
                 else:
                     # do spot check to make sure mapreduce is up to date
-                    random_id = random.randint(0, client[db].columnsCount_mapreduce.count())
-                    ref = client[db].columnsCount_mapreduce.find_one({"_id": random_id})["value"]
-                    test = client[db].bicluster_info.find({"columns": random_id}).count()
+                    random_id = random.randint(0, client[dbname].columnsCount_mapreduce.count())
+                    ref = client[dbname].columnsCount_mapreduce.find_one({"_id": random_id})["value"]
+                    test = client[dbname].bicluster_info.find({"columns": random_id}).count()
 
                     if ref != test:
                         logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                        client[db].bicluster_info.map_reduce(mapColumns, reduce, "columnsCount_mapreduce")
+                        client[dbname].bicluster_info.map_reduce(mapColumns, reduce, "columnsCount_mapreduce")
 
-                if client[db].columnsCount_mapreduce.count() == 0:
-                    client[db].bicluster_info.map_reduce(mapColumns, reduce, "columnsCount_mapreduce")
+                if client[dbname].columnsCount_mapreduce.count() == 0:
+                    client[dbname].bicluster_info.map_reduce(mapColumns, reduce, "columnsCount_mapreduce")
 
                 cols = pd.Series(list(itertools.chain(*query["columns"].tolist()))).value_counts().to_frame("counts")
 
                 # filter out columns that aren't in the database - i.e. not annotated in MicrobesOnline
-                in_db = pd.DataFrame(list(client[db].col_info.find({}, {"_id": 0, "col_id": 1}))).col_id.tolist()
+                in_db = pd.DataFrame(list(client[dbname].col_info.find({}, {"_id": 0, "col_id": 1}))).col_id.tolist()
                 common_cols = list(set(cols.index).intersection(set(in_db)))
                 cols = cols.loc[common_cols]
 
                 # find all bicluster counts
-                all_counts = pd.DataFrame(list(client[db].columnsCount_mapreduce.find()))
+                all_counts = pd.DataFrame(list(client[dbname].columnsCount_mapreduce.find()))
                 all_counts = all_counts.set_index("_id")
 
                 # combine two data frames
@@ -343,30 +343,30 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 to_r.columns = ["counts","all_counts"]
 
                 if translate:
-                    to_r.index = col2id_batch(to_r.index.tolist(), host, port, db, return_field="egrin2_col_name", input_type="col_id")
+                    to_r.index = col2id_batch(to_r.index.tolist(), host, port, dbname, return_field="egrin2_col_name", input_type="col_id")
 
 
             if y_type == "gre_id":
 
-                if client[db].gresCount_mapreduce.count() == 0:
+                if client[dbname].gresCount_mapreduce.count() == 0:
                     logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                    client[db].motif_info.map_reduce(mapGREs, reduce, "gresCount_mapreduce")
+                    client[dbname].motif_info.map_reduce(mapGREs, reduce, "gresCount_mapreduce")
 
                 else:
                     # do spot check to make sure mapreduce is up to date
-                    random_id = random.randint(0, client[db].gresCount_mapreduce.count())
-                    ref = client[db].gresCount_mapreduce.find_one({"_id": random_id})["value"]
-                    test = client[db].motif_info.find({"gre_id": random_id}).count()
+                    random_id = random.randint(0, client[dbname].gresCount_mapreduce.count())
+                    ref = client[dbname].gresCount_mapreduce.find_one({"_id": random_id})["value"]
+                    test = client[dbname].motif_info.find({"gre_id": random_id}).count()
                     if ref != test:
                         logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                        client[db].motif_info.map_reduce(mapGREs,reduce,"gresCount_mapreduce")
+                        client[dbname].motif_info.map_reduce(mapGREs,reduce,"gresCount_mapreduce")
 
                 gres = query.gre_id.tolist()
                 gres = filter(lambda x: x != "NaN", gres)
                 gres = pd.Series(gres).value_counts().to_frame("counts")
 
                 # find all bicluster counts
-                all_counts = pd.DataFrame(list(client[db].gresCount_mapreduce.find()))
+                all_counts = pd.DataFrame(list(client[dbname].gresCount_mapreduce.find()))
                 all_counts = all_counts.set_index("_id")
 
                 # combine two data frames
@@ -376,7 +376,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 # filter by GREs with more than 10 instances
                 to_r = to_r.loc[to_r.all_counts>=gre_lim, :]
 
-            to_r["pval"] = to_r.apply(compute_p, axis=1, M=client[db].bicluster_info.count(), N=query.shape[0])
+            to_r["pval"] = to_r.apply(compute_p, axis=1, M=client[dbname].bicluster_info.count(), N=query.shape[0])
             to_r["qval_BH"] = multipletests(to_r.pval, method='fdr_bh')[1]
             to_r["qval_bonferroni"] = multipletests(to_r.pval, method='bonferroni')[1]
             to_r = to_r.sort(["pval","counts"], ascending=True)
@@ -390,7 +390,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
         return None
 
 def fimoFinder(start=None, stop=None, locusId=None, strand=None, mot_pval_cutoff=None, filterby=None, filter_type=None,
-               filterby_input_type=None, host="localhost", port=27017, db=None, use_fimo_small=True,
+               filterby_input_type=None, host="localhost", port=27017, dbname=None, use_fimo_small=True,
                logic="or", return_format="file", outfile=None, tosingle=True):
     """
     Find motifs/GREs that fall within a specific range. Filter by biclusters/genes/conditions/etc. Optionally write to GGBweb compatible .gsif format.
@@ -408,7 +408,7 @@ def fimoFinder(start=None, stop=None, locusId=None, strand=None, mot_pval_cutoff
     -- filterby_input_type: name format of filterby. Speeds up name translation
     -- host: location of EGRIN 2 MongoDB
     -- port: port on which MongoDB is listening
-    -- db: name of MongoDB database
+    -- dbname: name of MongoDB database
     -- use_fimo_small: use fimo_small collection (highly significant matches only). Speed up query.
     -- logic: logcal operation to apply to filterby, ie and, or, nor
     -- return_format: how should the fimo tracks be returned, only "file" currently support (for upload to GGBweb)
@@ -417,9 +417,9 @@ def fimoFinder(start=None, stop=None, locusId=None, strand=None, mot_pval_cutoff
     """
     def getBCs(x, x_type):
         if x is None:
-            to_r = pd.DataFrame(list(client[db].motif_info.find({}, {"cluster_id": 1, "gre_id": 1})))
+            to_r = pd.DataFrame(list(client[dbname].motif_info.find({}, {"cluster_id": 1, "gre_id": 1})))
         else:
-            to_r = pd.DataFrame(list(client[db].motif_info.find({x_type: x}, {"cluster_id": 1, "gre_id": 1})))
+            to_r = pd.DataFrame(list(client[dbname].motif_info.find({x_type: x}, {"cluster_id": 1, "gre_id": 1})))
         return(to_r.loc[:, ["gre_id" ,"cluster_id"]])
 
     def aggSeq(x):
@@ -438,11 +438,11 @@ def fimoFinder(start=None, stop=None, locusId=None, strand=None, mot_pval_cutoff
 
     client = MongoClient(host=host, port=port)
 
-    if db is None:
+    if dbname is None:
         logging.error("Please provide a database name, e.g. *org*_db, where *org* is a three lettter short organism code")
         return None
 
-    db_chr = pd.DataFrame(list(client[db].genome.find({}, {"scaffoldId": 1, "NCBI_RefSeq": 1})))
+    db_chr = pd.DataFrame(list(client[dbname].genome.find({}, {"scaffoldId": 1, "NCBI_RefSeq": 1})))
     db_scaffoldId = db_chr.scaffoldId.tolist()
     db_NCBI_RefSeq = db_chr.NCBI_RefSeq.tolist()
 
@@ -455,7 +455,7 @@ LocusIds in database %s include:
   - %s
   - NCBI_RefSeq
   - %s""",
-                      db, (", ").join(db_scaffoldId), (", ").join(db_NCBI_RefSeq))
+                      dbname, (", ").join(db_scaffoldId), (", ").join(db_NCBI_RefSeq))
         return None
 
     locusId = str(locusId)
@@ -468,12 +468,12 @@ LocusIds in this database include:
   - %s
   - NCBI_RefSeq
   - %s""",
-                      locusId, db,
+                      locusId, dbname,
                       (", ").join(db_scaffoldId),
                       (", ").join(db_NCBI_RefSeq))
         return None
 
-    chromosome = client[db].genome.find_one({"$or": [{"scaffoldId": locusId}, {"NCBI_RefSeq": locusId}]})
+    chromosome = client[dbname].genome.find_one({"$or": [{"scaffoldId": locusId}, {"NCBI_RefSeq": locusId}]})
     scaffoldId = chromosome["scaffoldId"]
     ncbi = chromosome["NCBI_RefSeq"]
 
@@ -499,7 +499,7 @@ LocusIds in this database include:
         if filter_type == "rows" or filter_type == "row" or filter_type == "gene" or filter_type == "genes":
             filter_type = "rows"
             filterby_o = filterby
-            filterby = row2id_batch(filterby, host, port, db, input_type = filter_input_type, return_field="row_id")
+            filterby = row2id_batch(filterby, host, port, dbname, input_type=filter_input_type, return_field="row_id")
             filterby = list(set(filterby))
             if len(filterby) == 0:
                 logging.error("Cannot translate row names: %s", filterby_o)
@@ -508,7 +508,7 @@ LocusIds in this database include:
         elif filter_type == "columns" or filter_type == "column" or filter_type == "col" or filter_type == "cols" or filter_type == "condition" or filter_type == "conditions" or filter_type == "conds":
             filter_type = "columns"
             filterby_o = filterby
-            filterby = col2id_batch(filterby, host, port, db, input_type=filterby_input_type, return_field="col_id")
+            filterby = col2id_batch(filterby, host, port, dbname, input_type=filterby_input_type, return_field="col_id")
             filterby = list(set(filterby))
 
             if len(filterby) == 0:
@@ -524,14 +524,14 @@ LocusIds in this database include:
 
         logging.info("Filtering motifs by %s", ilter_type)
         bcs_df= pd.concat([getBCs(i, filter_type) for i in filterby], ignore_index=True)
-        mots = pd.DataFrame(list(client[db][fimo_collection].find({"start": {"$gte": start},
+        mots = pd.DataFrame(list(client[dbname][fimo_collection].find({"start": {"$gte": start},
                                                                    "stop": {"$lte": stop },
                                                                    "cluster_id": {"$in": bcs_df.cluster_id.tolist()},
                                                                    "scaffoldId": scaffoldId})))
         mots = pd.merge(mots, bcs_df, on="cluster_id")
     else:
         bcs_df= pd.concat( [ getBCs( None, filter_type ) ], ignore_index = True )
-        mots = pd.DataFrame(list(client[db][fimo_collection].find({ "start": {"$gte": start}, "stop": {"$lte": stop}, "scaffoldId": scaffoldId})))
+        mots = pd.DataFrame(list(client[dbname][fimo_collection].find({ "start": {"$gte": start}, "stop": {"$lte": stop}, "scaffoldId": scaffoldId})))
         mots = pd.merge(mots, bcs_df, on="cluster_id")
 
     gre_scans = mots.groupby("gre_id").apply(aggSeq)
@@ -579,7 +579,7 @@ LocusIds in this database include:
     return gre_scans
 
 def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_return_field=None,
-                count=False, logic="or", host="localhost", port=27017, db=""):
+                count=False, logic="or", host="localhost", port=27017, dbname=""):
 
     """
     Fetch corem-related info 'y' given query 'x'.
@@ -614,14 +614,14 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
     x_type = TYPE_MAP[x_type]
     if x_type == "rows":
         x_o = x
-        x = row2id_batch(x, host, port, db, input_type = x_input_type, return_field="row_id")
+        x = row2id_batch(x, host, port, dbname, input_type = x_input_type, return_field="row_id")
         x = list(set(x))
         if len(x) == 0:
             logging.error("Cannot translate row names: %s", x_o)
             return None
     elif x_type == "cols.col_id":
         x_o = x
-        x = col2id_batch(x, host, port, db, input_type = x_input_type, return_field="col_id")
+        x = col2id_batch(x, host, port, dbname, input_type = x_input_type, return_field="col_id")
         x = list(set(x))
         if len(x) == 0:
             logging.error("Cannot translate row names: %s", x_o)
@@ -629,7 +629,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
     elif x_type == "edges":
         x_new = []
         for i in x:
-            i_trans = row2id_batch(i.split("-"), host, port, db, input_type=x_input_type, return_field="row_id", verbose=False)
+            i_trans = row2id_batch(i.split("-"), host, port, dbname, input_type=x_input_type, return_field="row_id", verbose=False)
             i_trans = [str(j) for j in i_trans]
             x_new.append("-".join(i_trans))
             i_trans.reverse()
@@ -652,7 +652,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
             q = {"$" + logic: [{x_type: i} for i in x]}
 
         o = {y_type: 1}
-        query = pd.DataFrame(list(client[db].corem.find(q, o)))
+        query = pd.DataFrame(list(client[dbname].corem.find(q, o)))
 
     else:
         logging.error("I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'.")
@@ -672,7 +672,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                     to_r = to_r[to_r >= query.shape[0]]
 
                     if to_r.shape[0] > 0:
-                        to_r.index = row2id_batch(to_r.index.tolist(), host, port, db, return_field=y_return_field, input_type="row_id")
+                        to_r.index = row2id_batch(to_r.index.tolist(), host, port, dbname, return_field=y_return_field, input_type="row_id")
                     else:
                         logging.error("No genes found")
                         return None
@@ -680,7 +680,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                     to_r = to_r[to_r >= query.shape[0]].index.tolist()
 
                     if len(to_r):
-                        to_r = row2id_batch(to_r, host, port, db, return_field=y_return_field, input_type="row_id")
+                        to_r = row2id_batch(to_r, host, port, dbname, return_field=y_return_field, input_type="row_id")
                         to_r.sort()
                     else:
                         logging.error("No genes found")
@@ -690,20 +690,20 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                     to_r = pd.Series(to_r).value_counts()
 
                     if to_r.shape[0] > 0:
-                        to_r.index = row2id_batch(to_r.index.tolist(), host, port, db, return_field=y_return_field, input_type="row_id")
+                        to_r.index = row2id_batch(to_r.index.tolist(), host, port, dbname, return_field=y_return_field, input_type="row_id")
                     else:
                         logging.error("No genes found")
                         return None
                 else:
                     to_r = list(set(to_r))
                     if len(to_r):
-                        to_r = row2id_batch(to_r, host, port, db, return_field=y_return_field, input_type = "row_id")
+                        to_r = row2id_batch(to_r, host, port, dbname, return_field=y_return_field, input_type = "row_id")
                         to_r.sort()
                     else:
                         logging.error("No genes found")
                         return None
         else:
-            to_r = row2id_batch(query.rows[0], host, port, db, return_field=y_return_field, input_type="row_id")
+            to_r = row2id_batch(query.rows[0], host, port, dbname, return_field=y_return_field, input_type="row_id")
 
     elif y_type == "cols.col_id":
         if y_return_field is None:
@@ -718,7 +718,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                 if count:
                     to_r = to_r[to_r >= query.shape[0]]
                     if to_r.shape[0] > 0:
-                        to_r.index = col2id_batch(to_r.index.tolist(), host, port, db, return_field=y_return_field, input_type="col_id")
+                        to_r.index = col2id_batch(to_r.index.tolist(), host, port, dbname, return_field=y_return_field, input_type="col_id")
                     else:
                         logging.error("No conditions found")
                         return None
@@ -726,7 +726,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                     to_r = to_r[to_r >= query.shape[0]].index.tolist()
 
                     if len(to_r):
-                        to_r = col2id_batch(to_r, host, port, db, return_field=y_return_field, input_type="col_id")
+                        to_r = col2id_batch(to_r, host, port, dbname, return_field=y_return_field, input_type="col_id")
                         to_r.sort()
                     else:
                         logging.error("No conditions found")
@@ -735,21 +735,21 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                 if count:
                     to_r = pd.Series(to_r).value_counts()
                     if to_r.shape[0] > 0:
-                        to_r.index = col2id_batch(to_r.index.tolist(), host, port, db, return_field=y_return_field, input_type="col_id")
+                        to_r.index = col2id_batch(to_r.index.tolist(), host, port, dbname, return_field=y_return_field, input_type="col_id")
                     else:
                         logging.error("No conditions found")
                         return None
                 else:
                     to_r = list(set(to_r))
                     if len(to_r):
-                        to_r = col2id_batch(to_r, host, port, db, return_field=y_return_field, input_type="col_id")
+                        to_r = col2id_batch(to_r, host, port, dbname, return_field=y_return_field, input_type="col_id")
                         to_r.sort()
                     else:
                         logging.error("No conditions found")
                         return None
         else:
             to_r = [int(i["col_id"]) for i in list(itertools.chain( *query.cols.values.tolist())) if i["col_id"] if type(i["col_id"]) is float]
-            to_r = col2id_batch( to_r, host, port, db, return_field=y_return_field, input_type="col_id")
+            to_r = col2id_batch( to_r, host, port, dbname, return_field=y_return_field, input_type="col_id")
 
     elif y_type == "corem_id":
         to_r = query.corem_id.tolist()
@@ -762,7 +762,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
 
         for i in to_r:
             i_trans = row2id_batch([int(j) for j in i.split("-")],
-                                   host, port, db, input_type="row_id",
+                                   host, port, dbname, input_type="row_id",
                                    return_field=y_return_field, verbose = False)
 
             i_trans = [str(j) for j in i_trans]
@@ -785,7 +785,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
     return to_r
 
 
-def expressionFinder(rows=None, cols=None, standardized=True, host="localhost", port=27017, db=""):
+def expressionFinder(rows=None, cols=None, standardized=True, host="localhost", port=27017, dbname=""):
     """
     Fetch gene expression given rows and columns.
 
@@ -795,7 +795,7 @@ def expressionFinder(rows=None, cols=None, standardized=True, host="localhost", 
     -- standardized: fetch standardized data if True, otherwise raw (normalized) data
     -- host: location of EGRIN 2 MongoDB
     -- port: port on which MongoDB is listening
-    -- db: name of MongoDB database
+    -- dbname: name of MongoDB database
 
     """
     client = MongoClient(host=host, port=port)
@@ -804,12 +804,12 @@ def expressionFinder(rows=None, cols=None, standardized=True, host="localhost", 
 
     if rows is None:
         # assume all genes
-        rows = pd.DataFrame(list(client[db].row_info.find({}, {"row_id":1}))).row_id.tolist()
+        rows = pd.DataFrame(list(client[dbname].row_info.find({}, {"row_id":1}))).row_id.tolist()
         input_type_rows = "row_id"
 
     if cols is None:
         # assume all cols
-        cols = pd.DataFrame(list(client[db].col_info.find({}, {"col_id":1}))).col_id.tolist()
+        cols = pd.DataFrame(list(client[dbname].col_info.find({}, {"col_id":1}))).col_id.tolist()
         input_type_cols = "col_id"
 
     if type(rows) == str or type(rows) == int:
@@ -820,15 +820,15 @@ def expressionFinder(rows=None, cols=None, standardized=True, host="localhost", 
 
     # translate rows/cols
 
-    rows = row2id_batch(rows, host, port, db,  verbose=False, return_field="row_id", input_type=input_type_rows)
-    cols = col2id_batch(cols, host, port, db,  verbose=False, return_field="col_id", input_type=input_type_cols)
+    rows = row2id_batch(rows, host, port, dbname,  verbose=False, return_field="row_id", input_type=input_type_rows)
+    cols = col2id_batch(cols, host, port, dbname,  verbose=False, return_field="col_id", input_type=input_type_cols)
 
     if len(rows) > 1000 or len(cols) > 1000:
         logging.warn("This is a large query. Please be patient. If you need faster access, I would suggest saving this matrix and loading directly from file.")
 
     # get expression data
     data = pd.DataFrame(None, columns=cols, index=rows)
-    query = pd.DataFrame (list(client[db].gene_expression.find({"$and": [{"row_id": {"$in": rows}}, {"col_id": {"$in": cols}}]})))
+    query = pd.DataFrame (list(client[dbname].gene_expression.find({"$and": [{"row_id": {"$in": rows}}, {"col_id": {"$in": cols}}]})))
 
     for i in query:
         if standardized:
@@ -836,15 +836,15 @@ def expressionFinder(rows=None, cols=None, standardized=True, host="localhost", 
         else:
             data = query.pivot(index="row_id", columns="col_id", values="raw_expression")
 
-    data.index = row2id_batch(data.index.tolist(), host, port, db,  verbose=False, return_field="egrin2_row_name", input_type="row_id")
-    data.columns = col2id_batch(data.columns.tolist(), host, port, db,  verbose=False, return_field="egrin2_col_name", input_type="col_id")
+    data.index = row2id_batch(data.index.tolist(), host, port, dbname,  verbose=False, return_field="egrin2_row_name", input_type="row_id")
+    data.columns = col2id_batch(data.columns.tolist(), host, port, dbname,  verbose=False, return_field="egrin2_col_name", input_type="col_id")
     data = data.sort_index()
     data = data.reindex_axis(sorted(data.columns), axis=1)
 
     client.close()
     return data
 
-def ggbwebModule(genes=None, outfile=None, host="localhost", port=27017, db=""):
+def ggbwebModule(genes=None, outfile=None, host="localhost", port=27017, dbname=""):
     """
     Write gene module in GGBweb .gsif format
 
@@ -853,7 +853,7 @@ def ggbwebModule(genes=None, outfile=None, host="localhost", port=27017, db=""):
     -- outfile: path/name of module file to write
     -- host: location of EGRIN 2 MongoDB
     -- port: port on which MongoDB is listening
-    -- db: name of MongoDB database
+    -- dbname: name of MongoDB database
     """
     client = MongoClient(host=host, port=port)
 
@@ -867,7 +867,7 @@ def ggbwebModule(genes=None, outfile=None, host="localhost", port=27017, db=""):
     def locFormat(x, gene):
         return pd.DataFrame([gene, "E.colik-12", str(x.start), str(x.stop)])
 
-    gene_info = pd.DataFrame(row2id_batch(genes, host=host, port=port, db=db, return_field="all", verbose=False))
+    gene_info = pd.DataFrame(row2id_batch(genes, host=host, port=port, dbname=dbname, return_field="all", verbose=False))
 
     to_r = pd.concat([locFormat(gene_info.iloc[i], gene_info.loc[i, "egrin2_row_name"]) for i in range(gene_info.shape[0])], 2).T
 
@@ -879,7 +879,7 @@ def ggbwebModule(genes=None, outfile=None, host="localhost", port=27017, db=""):
     client.close()
     return to_r
 
-def motifFinder(x, x_type, output_type=["data_frame", "array"][0], host="localhost", port=27017, db=""):
+def motifFinder(x, x_type, output_type=["data_frame", "array"][0], host="localhost", port=27017, dbname=""):
     """
     Find, retrieve, and format motif PWM
 
@@ -889,7 +889,7 @@ def motifFinder(x, x_type, output_type=["data_frame", "array"][0], host="localho
     -- output_type: format of output. `data_frame` for pretty printing, `array` for viz by weblogo
     -- host: location of EGRIN 2 MongoDB
     -- port: port on which MongoDB is listening
-    -- db: name of MongoDB database
+    -- dbname: name of MongoDB database
 
     Returns DataFrame (or list of DataFrames) containing PWM (more precisely PPMs)
     """
@@ -949,7 +949,7 @@ def motifFinder(x, x_type, output_type=["data_frame", "array"][0], host="localho
         o = {i: 1 for i in x_type_split}
 
         # get biclusters
-        prequery = pd.DataFrame(list(client[db].bicluster_info.find(q1, o)))
+        prequery = pd.DataFrame(list(client[dbname].bicluster_info.find(q1, o)))
         prequery = prequery.merge(q2, on=list(set(prequery.columns.tolist()) & set(x_type_split)))
         prequery = prequery.rename(columns={'_id' : 'cluster_id'})
 
@@ -959,7 +959,7 @@ def motifFinder(x, x_type, output_type=["data_frame", "array"][0], host="localho
         else:
             q = {"$or": prequery.loc[:, ["cluster_id"]].to_dict("records")}
 
-        query = pd.DataFrame(list(client[db].motif_info.find(q)))
+        query = pd.DataFrame(list(client[dbname].motif_info.find(q)))
         query = query.merge(prequery, on=list(set(query.columns.tolist()) & set(prequery.columns.tolist())))
 
         query["x_type"] = ""
@@ -974,7 +974,7 @@ def motifFinder(x, x_type, output_type=["data_frame", "array"][0], host="localho
         x_type = "gre_id"
         q = {x_type: {"$in": x}}
         o = {"_id": 0, "pwm": 1}
-        query = pd.DataFrame(list(client[db].corem.find(q, o)))
+        query = pd.DataFrame(list(client[dbname].corem.find(q, o)))
     else:
         logging.error("Cannot recognize x_type = %s", x_type)
 
