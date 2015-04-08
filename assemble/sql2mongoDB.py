@@ -21,7 +21,6 @@ import pandas as pd
 
 import sqlite3
 import pymongo
-from pymongo import MongoClient
 from bson.objectid import ObjectId
 from Bio import SeqIO
 
@@ -36,26 +35,14 @@ from Bio import SeqIO
 
 class ResultDatabase:
 
-    def __init__(self, organism, host, port, ensembledir=None, targetdir=None,
-                 prefix=None, ratios_raw=None, gre2motif=None, col_annot=None, ncbi_code=None,
-                 dbname=None , db_run_override=None, genome_file=None, row_annot=None,
+    def __init__(self, organism, db, ensembledir=None, targetdir=None,
+                 prefix=None, ratios_raw=None, gre2motif=None, col_annot=None,
+                 ncbi_code=None,
+                 db_run_override=None, genome_file=None, row_annot=None,
                  row_annot_match_col=None):
 
         self.organism = organism
-        self.host = host
-        self.port = port
-
-        client = MongoClient(host=host, port=port)
-        logging.info("Connected to MongoDB")
-        
-        self.dbname = '%s_db' % self.organism if dbname is None else dbname
-
-        if self.dbname in client.database_names():
-            logging.warn("WARNING: %s database already exists!!!", self.dbname)
-        else:
-            logging.info("Initializing MongoDB database: %s", self.dbname)
-
-        self.db = client[self.dbname]
+        self.db = db
 
         # get db files in directory
         if prefix is None:
@@ -765,7 +752,8 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         """Write contents from MongoDB instance to binary file"""
         logging.info("Dumping MongoDB to BSON")
         outfile_wdir = os.path.abspath(os.path.join(self.targetdir, outfile))
-        sys_command = "mongodump --db " + db + " --out " + outfile_wdir + " --host " + self.host + " --port " + str(self.port)
+        self.db.client
+        sys_command = "mongodump --db %s --out %s" % (db, outfile_wdir)
         os.system(sys_command)
 
         logging.info("Compressing MongoDB BSON docs")
@@ -781,7 +769,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
     def mongoRestore(self, db, infile):
         """Read contents of binary MongoDB dump into MongoDB instance"""
-        sys_command = "mongorestore --db " + db + " --host " + self.host + " --port " + str(self.port) + " " + infile
+        sys_command = "mongorestore --db %s %s" % (db, infile)
         os.system(sys_command)
 
     def compile(self):

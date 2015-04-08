@@ -14,9 +14,10 @@ import argparse
 import os, sys, stat
 import itertools
 import logging
+import pymongo
 
 import assemble.sql2mongoDB as rdb
-from assemble.makeCorems import *
+from assemble.makeCorems import CoremMaker
 from assemble.resample import *
 
 QSUB_TEMPLATE_HEADER_CSH = """#!/bin/csh
@@ -74,6 +75,7 @@ LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
 LOG_LEVEL = logging.DEBUG
 LOG_FILE = None # "assembler.log"
 
+
 if __name__ == '__main__':
     import argparse
     import os
@@ -110,7 +112,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    db = args.db if args.db is not None else "%s_db" % args.organism
+    dbname = args.db if args.db is not None else "%s_db" % args.organism
     targetdir = args.targetdir
     user = args.user
 
@@ -121,7 +123,7 @@ if __name__ == '__main__':
         "ncbi_code": args.ncbi_code,
         "host": args.host,
         "port": args.port,
-        "db": db,
+        "db": dbname,
         "backbone_pval": args.backbone_pval,
         "link_comm_score": args.link_comm_score,
         "link_comm_increment": args.link_comm_increment,
@@ -129,21 +131,30 @@ if __name__ == '__main__':
         "corem_size_threshold": args.corem_size_threshold,
         "n_resamples": args.n_resamples
     }
+    client = pymongo.MongoClient(host=args.host, port=args.port)
+
+    if not args.finish_only:
+        if dbname in client.database_names():
+            logging.warn("WARNING: %s database already exists!!!", self.dbname)
+        else:
+            logging.info("Initializing MongoDB database: %s", self.dbname)
+
+    db = client[dbname]
 
     with open(os.path.abspath(os.path.join(targetdir, "ensemble.info")), 'w') as outfile:
         outfile.write(RUN_INFO_TEMPLATE % info_d)
 
     if args.finish_only:
-        resultdb = rdb.ResultDatabase(organism=args.organism, host=args.host, port=args.port,
+        resultdb = rdb.ResultDatabase(organism=args.organism, db=db,
                                       ensembledir=args.ensembledir, prefix=args.prefix,
                                       ratios_raw=args.ratios, gre2motif=args.gre2motif,
                                       col_annot=args.col_annot, ncbi_code=args.ncbi_code,
-                                      dbname=args.db, db_run_override=None,
+                                      db_run_override=None,
                                       genome_file=args.genome_annot, row_annot=args.row_annot,
                                       row_annot_match_col=args.row_annot_matchCol)
 
-        corems = makeCorems(organism=args.organism, host=args.host, port=args.port,
-                            db=db, dbfiles=None, backbone_pval=args.backbone_pval,
+        corems = CoremMaker(organism=args.organism, db=db,
+                            backbone_pval=args.backbone_pval,
                             out_dir=targetdir, n_subs=args.cores,
                             link_comm_score=args.link_comm_score,
                             link_comm_increment=args.link_comm_increment,
@@ -168,16 +179,16 @@ if __name__ == '__main__':
         logging.info("Done.")
     else:
         # Initialize to find problems early!!
-        resultdb = rdb.ResultDatabase(organism=args.organism, host=args.host, port=args.port, ensembledir=args.ensembledir,
+        resultdb = rdb.ResultDatabase(organism=args.organism, ensembledir=args.ensembledir,
                                       prefix=args.prefix, ratios_raw=args.ratios, gre2motif=args.gre2motif,
-                                      col_annot=args.col_annot, ncbi_code=args.ncbi_code, dbname=args.db,
+                                      col_annot=args.col_annot, ncbi_code=args.ncbi_code,
                                       db_run_override=None, genome_file=args.genome_annot, row_annot=args.row_annot,
                                       row_annot_match_col=args.row_annot_matchCol)
 
         if len(resultdb.db_files) > 0:
             # Merge sql into mongoDB
             resultdb.compile()
-            corems = makeCorems(organism=args.organism, host=args.host, port=args.port, db=db, dbfiles=None,
+            corems = CoremMaker(organism=args.organism, db=db,
                                 backbone_pval=args.backbone_pval, out_dir=targetdir, n_subs=args.cores,
                                 link_comm_score=args.link_comm_score, link_comm_increment=args.link_comm_increment,
                                 link_comm_density_score=args.link_comm_density_score,
@@ -190,9 +201,8 @@ if __name__ == '__main__':
             corems.addCorems()
 
             if args.cluster:
-                client = MongoClient(host=args.host, port=args.port)
-                logging.debug("connecting to db: '%s'", db)
-                corem_sizes = list(set([len(i["rows"] ) for i in client[db]["corem"].find({}, {"rows": 1})]))
+                logging.debug("connecting to db: '%s'", dbname)
+                corem_sizes = list(set([len(i["rows"] ) for i in db["corem"].find({}, {"rows": 1})]))
                 logging.debug("corem sizes: '%s'", str(corem_sizes))
 
                 if not os.path.isdir(os.path.abspath(os.path.join( targetdir, "qsub"))):
@@ -206,14 +216,14 @@ if __name__ == '__main__':
                             "n_resamples": args.n_resamples,
                             "name": name + ".sh",
                             "host": args.host,
-                            "db": db,
+                            "db": dbname,
                             "n_rows": x,
                             "port": args.port
                         }
                         outfile.write(QSUB_TEMPLATE_HEADER_CSH)
                         outfile.write(QSUB_TEMPLATE_CSH % argss)
 
-                with open(os.path.join( os.path.abspath( os.path.join(targetdir, "qsub")), "resample.sh"), 'w') as outfile:
+                with open(os.path.join(os.path.abspath( os.path.join(targetdir, "qsub")), "resample.sh"), 'w') as outfile:
                     outfile.write(RUN_ALL_TEMPLATE % args.organism + "_r_" )
 
                 logging.info("""Output Qsub scripts to %s.

@@ -23,47 +23,21 @@ import numpy as np
 import pandas as pd
 
 import sqlite3
-import pymongo
-from pymongo import MongoClient
 from Bio import SeqIO
 from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 
-class makeCorems:
+class CoremMaker:
 
-    def __init__(self, organism, host, port, db=None, dbfiles=None,
+    def __init__(self, organism, db,
                  backbone_pval=None, out_dir=None, n_subs=None, link_comm_score=None,
                  link_comm_increment=None, link_comm_density_score=None,
                  corem_size_threshold=None, n_resamples=None):
 
         self.organism = organism
-        self.host = host
-        self.port = port
-
-        client = MongoClient(host=self.host, port=self.port)
-
-        if db is None:
-            self.db = self.organism + "_db"
-        else:
-            self.db = db
-
-        if self.db in client.database_names():
-            logging.info("Found ensemble database: '%s'", self.db)
-        else:
-            logging.warn("""Could not locate a MongoDB database with name: %s
-Attempting to perform DB import at: %s""", self.db, str(dbfiles))
-
-            if dbfiles != None:
-                try:
-                    self.mongoRestore(self.db, dbfiles)
-                except Exception:
-                    return None
-            else:
-                return None
-
-        self.db = client[self.db]
+        self.db = db
 
         self.row2id = {}
         self.id2row = {}
@@ -146,13 +120,7 @@ Attempting to perform DB import at: %s""", self.db, str(dbfiles))
         else:
             self.n_resamples = n_resamples
 
-    def mongoRestore(self, db, infile):
-        """Read contents of binary MongoDB dump into MongoDB instance"""
-        sys_command = "mongorestore --db " + db + " " + infile
-        logging.info("Executing %s", sys_command)
-        os.system(sys_command)
-
-    def getRowCo( self, row_id ):
+    def getRowCo(self, row_id):
         """Given a row (gene), count all of the other rows that occur with it in a bicluster"""
         data = []
         for i in self.db.bicluster_info.find({"rows": {"$all": [self.row2id[row_id]]}}, {"rows": "1"}):

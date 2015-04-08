@@ -6,6 +6,7 @@ import pymongo
 from collections import namedtuple
 
 import query.egrin2_query as e2q
+import assemble.resample as resample
 import pandas as pd
 
 
@@ -15,16 +16,15 @@ LOG_LEVEL = logging.DEBUG
 LOG_FILE = None
 
 
-def check_col_resamples(db, col, n_rows, n_resamples):
+def __check_col_resamples(db, col, n_rows, n_resamples):
     if db.col_resample.find_one({"n_rows": n_rows, "col_id": col, "resamples": {"$gte": n_resamples}}) is None:
         return col
 
 
-def col_resample_pval(db, rows, row_type, cols, col_type, n_resamples,
-                      host, port, dbname,
-                      standardized=True, sig_cutoff=0.05,
-                      sort=True, add_override=False, n_jobs=4, keepP=0.1, verbose=False,
-                      col_outtype="col_id"):
+def __col_resample_pval(db, rows, row_type, cols, col_type, n_resamples,
+                        standardized=True, sig_cutoff=0.05,
+                        sort=True, add_override=False, n_jobs=4, keepP=0.1, verbose=False,
+                        col_outtype="col_id"):
 
     def empirical_pval(i, random_rsd, resamples):
         for x in range(0, len(i)):
@@ -39,28 +39,28 @@ def col_resample_pval(db, rows, row_type, cols, col_type, n_resamples,
                 return val
 
     rows_o = rows
-    rows = e2q.row2id_batch(rows, host, port, dbname, input_type=row_type)
+    rows = e2q.row2id_batch(db, rows, input_type=row_type)
 
     if len(rows) == 0:
         logging.info("Please provide an appropriately named array of rows")
         return None
 
     cols_o = cols
-    cols = e2q.col2id_batch(cols, host, port, dbname, input_type=col_type)
+    cols = e2q.col2id_batch(db, cols, input_type=col_type)
 
     if len(cols) == 0:
         logging.info("Please provide an appropriately named array of cols")
         return None
 
     # Determine what/how many resamples need to be added to db
-    toAdd = [check_col_resamples(db, i, len(rows), n_resamples) for i in cols]
-    toAdd = [i for i in toAdd if i is not None]
+    to_add = [__check_col_resamples(db, i, len(rows), n_resamples) for i in cols]
+    to_add = [i for i in to_add if i is not None]
 
     count = 1
-    if len(toAdd) > 0:
+    if len(to_add) > 0:
         if add_override:
-            logging.info("I need to perform %d random resample(s) of size %d to compute pvals. Please be patient. This may take a while...", len(toAdd), n_resamples)
-            tmp = e2q.colResampleInd(host=host, n_rows=len(rows), cols=toAdd, n_resamples=n_resamples, keepP=keepP, port=port, db=dbname)
+            logging.info("I need to perform %d random resample(s) of size %d to compute pvals. Please be patient. This may take a while...", len(to_add), n_resamples)
+            tmp = resample.col_resample_ind(db, n_rows=len(rows), cols=to_add, n_resamples=n_resamples, keepP=keepP)
             logging.info("Done adding random resamples.")
         else:
             logging.info("""I would need to perform %d random resample(s) of size %d
@@ -68,8 +68,8 @@ to compute pvals. Since this would require significant computational power (and 
 I have only returned results where resample data has been pre-calculated.
 Consult resample.py to run these jobs on multiple cores (much faster)
 or change 'add_override' flag of this function to 'True' to build the resample now.""",
-                         len(toAdd), n_resamples)
-            cols = [i for i in cols if i not in toAdd]
+                         len(to_add), n_resamples)
+            cols = [i for i in cols if i not in to_add]
 
     if verbose:
         logging.info("Calculating pvals...")
@@ -99,7 +99,7 @@ or change 'add_override' flag of this function to 'True' to build the resample n
 
     pvals = exp_df_rsd.groupby(level=0).aggregate(empirical_pval, random_rsd, resamples)
     pvals.columns = ["pval"]
-    pvals.index = e2q.col2id_batch(pvals.index.values, host, port, dbname, input_type="col_id", return_field=col_outtype)
+    pvals.index = e2q.col2id_batch(db, pvals.index.values, input_type="col_id", return_field=col_outtype)
 
     if sig_cutoff is not None:
         pvals = pvals[pvals <= sig_cutoff]
@@ -116,10 +116,10 @@ or change 'add_override' flag of this function to 'True' to build the resample n
     return pvals
 
 
-def compute_and_write_col(db, corem, cond_ids, dbname, host, port, n_resamples=1000):
+def __compute_and_write_col(db, corem, cond_ids, n_resamples=1000):
     logging.info("Adding conditions for corem %d", corem['corem_id'])
-    pvals = col_resample_pval(db, corem['rows'], "row_id", cond_ids, "col_id",
-                              n_resamples, host, port, dbname, keepP=0.05)
+    pvals = __col_resample_pval(db, corem['rows'], "row_id", cond_ids, "col_id",
+                                n_resamples, keepP=0.05)
 
     pvals["col_id"] = pvals.index
     d = pvals.to_dict('records')
@@ -128,12 +128,12 @@ def compute_and_write_col(db, corem, cond_ids, dbname, host, port, n_resamples=1
     #self.db.corem.update({"_id": corem._id}, {"$set": {"cols": d}})
 
 
-def finish_corems(db, dbname, host, port):
+def finish_corems(db):
     """Finish adding corem info (cols) after resampling. Assumes corem docs already exist"""
     cond_ids = [entry['col_id'] for entry in db["col_info"].find({}, {"_id": 0, "col_id": 1})]
 
     for corem in db["corem"].find({}, {'_id': 1, "rows": 1, "corem_id": 1}):
-        compute_and_write_col(db, corem, cond_ids, dbname, host, port)
+        __compute_and_write_col(db, corem, cond_ids)
 
 
 if __name__ == '__main__':
@@ -143,11 +143,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('db', help="MongoDB database name")
     parser.add_argument('--host', default='localhost', required=False, help="MongoDB database host")
-    parser.add_argument('--port', default=27017, type=int, required=False, help="MongoDB database host")
+    parser.add_argument('--port', default=27017, type=int, required=False, help="MongoDB database port")
     args = parser.parse_args()
     print "Connecting to database: ", args.db
     client = pymongo.MongoClient(host=args.host, port=args.port)
     try:
-        finish_corems(client[args.db], args.db, args.host, args.port)
+        finish_corems(client[args.db])
     finally:
         client.close()

@@ -33,7 +33,7 @@ def resample(row_vals, n_rows):
     return rsd(random.sample(row_vals.dropna(), n_rows))
 
 
-def choose_n(col, vals, n, add, client, db, n_rows, n_resamples, old_records, keepP):
+def __choose_n(db, col, vals, n, add, n_rows, n_resamples, old_records, keepP):
     raw = vals.loc[:, "raw_expression"].copy()
     raw.sort()
     standardized = vals.loc[:, "standardized_expression"].copy()
@@ -47,7 +47,7 @@ def choose_n(col, vals, n, add, client, db, n_rows, n_resamples, old_records, ke
             "lowest_raw": raw.iloc[0:n].tolist(),
             "lowest_standardized": standardized.iloc[0:n].tolist()
         }
-        client[db]["col_resample"].insert(d)
+        db["col_resample"].insert(d)
     else:
         # update
         resamples = n_resamples + old_records[col]["resamples"]
@@ -58,20 +58,18 @@ def choose_n(col, vals, n, add, client, db, n_rows, n_resamples, old_records, ke
         ras = standardized.tolist() + old_records[col]["lowest_standardized"]
         ras.sort()
         ras = ras[0: int(n2keep)]
-        client[db]["col_resample"].update({"n_rows": n_rows, "col_id": col},
-                                          {"$set": {"resamples": resamples, "lowest_raw": ran, "lowest_standardized": ras}})
+        db["col_resample"].update({"n_rows": n_rows, "col_id": col},
+                                  {"$set": {"resamples": resamples, "lowest_raw": ran, "lowest_standardized": ras}})
 
-def colResampleInd(host, db, n_rows, cols, n_resamples=1000, keepP=0.1, port=27017):
+
+def col_resample_ind(db, n_rows, cols, n_resamples=1000, keepP=0.1):
     """Resample gene expression for a given number of genes in a particular condition using RSD, brute force."""
 
     logging.info("Adding brute force resample document for gene set size %d", n_rows)
 
-    # make connection
-    client = MongoClient(host=host, port=port)
-
     # see if a record for this gene set size exists
     old_records = {i["col_id"]: i
-                   for i in client[db]["col_resample"].find({ "n_rows": n_rows, "col_id": {"$in": cols}})}
+                   for i in db["col_resample"].find({ "n_rows": n_rows, "col_id": {"$in": cols}})}
 
     if old_records is not None:
         toUpdate = [int(i["col_id"])
@@ -81,7 +79,6 @@ def colResampleInd(host, db, n_rows, cols, n_resamples=1000, keepP=0.1, port=270
 
     if len(toAdd) == 0 and len(toUpdate) == 0:
         logging.info("Nothing to add")
-        client.close()
         return None
 
     n2keep = int(round(n_resamples * keepP))
@@ -99,7 +96,7 @@ def colResampleInd(host, db, n_rows, cols, n_resamples=1000, keepP=0.1, port=270
         nbins = int(math.ceil(len(toAdd) / 100.0))
         bins = split_list(toAdd, nbins)
         for b in bins:
-            df = pd.DataFrame(list(client[db].gene_expression.find({"col_id": {"$in": b}},
+            df = pd.DataFrame(list(db.gene_expression.find({"col_id": {"$in": b}},
                                                                    { "col_id": 1, "raw_expression": 1, "standardized_expression": 1})))
             if df.shape != (0,0):
                 df = df.groupby("col_id")
@@ -107,8 +104,8 @@ def colResampleInd(host, db, n_rows, cols, n_resamples=1000, keepP=0.1, port=270
                 df_rsd = df_rsd.groupby(df_rsd.index)
 
                 logging.info("Adding new documents to MongoDB")
-                tmp = [choose_n(int(i), df_rsd.get_group(i), n2keep, True, client, db, n_rows,
-                                n_resamples, old_records, keepP) for i in df_rsd.groups.keys()]
+                tmp = [__choose_n(db, int(i), df_rsd.get_group(i), n2keep, True, n_rows,
+                                  n_resamples, old_records, keepP) for i in df_rsd.groups.keys()]
 
     # toUpdate
     if len(toUpdate) > 0:
@@ -118,8 +115,8 @@ def colResampleInd(host, db, n_rows, cols, n_resamples=1000, keepP=0.1, port=270
         nbins = int(math.ceil(len(toUpdate) / 100.0))
         bins = split_list(toUpdate, nbins)
         for b in bins:
-            df = pd.DataFrame(list( client[db].gene_expression.find({ "col_id": {"$in": b}},
-                                                                    {"col_id":1, "raw_expression":1, "standardized_expression": 1})))
+            df = pd.DataFrame(list(db.gene_expression.find({ "col_id": {"$in": b}},
+                                                           {"col_id":1, "raw_expression":1, "standardized_expression": 1})))
 
             if df.shape != (0, 0):
                 df = df.groupby("col_id")
@@ -130,10 +127,8 @@ def colResampleInd(host, db, n_rows, cols, n_resamples=1000, keepP=0.1, port=270
                     df_rsd = df_rsd.groupby(df_rsd.index)
 
                     logging.info("Updating MongoDB documents")
-                    tmp = [choose_n(int(i), df_rsd.get_group(i), n2keep, False, client, db, n_rows,
-                                    resamples, old_records, keepP) for i in df_rsd.groups.keys()]
-    client.close()
-
+                    tmp = [__choose_n(db, int(i), df_rsd.get_group(i), n2keep, False, n_rows,
+                                      resamples, old_records, keepP) for i in df_rsd.groups.keys()]
     return None
 
 
@@ -151,7 +146,7 @@ if __name__ == '__main__':
                         level=LOG_LEVEL, filename=LOG_FILE)
 
     parser = argparse.ArgumentParser( description=DESCRIPTION )
-    parser.add_argument( '--host', required=True, type=str, help="Host for MongoDB" )
+    parser.add_argument('--host', required=True, type=str, help="Host for MongoDB" )
     parser.add_argument('--db', required=True, type=str, help="Database name")
     parser.add_argument('--n_rows', required=True, type=int, help="Gene set size to test")
     parser.add_argument('--n_resamples', default=1000, type=int, help="Number of resamples to compute")
@@ -170,6 +165,5 @@ if __name__ == '__main__':
         cols = None
 
     logging.info("Starting resample for n_rows = %d", args.n_rows)
-
-    colResampleInd(host=args.host, db=args.db, n_rows=args.n_rows, cols=cols, n_resamples=args.n_resamples, keepP=args.keep_p, port=args.port)
+    col_resample_ind(client[args.db], n_rows=args.n_rows, cols=cols, n_resamples=args.n_resamples, keepP=args.keep_p)
     client.close()

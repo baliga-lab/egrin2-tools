@@ -4,7 +4,6 @@
 import random
 import logging
 
-from pymongo import MongoClient
 import numpy as np
 import pandas as pd
 from scipy.stats import hypergeom
@@ -22,7 +21,7 @@ def rsd(vals):
     return abs(np.std(vals) / np.mean(vals))
 
 
-def findMatch(x, df, return_field):
+def find_match(x, df, return_field):
     """Find which 'df' element x matches. Return appropriate translation"""
     # find matching row
     counter = 0
@@ -31,18 +30,10 @@ def findMatch(x, df, return_field):
     return df.iloc[counter][return_field]
 
 
-def row2id(row, host="localhost", port=27017, dbname="", verbose=False, return_field="row_id"):
+def __row2id(db, row, return_field="row_id"):
     """Check name format of rows. If necessary, translate."""
-
-    # TODO: Remove me
-    client = MongoClient(host=host, port=port)
-    db = client[dbname]
-
     query = list(db.row_info.find({"$or": [{"row_id": row}, {"egrin2_row_name": row}, {"GI": row},
                                            {"accession": row}, {"name": row}, {"sysName": row}]}))
-    # TODO: Remove me
-    client.close()
-
     if len(query) == 1:
         if return_field == "all":
             row = query[0]
@@ -55,24 +46,18 @@ def row2id(row, host="localhost", port=27017, dbname="", verbose=False, return_f
 
     elif len(query) > 0:
         logging.error("Multiple rows match the row name: %s", row)
-        if verbose:
-            logging.info(query)
+        logging.info(query)
         return None
     else:
         logging.error("Cannot identify row name: %s", row)
         return None
 
 
-def row2id_batch(rows, host="localhost", port=27017, dbname="", verbose=True,
-                 return_field="row_id", input_type=None):
+def row2id_batch(db, rows, return_field="row_id", input_type=None):
     """Check name format of rows. If necessary, translate."""
 
     if return_field == input_type:
         return rows
-
-    # TODO: Remove me
-    client = MongoClient(host=host, port=port)
-    db = client[dbname]
 
     query = pd.DataFrame(list(db.row_info.find({"$or": [{"row_id": {"$in": rows}},
                                                         {"egrin2_row_name": {"$in": rows}},
@@ -89,28 +74,17 @@ def row2id_batch(rows, host="localhost", port=27017, dbname="", verbose=True,
         query = query.set_index(input_type)
         to_r = query.loc[rows][return_field].tolist()
     else:
-        #try to match input_type automatically
-        if verbose:
-            logging.info("Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query.")
-        to_r = [row2id(x, host, port, dbname, return_field = return_field) for x in rows]
-
-    # TODO: Remove me
-    client.close()
+        # try to match input_type automatically
+        logging.info("Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query.")
+        to_r = [__row2id(db, x, return_field=return_field) for x in rows]
 
     return to_r
 
 
-def col2id(col, host="localhost", port=27017, dbname="",  verbose=False, return_field="col_id"):
+def __col2id(db, col, return_field="col_id"):
     """Check name format of rows. If necessary, translate."""
-
-    # TODO: Remove me
-    client = MongoClient(host=host, port=port)
-    db = client[dbname]
-
     query = list(db.col_info.find({"$or": [{"col_id": col},
                                            { "egrin2_col_name": col}]}))
-    # TODO: Remove me
-    client.close()
     if len(query) == 1:
         try:
             col = query[0][return_field]
@@ -120,24 +94,18 @@ def col2id(col, host="localhost", port=27017, dbname="",  verbose=False, return_
 
     elif len(query) > 0:
         logging.error("Multiple cols match the col name: %s", col)
-        if verbose:
-            logging.info(query)
+        logging.info(query)
         return None
     else:
         logging.error("Cannot identify col name: %s", col)
         return None
 
 
-def col2id_batch(cols, host="localhost", port=27017, dbname="", verbose=True,
-                 return_field="col_id", input_type=None):
+def col2id_batch(db, cols, return_field="col_id", input_type=None):
     """Check name format of rows. If necessary, translate."""
 
     if return_field == input_type:
         return cols
-
-    # TODO: Remove me
-    client = MongoClient(host=host, port=port)
-    db = client[dbname]
 
     query = pd.DataFrame(list(db.col_info.find({ "$or": [{"col_id": {"$in": cols}},
                                                          {"egrin2_col_name": {"$in": cols}}]},
@@ -149,18 +117,14 @@ def col2id_batch(cols, host="localhost", port=27017, dbname="", verbose=True,
 
     else:
         # try to match input_type automatically
-        if verbose:
-            logging.info("Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query.")
-        to_r = [col2id(x, host, port, dbname, return_field=return_field) for x in cols]
+        logging.info("Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query.")
+        to_r = [__col2id(db, x, return_field=return_field) for x in cols]
 
-    # TODO: Remove me
-    client.close()
     return to_r
 
 
-def agglom(x=[0, 1], x_type=None, y_type=None, x_input_type=None, y_output_type=None,
-           logic="or", host="localhost", port=27017, dbname="", verbose=False, gre_lim=10,
-           pval_cutoff=0.05, translate=True):
+def agglom(db, x=[0, 1], x_type=None, y_type=None, x_input_type=None, y_output_type=None,
+           logic="or", gre_lim=10, pval_cutoff=0.05, translate=True):
     """
     Determine enrichment of y given x through bicluster co-membership.
     Available x_type(s)/y_type(s):
@@ -192,15 +156,11 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
     if type(x) == str or type(x) == int:
         x = [x]  # single
 
-    # TODO: Remove me
-    client = MongoClient(host=host, port=port)
-    db = client[dbname]
-
     # Check input types
     if x_type == "rows" or x_type == "row" or x_type == "gene" or x_type == "genes":
         x_type = "rows"
         x_o = x
-        x = row2id_batch(x, host, port, dbname, input_type=x_input_type, return_field="row_id")
+        x = row2id_batch(db, x, input_type=x_input_type, return_field="row_id")
         x = list(set(x))
         if len(x) == 0:
             logging.info("Cannot translate row names: %s", x_o)
@@ -209,7 +169,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
     elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type == "conds":
         x_type = "columns"
         x_o = x
-        x = col2id_batch(x, host, port, dbname, input_type=x_input_type, return_field="col_id")
+        x = col2id_batch(db, x, input_type=x_input_type, return_field="col_id")
         x = list(set(x))
         if len(x) == 0:
             logging.info("Cannot translate col names: %s", x_o)
@@ -258,8 +218,6 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
     else:
         logging.error("I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'.")
         return None
-
-    client.close()
 
     if query.shape[0] > 0:
 
@@ -327,8 +285,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 to_r.columns = ["counts","all_counts"]
 
                 if translate:
-                    to_r.index = row2id_batch(to_r.index.tolist(), host, port, dbname,
-                                              return_field="egrin2_row_name", input_type="row_id")
+                    to_r.index = row2id_batch(db, to_r.index.tolist(), return_field="egrin2_row_name", input_type="row_id")
 
             if y_type == "columns":
 
@@ -365,8 +322,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 to_r.columns = ["counts","all_counts"]
 
                 if translate:
-                    to_r.index = col2id_batch(to_r.index.tolist(), host, port, dbname, return_field="egrin2_col_name", input_type="col_id")
-
+                    to_r.index = col2id_batch(db, to_r.index.tolist(), return_field="egrin2_col_name", input_type="col_id")
 
             if y_type == "gre_id":
 
@@ -411,15 +367,16 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
         logging.info("Could not find any biclusters matching your criteria")
         return None
 
-def fimoFinder(start=None, stop=None, locusId=None, strand=None, mot_pval_cutoff=None, filterby=None, filter_type=None,
-               filterby_input_type=None, host="localhost", port=27017, dbname=None, use_fimo_small=True,
-               logic="or", return_format="file", outfile=None, tosingle=True):
+def find_fimo(db, start=None, stop=None, locusId=None, strand=None, mot_pval_cutoff=None, filterby=None, filter_type=None,
+              filterby_input_type=None, use_fimo_small=True,
+              logic="or", return_format="file", outfile=None, tosingle=True):
     """
     Find motifs/GREs that fall within a specific range. Filter by biclusters/genes/conditions/etc. Optionally write to GGBweb compatible .gsif format.
     IMPORTANT!!!! Only filtering by GREs currently supported
 
     Parameters:
 
+    -- db: mongo database object
     -- start: genomic start, chromosome start if None
     -- stop: genomic start, chromosome end if None
     -- locusId: chromosome Id, (i.e. MicrobesOnline scaffoldId or NCBI_RefSeq)
@@ -428,19 +385,12 @@ def fimoFinder(start=None, stop=None, locusId=None, strand=None, mot_pval_cutoff
     -- filterby: elements through which to filter fimo scans, e.g. gres
     -- filter_type: type of filterby, e.g. gres
     -- filterby_input_type: name format of filterby. Speeds up name translation
-    -- host: location of EGRIN 2 MongoDB
-    -- port: port on which MongoDB is listening
-    -- dbname: name of MongoDB database
     -- use_fimo_small: use fimo_small collection (highly significant matches only). Speed up query.
     -- logic: logcal operation to apply to filterby, ie and, or, nor
     -- return_format: how should the fimo tracks be returned, only "file" currently support (for upload to GGBweb)
     -- outfile: path and name of output file in .gsif format
     -- tosingle: return one filter per filterby object (eg GRE) or all in a single file (for early GGBweb dev support)
     """
-    # TODO: Remove me
-    client = MongoClient(host=host, port=port)
-    db = client[dbname]
-
     def getBCs(x, x_type):
         if x is None:
             to_r = pd.DataFrame(list(db.motif_info.find({}, {"cluster_id": 1, "gre_id": 1})))
@@ -462,10 +412,6 @@ def fimoFinder(start=None, stop=None, locusId=None, strand=None, mot_pval_cutoff
 
         return to_r
 
-    if dbname is None:
-        logging.error("Please provide a database name, e.g. *org*_db, where *org* is a three lettter short organism code")
-        return None
-
     db_chr = pd.DataFrame(list(db.genome.find({}, {"scaffoldId": 1, "NCBI_RefSeq": 1})))
     db_scaffoldId = db_chr.scaffoldId.tolist()
     db_NCBI_RefSeq = db_chr.NCBI_RefSeq.tolist()
@@ -479,7 +425,7 @@ LocusIds in database %s include:
   - %s
   - NCBI_RefSeq
   - %s""",
-                      dbname, (", ").join(db_scaffoldId), (", ").join(db_NCBI_RefSeq))
+                      db.name, (", ").join(db_scaffoldId), (", ").join(db_NCBI_RefSeq))
         return None
 
     locusId = str(locusId)
@@ -492,7 +438,7 @@ LocusIds in this database include:
   - %s
   - NCBI_RefSeq
   - %s""",
-                      locusId, dbname,
+                      locusId, db.name,
                       (", ").join(db_scaffoldId),
                       (", ").join(db_NCBI_RefSeq))
         return None
@@ -523,7 +469,7 @@ LocusIds in this database include:
         if filter_type == "rows" or filter_type == "row" or filter_type == "gene" or filter_type == "genes":
             filter_type = "rows"
             filterby_o = filterby
-            filterby = row2id_batch(filterby, host, port, dbname, input_type=filter_input_type, return_field="row_id")
+            filterby = row2id_batch(db, filterby, input_type=filter_input_type, return_field="row_id")
             filterby = list(set(filterby))
             if len(filterby) == 0:
                 logging.error("Cannot translate row names: %s", filterby_o)
@@ -532,7 +478,7 @@ LocusIds in this database include:
         elif filter_type == "columns" or filter_type == "column" or filter_type == "col" or filter_type == "cols" or filter_type == "condition" or filter_type == "conditions" or filter_type == "conds":
             filter_type = "columns"
             filterby_o = filterby
-            filterby = col2id_batch(filterby, host, port, dbname, input_type=filterby_input_type, return_field="col_id")
+            filterby = col2id_batch(db, filterby, input_type=filterby_input_type, return_field="col_id")
             filterby = list(set(filterby))
 
             if len(filterby) == 0:
@@ -599,11 +545,10 @@ LocusIds in this database include:
                 gres_scans.to_csv(outfile, sep="\t", index=False)
                 return None
 
-    client.close()
     return gre_scans
 
-def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_return_field=None,
-                count=False, logic="or", host="localhost", port=27017, dbname=""):
+def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes", y_return_field=None,
+                    count=False, logic="or"):
 
     """
     Fetch corem-related info 'y' given query 'x'.
@@ -632,20 +577,18 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
     if type(x) == str or type(x) == int:
         x = [x]  # single
 
-    client = MongoClient(host=host, port=port)
-
     # Check input types
     x_type = TYPE_MAP[x_type]
     if x_type == "rows":
         x_o = x
-        x = row2id_batch(x, host, port, dbname, input_type = x_input_type, return_field="row_id")
+        x = row2id_batch(db, x, input_type = x_input_type, return_field="row_id")
         x = list(set(x))
         if len(x) == 0:
             logging.error("Cannot translate row names: %s", x_o)
             return None
     elif x_type == "cols.col_id":
         x_o = x
-        x = col2id_batch(x, host, port, dbname, input_type = x_input_type, return_field="col_id")
+        x = col2id_batch(db, x, input_type = x_input_type, return_field="col_id")
         x = list(set(x))
         if len(x) == 0:
             logging.error("Cannot translate row names: %s", x_o)
@@ -653,7 +596,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
     elif x_type == "edges":
         x_new = []
         for i in x:
-            i_trans = row2id_batch(i.split("-"), host, port, dbname, input_type=x_input_type, return_field="row_id", verbose=False)
+            i_trans = row2id_batch(db, i.split("-"), input_type=x_input_type, return_field="row_id")
             i_trans = [str(j) for j in i_trans]
             x_new.append("-".join(i_trans))
             i_trans.reverse()
@@ -696,7 +639,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                     to_r = to_r[to_r >= query.shape[0]]
 
                     if to_r.shape[0] > 0:
-                        to_r.index = row2id_batch(to_r.index.tolist(), host, port, dbname, return_field=y_return_field, input_type="row_id")
+                        to_r.index = row2id_batch(db, to_r.index.tolist(), return_field=y_return_field, input_type="row_id")
                     else:
                         logging.error("No genes found")
                         return None
@@ -704,7 +647,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                     to_r = to_r[to_r >= query.shape[0]].index.tolist()
 
                     if len(to_r):
-                        to_r = row2id_batch(to_r, host, port, dbname, return_field=y_return_field, input_type="row_id")
+                        to_r = row2id_batch(db, to_r, return_field=y_return_field, input_type="row_id")
                         to_r.sort()
                     else:
                         logging.error("No genes found")
@@ -714,20 +657,20 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                     to_r = pd.Series(to_r).value_counts()
 
                     if to_r.shape[0] > 0:
-                        to_r.index = row2id_batch(to_r.index.tolist(), host, port, dbname, return_field=y_return_field, input_type="row_id")
+                        to_r.index = row2id_batch(db, to_r.index.tolist(), return_field=y_return_field, input_type="row_id")
                     else:
                         logging.error("No genes found")
                         return None
                 else:
                     to_r = list(set(to_r))
                     if len(to_r):
-                        to_r = row2id_batch(to_r, host, port, dbname, return_field=y_return_field, input_type = "row_id")
+                        to_r = row2id_batch(db, to_r, return_field=y_return_field, input_type = "row_id")
                         to_r.sort()
                     else:
                         logging.error("No genes found")
                         return None
         else:
-            to_r = row2id_batch(query.rows[0], host, port, dbname, return_field=y_return_field, input_type="row_id")
+            to_r = row2id_batch(db, query.rows[0], return_field=y_return_field, input_type="row_id")
 
     elif y_type == "cols.col_id":
         if y_return_field is None:
@@ -742,7 +685,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                 if count:
                     to_r = to_r[to_r >= query.shape[0]]
                     if to_r.shape[0] > 0:
-                        to_r.index = col2id_batch(to_r.index.tolist(), host, port, dbname, return_field=y_return_field, input_type="col_id")
+                        to_r.index = col2id_batch(db, to_r.index.tolist(), return_field=y_return_field, input_type="col_id")
                     else:
                         logging.error("No conditions found")
                         return None
@@ -750,7 +693,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                     to_r = to_r[to_r >= query.shape[0]].index.tolist()
 
                     if len(to_r):
-                        to_r = col2id_batch(to_r, host, port, dbname, return_field=y_return_field, input_type="col_id")
+                        to_r = col2id_batch(db, to_r, return_field=y_return_field, input_type="col_id")
                         to_r.sort()
                     else:
                         logging.error("No conditions found")
@@ -759,21 +702,21 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
                 if count:
                     to_r = pd.Series(to_r).value_counts()
                     if to_r.shape[0] > 0:
-                        to_r.index = col2id_batch(to_r.index.tolist(), host, port, dbname, return_field=y_return_field, input_type="col_id")
+                        to_r.index = col2id_batch(db, to_r.index.tolist(), return_field=y_return_field, input_type="col_id")
                     else:
                         logging.error("No conditions found")
                         return None
                 else:
                     to_r = list(set(to_r))
                     if len(to_r):
-                        to_r = col2id_batch(to_r, host, port, dbname, return_field=y_return_field, input_type="col_id")
+                        to_r = col2id_batch(db, to_r, return_field=y_return_field, input_type="col_id")
                         to_r.sort()
                     else:
                         logging.error("No conditions found")
                         return None
         else:
             to_r = [int(i["col_id"]) for i in list(itertools.chain( *query.cols.values.tolist())) if i["col_id"] if type(i["col_id"]) is float]
-            to_r = col2id_batch( to_r, host, port, dbname, return_field=y_return_field, input_type="col_id")
+            to_r = col2id_batch(db, to_r, return_field=y_return_field, input_type="col_id")
 
     elif y_type == "corem_id":
         to_r = query.corem_id.tolist()
@@ -785,9 +728,7 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
         to_r_new = []
 
         for i in to_r:
-            i_trans = row2id_batch([int(j) for j in i.split("-")],
-                                   host, port, dbname, input_type="row_id",
-                                   return_field=y_return_field, verbose = False)
+            i_trans = row2id_batch(db, [int(j) for j in i.split("-")], input_type="row_id", return_field=y_return_field)
 
             i_trans = [str(j) for j in i_trans]
             to_r_new.append("-".join(i_trans))
@@ -800,9 +741,6 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
         logging.error("Could not find corems matching your query")
         to_r = None
 
-    # TODO: Remove me
-    client.close()
-
     if to_r is not None:
         to_r = pd.DataFrame(to_r)
         to_r.columns = [y_type_original]
@@ -810,23 +748,17 @@ def coremFinder(x, x_type="corem_id", x_input_type=None, y_type="genes", y_retur
     return to_r
 
 
-def expressionFinder(rows=None, cols=None, standardized=True, host="localhost", port=27017, dbname=""):
+def find_gene_expression(db, rows=None, cols=None, standardized=True):
     """
     Fetch gene expression given rows and columns.
 
     Parameters:
+    -- db: mongo database object
     -- rows: list of rows/genes in format recognized by row2id_batch (i.e. some name present in MicrobesOnline)
     -- cols: list of columns/conditions in format recognized by col2id_batch (i.e. name in ratios matrix)
     -- standardized: fetch standardized data if True, otherwise raw (normalized) data
-    -- host: location of EGRIN 2 MongoDB
-    -- port: port on which MongoDB is listening
-    -- dbname: name of MongoDB database
 
     """
-    # TODO: Remove me
-    client = MongoClient(host=host, port=port)
-    db = client[dbname]
-
     input_type_rows = None
     input_type_cols = None
 
@@ -848,8 +780,8 @@ def expressionFinder(rows=None, cols=None, standardized=True, host="localhost", 
 
     # translate rows/cols
 
-    rows = row2id_batch(rows, host, port, dbname,  verbose=False, return_field="row_id", input_type=input_type_rows)
-    cols = col2id_batch(cols, host, port, dbname,  verbose=False, return_field="col_id", input_type=input_type_cols)
+    rows = row2id_batch(db, rows, return_field="row_id", input_type=input_type_rows)
+    cols = col2id_batch(db, cols, return_field="col_id", input_type=input_type_cols)
 
     if len(rows) > 1000 or len(cols) > 1000:
         logging.warn("This is a large query. Please be patient. If you need faster access, I would suggest saving this matrix and loading directly from file.")
@@ -864,29 +796,22 @@ def expressionFinder(rows=None, cols=None, standardized=True, host="localhost", 
         else:
             data = query.pivot(index="row_id", columns="col_id", values="raw_expression")
 
-    data.index = row2id_batch(data.index.tolist(), host, port, dbname,  verbose=False, return_field="egrin2_row_name", input_type="row_id")
-    data.columns = col2id_batch(data.columns.tolist(), host, port, dbname,  verbose=False, return_field="egrin2_col_name", input_type="col_id")
+    data.index = row2id_batch(db, data.index.tolist(), return_field="egrin2_row_name", input_type="row_id")
+    data.columns = col2id_batch(db, data.columns.tolist(), return_field="egrin2_col_name", input_type="col_id")
     data = data.sort_index()
     data = data.reindex_axis(sorted(data.columns), axis=1)
 
-    # TODO: Remove me
-    client.close()
-
     return data
 
-def ggbwebModule(genes=None, outfile=None, host="localhost", port=27017, dbname=""):
+def export_ggbweb(db, genes=None, outfile=None):
     """
     Write gene module in GGBweb .gsif format
 
     Parameters:
+    -- db: mongo database object
     -- genes: list of genes in format recognized by row2id_batch (some name present in MicrobesOnline)
     -- outfile: path/name of module file to write
-    -- host: location of EGRIN 2 MongoDB
-    -- port: port on which MongoDB is listening
-    -- dbname: name of MongoDB database
     """
-    client = MongoClient(host=host, port=port)
-
     if genes is None:
         logging.error("Please provide a gene or list of genes")
         return None
@@ -897,7 +822,7 @@ def ggbwebModule(genes=None, outfile=None, host="localhost", port=27017, dbname=
     def locFormat(x, gene):
         return pd.DataFrame([gene, "E.colik-12", str(x.start), str(x.stop)])
 
-    gene_info = pd.DataFrame(row2id_batch(genes, host=host, port=port, dbname=dbname, return_field="all", verbose=False))
+    gene_info = pd.DataFrame(row2id_batch(db, genes, return_field="all"))
 
     to_r = pd.concat([locFormat(gene_info.iloc[i], gene_info.loc[i, "egrin2_row_name"]) for i in range(gene_info.shape[0])], 2).T
 
@@ -906,20 +831,18 @@ def ggbwebModule(genes=None, outfile=None, host="localhost", port=27017, dbname=
         to_r.to_csv(os.path.abspath( outfile ), sep="\t", index=False, header=False)
         return None
 
-    client.close()
     return to_r
 
-def motifFinder(x, x_type, output_type=["data_frame", "array"][0], host="localhost", port=27017, dbname=""):
+
+def find_motifs(db, x, x_type, output_type=["data_frame", "array"][0]):
     """
     Find, retrieve, and format motif PWM
 
     Parameters:
+    -- db: mongo database object
     -- x: list of motifs to retrieve. Can be combined name separated by `_`, eg to return motif #1 from bicluster #10 in run #3 supply x = "3_10_1". See below for x_type.
     -- x_type: format of x, e.g. gre. Can be combined name separated by `_`, eg to return motif #1 from bicluster #10 in run #3 supply x_type = "run_cluster_motif"
     -- output_type: format of output. `data_frame` for pretty printing, `array` for viz by weblogo
-    -- host: location of EGRIN 2 MongoDB
-    -- port: port on which MongoDB is listening
-    -- dbname: name of MongoDB database
 
     Returns DataFrame (or list of DataFrames) containing PWM (more precisely PPMs)
     """
@@ -933,8 +856,6 @@ def motifFinder(x, x_type, output_type=["data_frame", "array"][0], host="localho
         # make sure order is consistent with weblogo
         to_r = to_r.loc[:, ["a","c","g","t"]]
         return to_r
-
-    client = MongoClient(host=host, port=port)
 
     if type(x) == str or type(x) == int:
         x = [x] # single
@@ -1016,27 +937,21 @@ def motifFinder(x, x_type, output_type=["data_frame", "array"][0], host="localho
     if len(to_r) == 1:
         to_r = to_r.values()[0]
 
-    client.close()
-
     return to_r
 
 
-def gre_motifs(gre_id, evalue=None, database='mtu_db', host='baligadev', port=27017):
+def gre_motifs(db, gre_id, evalue=None):
     """Returns a list of PSSMs for the given GRE id.
     If evalue is specified, only the motifs with a smaller evalue are returned
     """
     result = []
-    client = MongoClient(host=host, port=port)
-    try:
-        query = {'gre_id': gre_id}
-        if evalue is not None: 
-            query['evalue'] = {'$lt': evalue}
+    query = {'gre_id': gre_id}
+    if evalue is not None: 
+        query['evalue'] = {'$lt': evalue}
 
-        pwms = client[database].motif_info.find(query, {'pwm': 1, '_id': 0})
+    pwms = db.motif_info.find(query, {'pwm': 1, '_id': 0})
 
-        for i, pwm in enumerate(pwms):
-            rows = pwm['pwm']
-            result.append([[row['a'], row['g'], row['c'], row['t']] for row in rows])
-        return result
-    finally:
-        client.close()
+    for i, pwm in enumerate(pwms):
+        rows = pwm['pwm']
+        result.append([[row['a'], row['g'], row['c'], row['t']] for row in rows])
+    return result
