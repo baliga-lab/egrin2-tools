@@ -35,30 +35,15 @@ from Bio import SeqIO
 
 class ResultDatabase:
 
-    def __init__(self, organism, db, ensembledir=None, targetdir=None,
-                 prefix=None, ratios_raw=None, gre2motif=None, col_annot=None,
-                 ncbi_code=None,
-                 db_run_override=None, genome_file=None, row_annot=None,
-                 row_annot_match_col=None):
+    def __init__(self, organism, db, ensembledir, prefix, ratios_raw, gre2motif, col_annot,
+                 ncbi_code, db_run_override, genome_file, row_annot, row_annot_match_col,
+                 targetdir):
 
         self.organism = organism
         self.db = db
+        self.prefix = prefix
 
-        # get db files in directory
-        if prefix is None:
-            self.prefix = organism + '-out-'
-        else:
-            self.prefix = prefix
-        if ensembledir is None:
-            self.ensembledir = '.'
-        else:
-            self.ensembledir = ensembledir
-        if targetdir is None:
-            self.targetdir = '.'
-        else:
-            self.targetdir = targetdir
-
-        if gre2motif == None:
+        if gre2motif is None:
             # default file name?
             if os.path.isfile(os.path.join(self.ensembledir, "out.mot_metaclustering.txt.I45.txt")):
                 self.gre2motif = os.path.join(self.ensembledir, "out.mot_metaclustering.txt.I45.txt")
@@ -72,7 +57,7 @@ class ResultDatabase:
         self.db_files = np.sort(np.array(glob.glob(os.path.join(self.ensembledir, self.prefix) + "???/cmonkey_run.db")))
         self.db_run_override = db_run_override
 
-        if ncbi_code == None:
+        if ncbi_code is None:
             # try to find ncbi_code in cmonkey_run.db
             conn = sqlite3.connect(self.db_files[0])
             c = conn.cursor()
@@ -94,9 +79,8 @@ class ResultDatabase:
             logging.warn("""I cannot find any cMonkey SQLite databases in the current directory: %s
 Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemble results.""",
                          os.getcwd())
-        return None
 
-    def dlfile(self, url, save_name=None, num_retries=5):
+    def __download_file(self, url, save_name=None, num_retries=5):
         # Open the url
         if save_name is None:
             save_name = "tmp"
@@ -121,11 +105,11 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
                 logging.info("Trying to connect again. Attempt %d of 5", count)
                 count += 1
 
-    def checkRuns(self, db_files, db_run_override, db):
+    def __check_runs(self):
         """make sure the runs have data!!!"""
         to_keep = []
-        ensemble_info_collection = db.ensemble_info
-        for i in db_files:
+        ensemble_info_collection = self.db.ensemble_info
+        for i in self.db_files:
             try:
                 conn = sqlite3.connect(i)
                 c = conn.cursor()
@@ -138,7 +122,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
                     # incomplete runs
                     pass
                 else:
-                    if db_run_override == None:
+                    if self.db_run_override is None:
                         # do not include runs that are already in the database
                         # check for existence
                         run_name = i.split("/")[-2]
@@ -152,17 +136,16 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
                 pass
         return to_keep
 
-    def get_run2id(self, dbfiles, db):
+    def __get_run2id(self):
         """make run2id"""
-        ensemble_info_collection = db.ensemble_info
         run_name = []
         run_id = []
 
-        for i in ensemble_info_collection.find():
+        for i in self.db.ensemble_info.find():
             run_name.append(i["run_name"])
             run_id.append(i["run_id"])
 
-        for i in dbfiles:
+        for i in self.dbfiles:
             if i.split("/")[-2] not in run_name:
                 run_name.append(i.split("/")[-2])
                 if len(run_id) > 0:
@@ -172,7 +155,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         run_info =  pd.DataFrame(zip(run_id, run_name), index=run_name, columns=["run_id", "run_name"])
         return run_info
 
-    def check4existence(self, collection, document, key1=None, value1=None, key2=None, value2=None):
+    def __check4existence(self, collection, document, key1=None, value1=None, key2=None, value2=None):
         if key1 == None:
             d_check = collection.find(document).count()
         else:
@@ -183,14 +166,14 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         if d_check == 0:
             return document
 
-    def loadGenome (self, ncbi_code, genome_file):
-        if genome_file == None:
+    def __load_genome(self):
+        if self.genome_file is None:
             logging.info("No custom genome annotation file supplied by 'genome_file' parameter. Attempting automated download from MicrobesOnline...")
 
             # download genome from microbes online. store in MongoDB collection
-            url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId=%s;export=genome" % str(ncbi_code)
-            save_name = "%s_genome.fa" % str(ncbi_code)
-            self.dlfile(url, save_name)
+            url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId=%s;export=genome" % str(self.ncbi_code)
+            save_name = "%s_genome.fa" % str(self.ncbi_code)
+            self.__download_file(url, save_name)
 
             seqs_b = []
             with open(save_name, 'r') as f:
@@ -207,7 +190,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         # Check whether documents are already present in the collection before insertion
         if genome_collection.count() > 0:
-            seqs_f = filter(None, [self.check4existence(genome_collection, i) for i in seqs_b])
+            seqs_f = filter(None, [self.__check4existence(genome_collection, i) for i in seqs_b])
         else:
             seqs_f = seqs_b
 
@@ -217,7 +200,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         return genome_collection
 
-    def loadRatios(self, file_in):
+    def __load_ratios(self, file_in):
         """Loads ratios from individual cMonkey runs (unfinished) or single flat file (gzip compressed)."""
         if file_in == None:
             # compile from individual runs
@@ -236,7 +219,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
                 raise Exception("Cannot read ratios file. Check delimiter. Should be '\t' or ',' ")
         return ratios
 
-    def standardizeRatios(self, ratios):
+    def __standardize_ratios(self, ratios):
         """compute standardized ratios (global). row standardized"""
         ratios_standardized = ratios.copy()
         zscore = lambda x: (x - x.mean()) / x.std()
@@ -246,13 +229,12 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         return ratios_standardized
 
-    def get_row2id(self, ratios_standardized, db):
+    def __get_row2id(self, ratios_standardized):
         """make row2id and id2row dicts for lookup"""
-        row_info_collection = db.row_info
         row_name = []
         row_id = []
 
-        for i in row_info_collection.find():
+        for i in self.db.row_info.find():
             row_name.append(i["egrin2_row_name"])
             row_id.append(i["row_id"])
 
@@ -267,7 +249,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         row_info =  pd.DataFrame(zip(row_id, row_name), index=row_name, columns=["row_id", "egrin2_row_name"])
         return row_info
 
-    def insert_row_info(self, ncbi_code, row_info, row_annot, row_annot_match_col):
+    def __insert_row_info(self):
         """
         Insert row_info into mongoDB database
 
@@ -284,60 +266,59 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
             print i["GO"]
 
         """
-        if row_annot == None:
+        row_annot = self.row_annot
+        row_annot_match_col = self.row_annot_match_col
+
+        if row_annot is None:
             logging.info("Row annotation file not supplied as 'row_annot' parameter. Attempting automated download from MicrobesOnline...")
-            if ncbi_code is not None:
-                logging.info("Downloading gene information for NCBI taxonomy ID: %s", str(ncbi_code))
-                url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId=%s;export=tab" % str(ncbi_code)
-                save_name = "%s_geneInfo.tab" % str(ncbi_code)
-                self.dlfile(url, save_name)
+            if self.ncbi_code is not None:
+                logging.info("Downloading gene information for NCBI taxonomy ID: %s", str(self.ncbi_code))
+                url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId=%s;export=tab" % str(self.ncbi_code)
+                save_name = "%s_geneInfo.tab" % str(self.ncbi_code)
+                self.__download_file(url, save_name)
 
                 with open(save_name, 'r') as f:
                     row_annot = pd.read_csv(f, sep="\t")
 
                 left_on = "egrin2_row_name"
 
-                if row_annot_match_col == None:
+                if row_annot_match_col is None:
                     row_annot_match_col = "sysName"
 
                 # join with row_annot
-                row_table = pd.merge(row_info, row_annot, left_on=left_on, right_on=row_annot_match_col)
+                row_table = pd.merge(self.row2id, row_annot, left_on=left_on, right_on=row_annot_match_col)
             else:
-                print "WARNING: could not fetch additional gene information for NCBI taxonomy ID:", ncbi_code
+                print "WARNING: could not fetch additional gene information for NCBI taxonomy ID:", self.ncbi_code
                 # TODO:
                 # Check whether documents are already present in the collection before insertion
                 # In case where they are present, update them
-                row_table = row_info
+                row_table = self.row2id
         else:
             row_annot = pd.read_csv(open(row_annot, 'rb'), sep="\t")
             # join with row_annot
-            row_table = pd.merge(row_info, row_annot, left_on=left_on, right_on=row_annot_match_col)
-
-        # write to mongoDB collection
-        row_info_collection = self.db.row_info
+            row_table = pd.merge(self.row2id, row_annot, left_on=left_on, right_on=row_annot_match_col)
 
         # Check whether documents are already present in the collection before insertion
         d = row_table.to_dict('records')
 
-        if row_info_collection.count() > 0:
-            d_f = filter(None, [self.check4existence( row_info_collection, i) for i in d])
+        if self.db.row_info.count() > 0:
+            d_f = filter(None, [self.__check4existence(self.db.row_info, i) for i in d])
         else:
             d_f = d
 
         logging.info("%d new row info records to write", len(d_f))
 
         if len(d_f) > 0:
-            row_info_collection.insert(d_f)
+            self.db.row_info.insert(d_f)
 
-        return row_info_collection
+        return self.db.row_info
 
-    def get_col2id(self, ratios_standardized, db):
+    def __get_col2id(self, ratios_standardized):
         """make cond2id and id2cond dicts for lookup"""
-        col_info_collection = db.col_info
         col_name = []
         col_id = []
 
-        for i in col_info_collection.find():
+        for i in self.db.col_info.find():
             col_name.append(i["egrin2_col_name"])
             col_id.append(i["col_id"])
 
@@ -351,10 +332,9 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         col_info = pd.DataFrame(zip(col_id, col_name), index=col_name, columns=["col_id", "egrin2_col_name"])
         return col_info
 
-    def insert_col_info(self, col_info, col_annot):
+    def __insert_col_info(self):
         """
         Insert col_info into mongoDB database
-
 
         example queries
         ------------------------------
@@ -363,51 +343,52 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         for i in col_info_collection.find( { "$and": [ { "additional_info.name": "strain", "additional_info.value":  { "$regex": "MG1655" } }, { "additional_info.name": "growth_phase", "additional_info.value": "biofilm"  } ] } ):
             print i
-
         """
+        col_annot = self.col_annot
+
         # load additional col info
-        if  col_annot != None:
+        if col_annot is not None:
             # assumes default microbes online schema
-            col_annot = pd.read_csv( gzip.open(col_annot, 'rb'), sep="\t")
-            col_table = pd.merge(col_info, col_annot, left_on="egrin2_col_name", right_on="experiment_name")
+            col_annot = pd.read_csv(gzip.open(col_annot, 'rb'), sep="\t")
+            col_table = pd.merge(self.col2id, col_annot, left_on="egrin2_col_name", right_on="experiment_name")
         else:
-            col_table = col_info
+            col_table = self.col2id
 
         col_info_4_mongoDB = []
-        for i in range(0, len(col_info.egrin2_col_name)):
-            col_info_4_mongoDB.append(self.condInfo2Dict(col_table, col_info.egrin2_col_name[i]))
-
-        # write to mongoDB collection
-        col_info_collection = self.db.col_info
+        for i in range(0, len(self.col2id.egrin2_col_name)):
+            col_info_4_mongoDB.append(self.__cond_info2dict(col_table, self.col2id.egrin2_col_name[i]))
 
         # Check whether documents are already present in the collection before insertion
-        if col_info_collection.count() > 0:
-            d_f = filter(None, [self.check4existence( col_info_collection, i) for i in col_info_4_mongoDB])
+        if self.db.col_info.count() > 0:
+            d_f = filter(None, [self.__check4existence(self.db.col_info, i) for i in col_info_4_mongoDB])
         else:
             d_f = col_info_4_mongoDB
 
         logging.info("%d new col info records to write", len(d_f))
 
         if len(d_f) > 0:
-            col_info_collection.insert(d_f)
+            self.db.col_info.insert(d_f)
 
-        return col_info_collection
+        return self.db.col_info
 
-    def condInfo2Dict(self, col_table, cond_name):
+    def __cond_info_2dict(self, col_table, cond_name):
         cond_data = col_table[col_table.egrin2_col_name == cond_name]
         cond_dict = {"col_id": np.unique(cond_data.col_id)[0], "egrin2_col_name": np.unique(cond_data.egrin2_col_name)[0], "additional_info": []}
 
         if "feature_name" in cond_data.columns and "value" in cond_data.columns and "feature_units" in cond_data.columns:
             for i in range(0, cond_data.shape[0]):
-                cond_dict[ "additional_info" ].append({"name": cond_data.irow(i)["feature_name"],
-                                                       "value": cond_data.irow(i)["value"],
-                                                       "units": cond_data.irow(i)["feature_units"]})
+                cond_dict["additional_info"].append({"name": cond_data.irow(i)["feature_name"],
+                                                     "value": cond_data.irow(i)["value"],
+                                                     "units": cond_data.irow(i)["feature_units"]})
         return cond_dict
 
-    def insert_gene_expression(self, db, row2id, col2id, ratios, ratios_std):
+    def __insert_gene_expression(self):
         """
         Insert gene_expression into mongoDB database
         """
+        ratios = self.expression
+        ratios_std = self.expression_standardized
+
         exp_data = []
         num_rows = 0
 
@@ -416,8 +397,8 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         # TODO: Pandas dataframes are probably not a good idea for lookup tables
         # ----- get rid of them for row2id/col2id altogether
-        row_map = {row: row2id.loc[row].row_id for row in ratios.index.values}
-        col_map = {col: col2id.loc[col].col_id for col in ratios.columns.values}
+        row_map = {row: self.row2id.loc[row].row_id for row in ratios.index.values}
+        col_map = {col: self.col2id.loc[col].col_id for col in ratios.columns.values}
         
         for row_name in ratios.index.values:
             if num_rows % 200 == 0:
@@ -438,22 +419,22 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
             num_rows += 1
 
         # write to mongoDB collection
-        gene_expression_collection = db.gene_expression
+        gene_expression_collection = self.db.gene_expression
 
         # Check whether documents are already present in the collection before insertion
-        if gene_expression_collection.count() > 0:
-            d_f = filter(None, [self.check4existence(gene_expression_collection, i) for i in exp_data])
+        if self.db.gene_expression.count() > 0:
+            d_f = filter(None, [self.__check4existence(self.db.gene_expression, i) for i in exp_data])
         else:
             d_f = exp_data
 
         logging.info("%d new gene expression records to write", len(d_f))
 
         if len(d_f) > 0:
-            gene_expression_collection.insert(d_f)
+            self.db.gene_expression.insert(d_f)
 
-        return gene_expression_collection
+        return self.db.gene_expression
 
-    def assemble_ensemble_info(self, db_file, run2id, row2id, col2id):
+    def __assemble_ensemble_info(self, db_file):
         """Create python ensemble_info dictionary for bulk import into MongoDB collections"""
         run_name = db_file.split("/")[-2]
         logging.info("Assembling run info for cMonkey run: %s", run_name)
@@ -463,12 +444,12 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
             c.execute("SELECT start_time, finish_time, num_iterations, organism, species, num_rows, num_columns, num_clusters, git_sha FROM run_infos")
             run_info = c.fetchone()
             c.execute("SELECT name FROM row_names")
-            rows = [row2id.loc[str(row[0])].row_id for row in c.fetchall()]
+            rows = [self.row2id.loc[str(row[0])].row_id for row in c.fetchall()]
             c.execute("SELECT name FROM column_names")
-            cols = [col2id.loc[str(row[0])].col_id for row in c.fetchall()]
+            cols = [self.col2id.loc[str(row[0])].col_id for row in c.fetchall()]
 
             d = {
-                "run_id": run2id.loc[run_name].run_id,
+                "run_id": self.run2id.loc[run_name].run_id,
                 "run_name": run_name,
                 "start_time": str(run_info[0]),
                 "finish_time": str(run_info[1]),
@@ -487,15 +468,15 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
             conn.close()
         return d
 
-    def insert_ensemble_info(self, db_files, db, run2id, row2id, col2id):
+    def __insert_ensemble_info(self):
         """Compile and insert ensemble_info collection into MongoDB collection"""
-        to_insert = [self.assemble_ensemble_info( i, run2id, row2id, col2id) for i in db_files]
-        ensemble_info_collection = db.ensemble_info
+        to_insert = [self.__assemble_ensemble_info(dbfile) for dbfile in self.db_files]
+        ensemble_info_collection = self.db.ensemble_info
 
         # Check whether documents are already present in the collection before insertion
         if ensemble_info_collection.count() > 0:
-            d_f = filter(None, [self.check4existence(ensemble_info_collection, i, "run_name", i["run_name"])
-                                for i in to_insert])
+            d_f = filter(None, [self.__check4existence(ensemble_info_collection, doc, "run_name", doc["run_name"])
+                                for doc in to_insert])
         else:
             d_f = to_insert
 
@@ -506,11 +487,11 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         return ensemble_info_collection
 
-    def loadGREMap(self, gre2motif):
-        if gre2motif is not None:
+    def __load_gre_map(self):
+        if self.gre2motif is not None:
             count = 1
             mots = {}
-            with open(gre2motif, 'r') as f:
+            with open(self.gre2motif, 'r') as f:
                 for line in f:
                     # only consider motif clusters with > 3 motifs
                     if len(line.strip("\n").split("\t")) > 3:
@@ -536,7 +517,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         else:
             return None
 
-    def insert_bicluster_info( self, db, db_file, run2id, row2id, col2id ):
+    def __insert_bicluster_info(self, db_file):
         """Find all biclusters in a cMonkey run, process and add as documents to bicluster collection
 
         example queries
@@ -551,8 +532,8 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
             last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!!
             w = (last_run, )
             c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?", w)
-            biclusters = [self.assemble_bicluster_info_single(db, db_file, c, last_run, i[0], run2id, row2id, col2id)
-                          for i in c.fetchall()]
+            biclusters = [self.__assemble_bicluster_info_single(db_file, c, last_run, row[0])
+                          for row in c.fetchall()]
         finally:
             conn.close()
 
@@ -560,8 +541,8 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         # Check whether documents are already present in the collection before insertion
         if bicluster_info_collection.count() > 0:
-            d_f = filter(None, [self.check4existence(bicluster_info_collection, i, "run_id",
-                                                     i["run_id"], "cluster", i["cluster"]) for i in biclusters])
+            d_f = filter(None, [self.__check4existence(bicluster_info_collection, i, "run_id",
+                                                       i["run_id"], "cluster", i["cluster"]) for i in biclusters])
         else:
             d_f = biclusters
 
@@ -571,19 +552,19 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         return bicluster_info_collection
 
-    def assemble_bicluster_info_single(self, db, db_file, cursor, iteration, cluster, run2id, row2id, col2id):
+    def __assemble_bicluster_info_single(self, db_file, cursor, iteration, cluster):
         """Create python ensemble_info dictionary for bulk import into MongoDB collections"""
         run_name = db_file.split("/")[-2]
         w = (cluster, iteration)
         cursor.execute("SELECT residual FROM cluster_stats WHERE cluster = ? AND iteration = ?", w)
         residual = cursor.fetchone()[0]
         cursor.execute("SELECT name FROM row_members JOIN row_names ON row_members.order_num = row_names.order_num WHERE row_members.cluster = ? AND row_members.iteration = ?", w)
-        rows = [row2id.loc[str(i[0])].row_id for i in cursor.fetchall()]
+        rows = [self.row2id.loc[str(i[0])].row_id for i in cursor.fetchall()]
         cursor.execute("SELECT name FROM column_members JOIN column_names ON column_members.order_num = column_names.order_num WHERE column_members.cluster = ? AND column_members.iteration = ?", w)
-        cols = [col2id.loc[str(i[0])].col_id for i in cursor.fetchall()]
+        cols = [self.col2id.loc[str(i[0])].col_id for i in cursor.fetchall()]
 
         d = {
-            "run_id": run2id.loc[run_name].run_id,
+            "run_id": self.run2id.loc[run_name].run_id,
             "cluster": cluster,
             "rows": rows,
             "columns": cols,
@@ -592,7 +573,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         return d
 
-    def insert_motif_info(self, db, db_file, run2id, motif2gre, row_info_collection):
+    def __insert_motif_info(self, db_file):
         # Get all biclusters from cmonkey run
         conn = sqlite3.connect(db_file)
         try:
@@ -601,9 +582,9 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
             last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!!
             w = (last_run, )
 
-            c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?", w)
-            d_f = [self.assemble_motif_info_single(db, db_file, c, last_run, i[0], run2id, motif2gre, row_info_collection)
-                   for i in c.fetchall()]
+            c.execute("SELECT cluster FROM cluster_stats WHERE iteration=?", w)
+            d_f = [self.__assemble_motif_info_single(db_file, c, last_run, row[0])
+                   for row in c.fetchall()]
         finally:
             conn.close()
 
@@ -611,13 +592,13 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         d_f = filter(None, d_f)
 
         if len(d_f) > 0:
-            db.motif_info.insert(d_f)
+            self.db.motif_info.insert(d_f)
 
         return None
 
-    def assemble_motif_info_single(self, db, db_file, cursor, iteration, cluster, run2id, motif2gre, row_info_collection):
+    def __assemble_motif_info_single(self, db_file, cursor, iteration, cluster):
         run_name = db_file.split("/")[-2]
-        cluster_id = list(db.bicluster_info.find({"run_id": run2id.loc[run_name].run_id, "cluster": cluster}, {"_id": 1}))
+        cluster_id = list(self.db.bicluster_info.find({"run_id": self.run2id.loc[run_name].run_id, "cluster": cluster}, {"_id": 1}))
         if len(cluster_id) > 1:
             logging.info("Cluster %s from run %s matches more than one entry in MongoDB. You have a problem. Refusing to add motif_info.", cluster, run_name)
             return None
@@ -627,11 +608,12 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         w = (cluster, iteration)
         cursor.execute("SELECT motif_num FROM motif_infos WHERE cluster = ? AND iteration = ?", w)
         motif_nums = [i[0] for i in cursor.fetchall()]
-        motif_info = [self.get_motif_info_single(db, cursor, iteration, run_name, cluster, i, motif2gre, row_info_collection, cluster_id) for i in motif_nums]
+        motif_info = [self.__get_motif_info_single(cursor, iteration, run_name, cluster, i, cluster_id)
+                      for i in motif_nums]
 
         return motif_info
 
-    def get_motif_info_single(self, db, cursor, iteration, run_name, cluster, motif_num, motif2gre, row_info_collection, cluster_id):
+    def __get_motif_info_single(self, cursor, iteration, run_name, cluster, motif_num, cluster_id):
         w = (cluster, iteration, motif_num)
         cursor.execute("SELECT seqtype, evalue FROM motif_infos WHERE cluster = ? AND iteration = ? AND motif_num = ?", w)
         motif_data = cursor.fetchone()
@@ -641,7 +623,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         rows = [i[0] for i in cursor.fetchall()]
 
         try:
-            gre_id = motif2gre[run_name][cluster][motif_num]
+            gre_id = self.motif2gre[run_name][cluster][motif_num]
         except:
             gre_id = "NaN"
 
@@ -651,12 +633,14 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
             "motif_num": motif_num,
             "seqtype": motif_data[0],
             "evalue": motif_data[1],
-            "meme_motif_site": [self.get_meme_motif_site_single( cursor, iteration, run_name, cluster, motif_num, i, row_info_collection) for i in meme_site],
-            "pwm": [self.get_pwm_single( cursor, iteration, run_name, cluster, motif_num, i, row_info_collection ) for i in rows]
+            "meme_motif_site": [self.__get_meme_motif_site_single(cursor, iteration, run_name, cluster, motif_num, i)
+                                                                  for i in meme_site],
+            "pwm": [self.__get_pwm_single(cursor, iteration, run_name, cluster, motif_num, i)
+                    for i in rows]
         }
         return d
 
-    def get_meme_motif_site_single(self, cursor, iteration, run_name, cluster, motif_num, rowid, row_info_collection):
+    def __get_meme_motif_site_single(self, cursor, iteration, run_name, cluster, motif_num, rowid):
         w = (str(rowid), )
         cursor.execute("SELECT seq_name, reverse, start, pvalue, flank_left, seq, flank_right FROM meme_motif_sites WHERE rowid = ?", w)
         data = cursor.fetchone()
@@ -664,12 +648,12 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         # try to match accession to row_id
         try:
             # translate from accession to row_id, requires microbes online
-            row_id = row_info_collection.find({"accession": data[0]})[0]["row_id"]
+            row_id = self.row_info_collection.find({"accession": data[0]})[0]["row_id"]
         except:
             row_id = "NaN"
 
         try:
-            scaffoldId = row_info_collection.find({"accession": data[0]})[0]["scaffoldId"]
+            scaffoldId = self.row_info_collection.find({"accession": data[0]})[0]["scaffoldId"]
         except:
             scaffoldId = "NaN"
 
@@ -682,7 +666,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         }
         return d
 
-    def get_pwm_single(self, cursor, iteration, run_name, cluster, motif_num, row, row_info_collection):
+    def __get_pwm_single(self, cursor, iteration, run_name, cluster, motif_num, row):
         w = (cluster, iteration, motif_num, row)
         cursor.execute("SELECT row, a, c, g, t FROM motif_pssm_rows JOIN motif_infos ON motif_pssm_rows.motif_info_id = motif_infos.rowid WHERE motif_infos.cluster = ? AND motif_infos.iteration = ? AND motif_infos.motif_num = ? AND motif_pssm_rows.row = ?", w)
         data = cursor.fetchone()
@@ -698,7 +682,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         }
         return d
 
-    def assemble_fimo(self):
+    def __assemble_fimo(self):
 
         def get_fimo_scans_single(i, db, ensembledir, run2id):
             cluster = i.cluster
@@ -748,7 +732,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         tmp = bcs.apply(get_fimo_scans_single, axis=1, db=self.db, ensembledir=self.ensembledir, run2id=self.run2id)
         return None
 
-    def mongoDump(self, db, outfile, add_files=None):
+    def mongo_dump(self, db, outfile, add_files=None):
         """Write contents from MongoDB instance to binary file"""
         logging.info("Dumping MongoDB to BSON")
         outfile_wdir = os.path.abspath(os.path.join(self.targetdir, outfile))
@@ -767,7 +751,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         sys_command3 = "rm -rf " + outfile_wdir
         os.system(sys_command3)
 
-    def mongoRestore(self, db, infile):
+    def mongo_restore(self, db, infile):
         """Read contents of binary MongoDB dump into MongoDB instance"""
         sys_command = "mongorestore --db %s %s" % (db, infile)
         os.system(sys_command)
@@ -775,39 +759,38 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
     def compile(self):
         """Compile EGRIN2 ensemble"""
         logging.info("Compiling EGRIN2 ensemble...")
-        self.db_files = self.checkRuns(self.db_files, self.db_run_override, self.db)
-        self.run2id = self.get_run2id(self.db_files, self.db)
+        self.db_files = self.__check_runs()
+        self.run2id = self.__get_run2id()
 
         logging.info("Downloading genome information for NCBI taxonomy ID: %s", self.ncbi_code)
-        self.genome_collection = self.loadGenome(self.ncbi_code, self.genome_file)
-        self.expression = self.loadRatios(self.ratios_raw)
+        self.genome_collection = self.__load_genome()
+        self.expression = self.__load_ratios(self.ratios_raw)
 
         logging.info("Standardizing gene expression...")
-        self.expression_standardized = self.standardizeRatios(self.expression)
+        self.expression_standardized = self._standardize_ratios(self.expression)
 
         logging.info("Inserting into row_info collection")
-        self.row2id = self.get_row2id(self.expression_standardized, self.db)
-        self.row_info_collection = self.insert_row_info(self.ncbi_code, self.row2id, self.row_annot, self.row_annot_match_col)
+        self.row2id = self.__get_row2id(self.expression_standardized)
+        self.row_info_collection = self.__insert_row_info()
 
         logging.info("Inserting into col_info collection")
-        self.col2id = self.get_col2id(self.expression_standardized, self.db)
-        self.col_info_collection = self.insert_col_info(self.col2id, self.col_annot)
+        self.col2id = self.__get_col2id(self.expression_standardized)
+        self.col_info_collection = self.__insert_col_info()
 
         logging.info("Inserting gene expression into database")
-        self.gene_expression_collection = self.insert_gene_expression(self.db, self.row2id, self.col2id,
-                                                                      self.expression, self.expression_standardized)
+        self.gene_expression_collection = self.__insert_gene_expression()
         self.gene_expression_collection.ensure_index("row_id")
         self.gene_expression_collection.ensure_index("col_id")
 
         logging.info("Inserting into ensemble_info collection")
-        self.ensemble_info_collection = self.insert_ensemble_info(self.db_files, self.db, self.run2id, self.row2id, self.col2id)
-        self.motif2gre = self.loadGREMap(self.gre2motif)
+        self.ensemble_info_collection = self.__insert_ensemble_info()
+        self.motif2gre = self.__load_gre_map()
 
         logging.info("Inserting into bicluster collection")
-        for i in self.db_files:
-            logging.info("%s", str(i))
-            self.bicluster_info_collection = self.insert_bicluster_info(self.db, i, self.run2id, self.row2id, self.col2id)
-            self.insert_motif_info(self.db, i, self.run2id, self.motif2gre, self.row_info_collection)
+        for dbfile in self.db_files:
+            logging.info("%s", str(dbfile))
+            self.bicluster_info_collection = self.__insert_bicluster_info(dbfile)
+            self.__insert_motif_info(dbfile)
 
         logging.info("Indexing bicluster collection")
         self.bicluster_info_collection.ensure_index("rows")
@@ -816,7 +799,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         self.db.motif_info.ensure_index("gre_id")
 
         logging.info("Inserting into fimo collection. This might take awhile...")
-        self.assemble_fimo()
+        self.__assemble_fimo()
 
         logging.info("Indexing fimo collection")
         self.db.fimo.ensure_index([("scaffoldId", pymongo.ASCENDING), ("start", pymongo.ASCENDING), ("stop", pymongo.ASCENDING),

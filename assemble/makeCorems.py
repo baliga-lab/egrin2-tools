@@ -31,31 +31,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 class CoremMaker:
 
-    def __init__(self, organism, db,
-                 backbone_pval=None, out_dir=None, n_subs=None, link_comm_score=None,
-                 link_comm_increment=None, link_comm_density_score=None,
-                 corem_size_threshold=None, n_resamples=None):
-
-        self.organism = organism
-        self.db = db
-
-        self.row2id = {}
-        self.id2row = {}
-        for i in self.db.row_info.find({}, {"egrin2_row_name": "1", "row_id": "1"}):
-            self.row2id[i["egrin2_row_name"]] = i["row_id"]
-            self.id2row[i["row_id"]] = i["egrin2_row_name"]
-
-        self.col2id = {}
-        self.id2col = {}
-        for i in self.db.col_info.find({}, {"egrin2_col_name": "1", "col_id": "1"}):
-            self.col2id[i["egrin2_col_name"]] = i["col_id"]
-            self.id2col[i["col_id"]] = i["egrin2_col_name"]
-
-        if backbone_pval is None:
-            self.backbone_pval = 0.05
-        else:
-            self.backbone_pval = backbone_pval
-
+    def __check_c_code_exists(self):
         self.cFail = False
         if subprocess.call(["which", "adjmat2wpairs"], stdout=open(os.devnull, 'wb')) != 0:
             logging.warn("You need to compile adjmat2wpairs.cpp to adjmat2wpairs and add its location to your path to detect corems")
@@ -73,54 +49,42 @@ class CoremMaker:
             logging.warn("You need to compile getting_communities.cpp to getting_communities and add its location to your path to detect corems")
             self.cFail = True
 
-        if out_dir is None:
-            self.out_dir = "corem_data"
-            if not os.path.isdir(self.out_dir):
-                os.makedirs(self.out_dir)
-        else:
-            self.out_dir = os.path.abspath( os.path.join(out_dir,"corem_data"))
-            if not os.path.isdir(self.out_dir):
-                os.makedirs(self.out_dir)
+    def __init__(self, organism, db, backbone_pval, out_dir, n_subs, link_comm_score,
+                 link_comm_increment, link_comm_density_score, corem_size_threshold,
+                 n_resamples):
+
+        self.organism = organism
+        self.db = db
+
+        self.row2id = {}
+        self.id2row = {}
+        for i in self.db.row_info.find({}, {"egrin2_row_name": "1", "row_id": "1"}):
+            self.row2id[i["egrin2_row_name"]] = i["row_id"]
+            self.id2row[i["row_id"]] = i["egrin2_row_name"]
+
+        self.col2id = {}
+        self.id2col = {}
+        for i in self.db.col_info.find({}, {"egrin2_col_name": "1", "col_id": "1"}):
+            self.col2id[i["egrin2_col_name"]] = i["col_id"]
+            self.id2col[i["col_id"]] = i["egrin2_col_name"]
+
+        self.backbone_pval = backbone_pval
+        self.__check_c_code_exists()
+
+        self.out_dir = os.path.abspath(os.path.join(out_dir, "corem_data"))
+        if not os.path.isdir(self.out_dir):
+            os.makedirs(self.out_dir)
         logging.info("Corem data will be output to '%s'", self.out_dir)
 
-        if n_subs is None:
-            # number of subprocesses to spawn
-            self.n_subs = 4
-        else:
-            self.n_subs = n_subs
-
-        if link_comm_score is None:
-            # use link similarity def of (0) Ahn or (1) Kalinka
-            self.link_comm_score = 0
-        else:
-            self.link_comm_score = link_comm_score
-
-        if link_comm_increment is None:
-            # amount to increment community detection threshold
-            self.link_comm_increment = 0.1
-        else:
-            self.link_comm_increment = link_comm_increment
-
-        if link_comm_density_score is None:
-            # score used to evaluate global density of communities (1,2,3,4,5)
-            self.link_comm_density_score = 5
-        else:
-            self.link_comm_density_score = link_comm_density_score
-
-        if corem_size_threshold is None:
-            # minimum size of corem, # edges
-            self.corem_size_threshold = 3
-        else:
-            self.corem_size_threshold = corem_size_threshold
-
+        self.n_subs = n_subs
+        self.link_comm_score = link_comm_score
+        self.link_comm_increment = link_comm_increment
+        self.link_comm_density_score = link_comm_density_score
+        self.corem_size_threshold = corem_size_threshold
         self.cutoff = None
+        self.n_resamples = n_resamples
 
-        if n_resamples is None:
-            self.n_resamples = 10000
-        else:
-            self.n_resamples = n_resamples
-
-    def getRowCo(self, row_id):
+    def __num_row_co_occurence(self, row_id):
         """Given a row (gene), count all of the other rows that occur with it in a bicluster"""
         data = []
         for i in self.db.bicluster_info.find({"rows": {"$all": [self.row2id[row_id]]}}, {"rows": "1"}):
@@ -132,7 +96,7 @@ class CoremMaker:
         data_counts = pd.Series(data).value_counts()
         return data_counts
 
-    def extractBackbone( self, data_counts ):
+    def __extract_backbone(self, data_counts):
         """Extract the significant elements from rBr co-occurrence matrix"""
         backbone_data_counts = data_counts.copy()
 
@@ -145,7 +109,7 @@ class CoremMaker:
             backbone_data_counts[i] = pval
         return backbone_data_counts
 
-    def rowRow(self):
+    def __row_row(self):
         """Construct row-row co-occurrence matrix (ie gene-gene co-occurrence)"""
 
         row_row_collection = self.db.row_row
@@ -203,7 +167,7 @@ class CoremMaker:
                 logging.info("%.2f percent done", round(float(counter) / len(self.row2id.keys()), 2) * 100.0)
 
             # check if already exists in DB
-            data_counts = self.getRowCo(i)
+            data_counts = self.__num_row_co_occurence(i)
 
             # set self counts to 0 and normalize other counts
             data_counts[i] = 0
@@ -212,7 +176,7 @@ class CoremMaker:
             data_counts_norm = data_counts_norm / sum(data_counts_norm)
 
             # only keep values > 0
-            backbone_data_counts = self.extractBackbone(data_counts_norm)
+            backbone_data_counts = self.__extract_backbone(data_counts_norm)
 
             to_write = [structureRowRow(i, j, data_counts[j], data_counts_norm[j], backbone_data_counts[j], row_row_collection)
                         for j in data_counts.index]
@@ -228,7 +192,7 @@ class CoremMaker:
         # clean up
         del self.rowrow_ref
 
-    def runCoremCscripts(self):
+    def __run_corem_cscripts(self):
 
         def drange(start, stop = None, step = 1, precision = None):
             """drange generates a set of Decimal values over the
@@ -397,7 +361,7 @@ class CoremMaker:
 
             # end plot
 
-    def getCorems(self, cutoff=None):
+    def __get_corems(self, cutoff=None):
         """load clusters at selected density"""
         if self.cutoff is None:
             if cutoff is None:
@@ -437,7 +401,7 @@ class CoremMaker:
                            sep="\t", index=False)
         return None
 
-    def addCorems(self):
+    def __add_corems(self):
         """Add corems to MongoDB. Will Only run if self.cutoff has been set by running C++ codes"""
         pd.options.mode.chained_assignment = None
 
@@ -477,3 +441,10 @@ class CoremMaker:
 
         to_write = [coremStruct(i, corems) for i in corems.Community_ID.unique()]
         self.db.corem.insert(to_write)
+
+    def make_corems(self):
+        """top-level corem making function"""
+        self.__row_row()
+        self.__run_corem_cscripts()
+        self.__get_corems()
+        self.__add_corems()
