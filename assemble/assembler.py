@@ -14,6 +14,7 @@ import argparse
 import os, sys, stat
 import itertools
 import logging
+import datetime
 import pymongo
 
 import assemble.sql2mongoDB as rdb
@@ -192,9 +193,9 @@ if __name__ == '__main__':
 
     if not args.finish_only:
         if dbname in client.database_names():
-            logging.warn("WARNING: %s database already exists!!!", self.dbname)
+            logging.warn("WARNING: %s database already exists!!!", dbname)
         else:
-            logging.info("Initializing MongoDB database: %s", self.dbname)
+            logging.info("Initializing MongoDB database: %s", dbname)
 
     db = client[dbname]
 
@@ -203,8 +204,8 @@ if __name__ == '__main__':
 
     resultdb = rdb.ResultDatabase(args.organism, db, args.ensembledir, out_prefix,
                                   args.ratios, args.gre2motif, args.col_annot, args.ncbi_code,
-                                  None, args.genome_annot, args.row_annot,
-                                  args.row_annot_match_col, targetdir)
+                                  args.genome_annot, args.row_annot,
+                                  args.row_annot_match_col, targetdir, db_run_override=False)
 
     if args.finish_only:
         corems = CoremMaker(args.organism, db, args.backbone_pval, targetdir,
@@ -227,8 +228,8 @@ if __name__ == '__main__':
             corems.make_corems()
 
             if args.cluster:
-                __generate_resample_sge_files(db, args.organism, targetdir, args.n_resamples, args.user,
-                                              args.host, args.port)
+                __generate_resample_sge_scripts(db, args.organism, targetdir, args.n_resamples, args.user,
+                                                args.host, args.port)
             else:
                 logging.error("""Non-cluster setup currently not supported. Consider running resamples on a cluster.
 This will dramatically speed up this step.""")

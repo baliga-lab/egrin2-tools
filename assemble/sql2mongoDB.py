@@ -25,209 +25,250 @@ from bson.objectid import ObjectId
 from Bio import SeqIO
 
 
-# ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz"
-# col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz"
-# db_file = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/eco-ens-m3d/eco-out-001/cmonkey_run.db"
+DEFAULT_MOTIF_OUT_FILENAME = "out.mot_metaclustering.txt.I45.txt"
 
-# delete egrin2 db. run on console
 
-# sql2mongoDB( ratios_raw = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/ratios_eco_m3d.tsv.gz",  col_annot = "/Users/abrooks/Desktop/Active/Eco_ensemble_python_m3d/E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz", ncbi_code = "511145")
+###########################################################################
+### Helper functions
+###
+### These module private functions support the database
+### import
+###########################################################################
+
+
+def _gre2motif_path(ensembledir, gre2motif):
+    """Determine GRE clustering file path"""
+    if gre2motif is None:
+        motif_out_path = os.path.join(ensembledir, DEFAULT_MOTIF_OUT_FILENAME)
+
+        if os.path.isfile(motif_out_path):
+            return motif_out_path
+        else:
+            logging.warn("I cannot find a GRE clustering file. If you want to assign GREs, please specify this file.")
+            return None
+    else:
+        return gre2motif
+
+
+def _get_ncbi_code(ncbi_code, resultdb_path):
+    """Determine the NCBI code either from the ncbi_code argument or the given result database"""
+    if ncbi_code is None:
+        # try to find ncbi_code in cmonkey_run.db
+        conn = sqlite3.connect(resultdb_path)
+        c = conn.cursor()
+        try:
+            c.execute("SELECT ncbi_code FROM run_infos")
+            return c.fetchone()[0]
+        except sqlite3.Error as e:
+            logging.warn("Could not find NCBI Genome ID in cmonkey_run.db: %s", resultdb_path)
+        finally:
+            c.close()
+            conn.close()
+    else:
+        return int(ncbi_code)
+
+
+def _available_cmonkey_resultdb_files(ensembledir, prefix):
+    """Search the ensemble directory for available cmonkey runs and return
+    a list of the paths of cmonkey runs found"""
+    result = sorted(glob.glob(os.path.join(ensembledir, "%s???/cmonkey_run.db" % prefix)))
+    if len(result) ==  0:
+        logging.warn("""I cannot find any cMonkey SQLite databases in the current directory: %s
+Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemble results.""",
+                     os.getcwd())
+    return result
+
+
+def _download_url(url, save_name='tmp', num_retries=5):
+    """Download the file at the specified location"""
+    count = 1
+    while count < num_retries:
+        try:
+            f = urlopen(url)
+            logging.info("downloading '%s'", url)
+
+            # Open our local file for writing
+            with open(os.path.basename(save_name), "wb") as local_file:
+              local_file.write(f.read())
+            break
+        # handle errors
+        except HTTPError, e:
+            logging.error("HTTP Error, code: %s URL: %s", str(e.code), url)
+            logging.info("Trying to connect again. Attempt %d of 5", count)
+            count += 1
+        except URLError, e:
+            logging.error("URL Error, Reason: %s URL: %s", e.reason, url)
+            logging.info("Trying to connect again. Attempt %d of 5", count)
+            count += 1
+    return count < num_retries
+
+
+def _valid_cmonkey_results(db, resultdb_files, db_run_override):
+    """make sure the runs have data!!!"""
+    def keep_this_run(dbpath):
+        """if db_run_override is false, only include runs that are not yet in the database"""
+        run_name = dbpath.split("/")[-2]
+        return db_run_override or db.ensemble_info.find({"run_name": run_name}).count() == 0
+
+    result = []
+    ensemble_info_collection = db.ensemble_info
+    for dbpath in resultdb_files:
+        conn = sqlite3.connect(dbpath)
+        c = conn.cursor()
+        try:
+            c.execute("select finish_time from run_infos")
+            row = c.fetchone()
+            if row is not None and row[0] is not None and keep_this_run(dbpath):
+                result.append(dbpath)
+            else:
+                if row is None or row[0] is None:
+                    logging.warn("incomplete run: '%s'", dbpath)
+                else:
+                    logging.warn("already in the database: '%s'", dbpath)
+        except Exception:
+            logging.warn("incomplete run: '%s'", dbpath)
+        finally:
+            c.close()
+            conn.close()
+    return result
+
+
+def _not_exists(collection, doc):
+    """check if the document exists in the specified MongoDB collection"""
+    return collection.find(doc).count() == 0
+
+
+def _not_exists_key_value(collection, key, value):
+    """check if the document exists in the specified MongoDB collection
+    using a key-value pair"""
+    return collection.find({key: value}).count() == 0
+
+def _not_exists_key_value2(collection, key1, value1, key2, value2):
+    """check if the document exists in the specified MongoDB collection
+    using two key-value pairs"""
+    return collection.find({key1: value1, key2: value2}).count() == 0
+
+
+def _get_run2id(db, db_files):
+    """make run2id"""
+    run_names_and_ids = [(run_info["run_name"], run_info["run_id"])
+                         for run_info in db.ensemble_info.find()]
+    run_names = [rni[0] for rni in run_names_and_ids]
+    run_ids = [rni[1] for rni in run_names_and_ids]
+
+    for dbpath in db_files:
+        run_name = dbpath.split("/")[-2]
+        if run_name not in run_names:
+            run_names.append(run_name)
+            if len(run_ids) > 0:
+                run_ids.append(max(run_ids) + 1)
+            else:
+                run_ids.append(0)
+
+    return pd.DataFrame(zip(run_ids, run_names), index=run_names, columns=["run_id", "run_name"])
+
+
+def _import_genome(db, genome_file, ncbi_code):
+    """Import genome information into database"""
+    logging.info("Downloading genome information for NCBI taxonomy ID: %s", ncbi_code)
+    if genome_file is None:
+        logging.info("No custom genome annotation file supplied by 'genome_file' parameter. Attempting automated download from MicrobesOnline...")
+
+        # download genome from microbes online. store in MongoDB collection
+        url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId=%d;export=genome" % ncbi_code
+        save_name = "%d_genome.fa" % ncbi_code
+        _download_url(url, save_name)
+
+        seqs_b = []
+        with open(save_name, 'r') as f:
+            fasta_sequences = SeqIO.parse(f ,'fasta')
+            for fasta in fasta_sequences:
+                seqs_b.append({"scaffoldId": fasta.id,
+                               "NCBI_RefSeq": fasta.description.split(" ")[1],
+                               "NCBI_taxonomyId": fasta.description.split(" ")[-1],
+                               "sequence": str(fasta.seq)})
+    else:
+        seqs_b = []
+
+    # Check whether documents are already present in the collection before insertion
+    if db.genome.count() > 0:
+        seqs_f = filter(lambda doc: _not_exists(db.genome, doc), seqs_b)
+    else:
+        seqs_f = seqs_b
+
+    logging.info("%d new genome sequence records to write", len(seqs_f))
+    if len(seqs_f) > 0:
+        db.genome.insert(seqs_f)
+
+    return db.genome
+
+
+def _load_ratios(file_in):
+    """Loads ratios from individual cMonkey runs (unfinished) or single flat file (gzip compressed)."""
+    if file_in == None:
+        # compile from individual runs
+        # do be done
+        file_in = sorted(glob.glob(os.path.join(ensembledir, "%s???/ratios.tsv.gz" % prefix)))
+    else:
+        logging.info("Loading gene expression file from '%s'", file_in)
+        # load directly from gzip file
+        ratios = pd.read_csv(gzip.open(file_in, 'rb'), index_col=0, sep="\t")
+
+        if ratios.shape[1] == 0:  # attempt using comma as a delimiter if tab failed
+             ratios = pd.read_csv(gzip.open(file_in, 'rb'), index_col=0, sep=",")
+
+        if ratios.shape[1] == 0:
+            # still wrong delimiter
+            raise Exception("Cannot read ratios file. Check delimiter. Should be '\t' or ',' ")
+    return ratios
+
+def _standardize_ratios(ratios):
+    """compute standardized ratios (global). row standardized"""
+    ratios_standardized = ratios.copy()
+    zscore = lambda x: (x - x.mean()) / x.std()
+
+    for row in ratios.iterrows():
+        ratios_standardized.loc[row[0]] = zscore(row[1])
+
+    return ratios_standardized
+
+
+def _cond_info2dict(col_table, cond_name):
+    cond_data = col_table[col_table.egrin2_col_name == cond_name]
+    cond_dict = {"col_id": np.unique(cond_data.col_id)[0], "egrin2_col_name": np.unique(cond_data.egrin2_col_name)[0], "additional_info": []}
+
+    if "feature_name" in cond_data.columns and "value" in cond_data.columns and "feature_units" in cond_data.columns:
+        for i in range(0, cond_data.shape[0]):
+            cond_dict["additional_info"].append({"name": cond_data.irow(i)["feature_name"],
+                                                 "value": cond_data.irow(i)["value"],
+                                                 "units": cond_data.irow(i)["feature_units"]})
+    return cond_dict
+
+
+
+###########################################################################
+### Result Database class
+### Coordinates the collection and assembly of corem information
+###########################################################################
 
 class ResultDatabase:
 
     def __init__(self, organism, db, ensembledir, prefix, ratios_raw, gre2motif, col_annot,
-                 ncbi_code, db_run_override, genome_file, row_annot, row_annot_match_col,
-                 targetdir):
-
+                 ncbi_code, genome_file, row_annot, row_annot_match_col,
+                 targetdir, db_run_override=False):
         self.organism = organism
         self.db = db
         self.prefix = prefix
-
-        if gre2motif is None:
-            # default file name?
-            if os.path.isfile(os.path.join(self.ensembledir, "out.mot_metaclustering.txt.I45.txt")):
-                self.gre2motif = os.path.join(self.ensembledir, "out.mot_metaclustering.txt.I45.txt")
-            else:
-                logging.warn("I cannot find a GRE clustering file. If you want to assign GREs, please specify this file.")
-                self.gre2motif = None
-        else:
-            self.gre2motif = gre2motif
-
-        # get all cmonkey_run.db files
-        self.db_files = np.sort(np.array(glob.glob(os.path.join(self.ensembledir, self.prefix) + "???/cmonkey_run.db")))
+        self.ensembledir = ensembledir
+        self.gre2motif = _gre2motif_path(ensembledir, gre2motif)
+        self.db_files = _available_cmonkey_resultdb_files(ensembledir, prefix)
         self.db_run_override = db_run_override
-
-        if ncbi_code is None:
-            # try to find ncbi_code in cmonkey_run.db
-            conn = sqlite3.connect(self.db_files[0])
-            c = conn.cursor()
-            try:
-                c.execute("SELECT ncbi_code FROM run_infos")
-                self.ncbi_code = c.fetchone()[0]
-            except sqlite3.Error as e:
-                logging.warn("Could not find NCBI Genome ID in cmonkey_run.db: %s", e.args[0])
-        else:
-            self.ncbi_code = ncbi_code
-
+        self.ncbi_code = _get_ncbi_code(ncbi_code, self.db_files[0])
         self.ratios_raw = ratios_raw
         self.col_annot = col_annot
         self.genome_file = genome_file
         self.row_annot = row_annot
         self.row_annot_match_col = row_annot_match_col
-
-        if len(self.db_files) < 1:
-            logging.warn("""I cannot find any cMonkey SQLite databases in the current directory: %s
-Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemble results.""",
-                         os.getcwd())
-
-    def __download_file(self, url, save_name=None, num_retries=5):
-        # Open the url
-        if save_name is None:
-            save_name = "tmp"
-
-        count = 1
-        while count < num_retries:
-            try:
-                f = urlopen(url)
-                logging.info("downloading '%s'", url)
-
-                # Open our local file for writing
-                with open(os.path.basename(save_name), "wb") as local_file:
-                  local_file.write(f.read())
-                break
-            # handle errors
-            except HTTPError, e:
-                logging.error("HTTP Error, code: %s URL: %s", str(e.code), url)
-                logging.info("Trying to connect again. Attempt %d of 5", count)
-                count += 1
-            except URLError, e:
-                logging.error("URL Error, Reason: %s URL: %s", e.reason, url)
-                logging.info("Trying to connect again. Attempt %d of 5", count)
-                count += 1
-
-    def __check_runs(self):
-        """make sure the runs have data!!!"""
-        to_keep = []
-        ensemble_info_collection = self.db.ensemble_info
-        for i in self.db_files:
-            try:
-                conn = sqlite3.connect(i)
-                c = conn.cursor()
-                c.execute("SELECT num_iterations FROM run_infos")
-                run_info = c.fetchone()
-
-                if run_info is None:
-                    pass
-                elif run_info[0] < 1000:
-                    # incomplete runs
-                    pass
-                else:
-                    if self.db_run_override is None:
-                        # do not include runs that are already in the database
-                        # check for existence
-                        run_name = i.split("/")[-2]
-                        if ensemble_info_collection.find({"run_name": run_name}).count() > 0:
-                            pass
-                        else:
-                            to_keep.append(i)
-                    else:
-                        to_keep.append(i)
-            except Exception:
-                pass
-        return to_keep
-
-    def __get_run2id(self):
-        """make run2id"""
-        run_name = []
-        run_id = []
-
-        for i in self.db.ensemble_info.find():
-            run_name.append(i["run_name"])
-            run_id.append(i["run_id"])
-
-        for i in self.dbfiles:
-            if i.split("/")[-2] not in run_name:
-                run_name.append(i.split("/")[-2])
-                if len(run_id) > 0:
-                    run_id.append(max(run_id) + 1)
-                else:
-                    run_id.append(0)
-        run_info =  pd.DataFrame(zip(run_id, run_name), index=run_name, columns=["run_id", "run_name"])
-        return run_info
-
-    def __check4existence(self, collection, document, key1=None, value1=None, key2=None, value2=None):
-        if key1 == None:
-            d_check = collection.find(document).count()
-        else:
-            if key2 == None:
-                d_check = collection.find({key1: value1}).count()
-            else:
-                d_check = collection.find({key1: value1, key2: value2}).count()
-        if d_check == 0:
-            return document
-
-    def __load_genome(self):
-        if self.genome_file is None:
-            logging.info("No custom genome annotation file supplied by 'genome_file' parameter. Attempting automated download from MicrobesOnline...")
-
-            # download genome from microbes online. store in MongoDB collection
-            url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId=%s;export=genome" % str(self.ncbi_code)
-            save_name = "%s_genome.fa" % str(self.ncbi_code)
-            self.__download_file(url, save_name)
-
-            seqs_b = []
-            with open(save_name, 'r') as f:
-                fasta_sequences = SeqIO.parse(f ,'fasta')
-                for fasta in fasta_sequences:
-                    seqs_b.append({"scaffoldId": fasta.id,
-                                   "NCBI_RefSeq": fasta.description.split(" ")[1],
-                                   "NCBI_taxonomyId": fasta.description.split(" ")[-1],
-                                   "sequence": str(fasta.seq)})
-        else:
-            seqs_b = []
-
-        genome_collection = self.db.genome
-
-        # Check whether documents are already present in the collection before insertion
-        if genome_collection.count() > 0:
-            seqs_f = filter(None, [self.__check4existence(genome_collection, i) for i in seqs_b])
-        else:
-            seqs_f = seqs_b
-
-        logging.info("%d new genome sequence records to write", len(seqs_f))
-        if len(seqs_f) > 0:
-            genome_collection.insert(seqs_f)
-
-        return genome_collection
-
-    def __load_ratios(self, file_in):
-        """Loads ratios from individual cMonkey runs (unfinished) or single flat file (gzip compressed)."""
-        if file_in == None:
-            # compile from individual runs
-            # do be done
-            file_in = np.sort(np.array(glob.glob(ensembledir + prefix + "???/ratios.tsv.gz")))
-        else:
-            logging.info("Loading gene expression file from '%s'", file_in)
-            # load directly from gzip file
-            ratios = pd.read_csv(gzip.open(file_in, 'rb'), index_col=0, sep="\t")
-
-            if ratios.shape[1] == 0:  # attempt using comma as a delimiter if tab failed
-                 ratios = pd.read_csv(gzip.open(file_in, 'rb'), index_col=0, sep=",")
-
-            if ratios.shape[1] == 0:
-                # still wrong delimiter
-                raise Exception("Cannot read ratios file. Check delimiter. Should be '\t' or ',' ")
-        return ratios
-
-    def __standardize_ratios(self, ratios):
-        """compute standardized ratios (global). row standardized"""
-        ratios_standardized = ratios.copy()
-        zscore = lambda x: (x - x.mean()) / x.std()
-
-        for row in ratios.iterrows():
-            ratios_standardized.loc[row[0]] = zscore(row[1])
-
-        return ratios_standardized
 
     def __get_row2id(self, ratios_standardized):
         """make row2id and id2row dicts for lookup"""
@@ -275,7 +316,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
                 logging.info("Downloading gene information for NCBI taxonomy ID: %s", str(self.ncbi_code))
                 url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId=%s;export=tab" % str(self.ncbi_code)
                 save_name = "%s_geneInfo.tab" % str(self.ncbi_code)
-                self.__download_file(url, save_name)
+                _download_url(url, save_name)
 
                 with open(save_name, 'r') as f:
                     row_annot = pd.read_csv(f, sep="\t")
@@ -299,12 +340,12 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
             row_table = pd.merge(self.row2id, row_annot, left_on=left_on, right_on=row_annot_match_col)
 
         # Check whether documents are already present in the collection before insertion
-        d = row_table.to_dict('records')
+        docs = row_table.to_dict('records')
 
         if self.db.row_info.count() > 0:
-            d_f = filter(None, [self.__check4existence(self.db.row_info, i) for i in d])
+            d_f = filter(lambda doc: _not_exists(self.db.row_info, doc), docs)
         else:
-            d_f = d
+            d_f = docs
 
         logging.info("%d new row info records to write", len(d_f))
 
@@ -356,11 +397,11 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         col_info_4_mongoDB = []
         for i in range(0, len(self.col2id.egrin2_col_name)):
-            col_info_4_mongoDB.append(self.__cond_info2dict(col_table, self.col2id.egrin2_col_name[i]))
+            col_info_4_mongoDB.append(_cond_info2dict(col_table, self.col2id.egrin2_col_name[i]))
 
         # Check whether documents are already present in the collection before insertion
         if self.db.col_info.count() > 0:
-            d_f = filter(None, [self.__check4existence(self.db.col_info, i) for i in col_info_4_mongoDB])
+            d_f = filter(lambda doc: _not_exists(self.db.col_info, doc), col_info_4_mongoDB)
         else:
             d_f = col_info_4_mongoDB
 
@@ -370,17 +411,6 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
             self.db.col_info.insert(d_f)
 
         return self.db.col_info
-
-    def __cond_info_2dict(self, col_table, cond_name):
-        cond_data = col_table[col_table.egrin2_col_name == cond_name]
-        cond_dict = {"col_id": np.unique(cond_data.col_id)[0], "egrin2_col_name": np.unique(cond_data.egrin2_col_name)[0], "additional_info": []}
-
-        if "feature_name" in cond_data.columns and "value" in cond_data.columns and "feature_units" in cond_data.columns:
-            for i in range(0, cond_data.shape[0]):
-                cond_dict["additional_info"].append({"name": cond_data.irow(i)["feature_name"],
-                                                     "value": cond_data.irow(i)["value"],
-                                                     "units": cond_data.irow(i)["feature_units"]})
-        return cond_dict
 
     def __insert_gene_expression(self):
         """
@@ -423,7 +453,7 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         # Check whether documents are already present in the collection before insertion
         if self.db.gene_expression.count() > 0:
-            d_f = filter(None, [self.__check4existence(self.db.gene_expression, i) for i in exp_data])
+            d_f = filter(lambda doc: _not_exists(self.db.gene_expression, doc), exp_data)
         else:
             d_f = exp_data
 
@@ -475,8 +505,8 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         # Check whether documents are already present in the collection before insertion
         if ensemble_info_collection.count() > 0:
-            d_f = filter(None, [self.__check4existence(ensemble_info_collection, doc, "run_name", doc["run_name"])
-                                for doc in to_insert])
+            d_f = filter(lambda doc: _not_exists_key_value(ensemble_info_collection,
+                                                           "run_name", doc["run_name"]), to_insert)
         else:
             d_f = to_insert
 
@@ -541,8 +571,9 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
 
         # Check whether documents are already present in the collection before insertion
         if bicluster_info_collection.count() > 0:
-            d_f = filter(None, [self.__check4existence(bicluster_info_collection, i, "run_id",
-                                                       i["run_id"], "cluster", i["cluster"]) for i in biclusters])
+            d_f = filter(lambda doc: _not_exists_key_value2(bicluster_info_collection,
+                                                            "run_id", doc["run_id"],
+                                                            "cluster", doc["cluster"]), biclusters)
         else:
             d_f = biclusters
 
@@ -605,9 +636,8 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
         else:
             cluster_id = ObjectId(cluster_id[0]["_id"])
 
-        w = (cluster, iteration)
-        cursor.execute("SELECT motif_num FROM motif_infos WHERE cluster = ? AND iteration = ?", w)
-        motif_nums = [i[0] for i in cursor.fetchall()]
+        cursor.execute("select motif_num from motif_infos where cluster=? and iteration=?", [cluster, iteration])
+        motif_nums = [row[0] for row in cursor.fetchall()]
         motif_info = [self.__get_motif_info_single(cursor, iteration, run_name, cluster, i, cluster_id)
                       for i in motif_nums]
 
@@ -759,15 +789,14 @@ Make sure 'ensembledir' variable points to the location of your cMonkey-2 ensemb
     def compile(self):
         """Compile EGRIN2 ensemble"""
         logging.info("Compiling EGRIN2 ensemble...")
-        self.db_files = self.__check_runs()
-        self.run2id = self.__get_run2id()
+        self.db_files = _valid_cmonkey_results(self.db, self.db_files, self.db_run_override)
+        self.run2id = _get_run2id(self.db, self.db_files)
 
-        logging.info("Downloading genome information for NCBI taxonomy ID: %s", self.ncbi_code)
-        self.genome_collection = self.__load_genome()
-        self.expression = self.__load_ratios(self.ratios_raw)
+        self.genome_collection = _import_genome(self.db, self.genome_file, self.ncbi_code)
+        self.expression = _load_ratios(self.ratios_raw)
 
         logging.info("Standardizing gene expression...")
-        self.expression_standardized = self._standardize_ratios(self.expression)
+        self.expression_standardized = _standardize_ratios(self.expression)
 
         logging.info("Inserting into row_info collection")
         self.row2id = self.__get_row2id(self.expression_standardized)
