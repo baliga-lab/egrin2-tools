@@ -157,7 +157,15 @@ def get_motif_cluster_sites( cluster_ind, force=False ):
 from cmonkeyobj import cMonkey2 as cm2
 ## pre-read in all cmonkey database objects for speed
 cmdbs = sorted( glob.glob( '%s-out-*/cmonkey_run.db'%(organism) ) )
-cms = { db:cm2(db) for db in cmdbs }
+cms = {}
+for db in cmdbs:
+    print db
+    try:
+        cms[db] = cm2(db)
+    except:
+        print 'OOPS!'
+        continue
+#cms = { db:cm2(db) for db in cmdbs }
     
 for iii in xrange( 0,len(clusters) ):
     ##df = clust_dfs.ix[iii]  # dont need for this?
