@@ -1,9 +1,12 @@
+import os
+import glob
+import cStringIO
+
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import IUPAC
 from Bio import SeqIO
 #from Bio import motifs
-import cStringIO
 import weblogolib as wl
 import utils as ut
 
@@ -14,9 +17,8 @@ except:
 
 import cmonkey.meme as meme ## use Wei-Ju's meme parser - much better than BioPython!
 
-organism = 'eco' ##'mtu'
+organism = 'mtu' ## 'eco' ##
 print organism, param_I_str
-
 
 try:
     os.mkdir("motif_clusters_%s"%(param_I_str)) ## location of output files
