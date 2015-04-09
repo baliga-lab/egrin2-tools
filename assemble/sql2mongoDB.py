@@ -149,23 +149,40 @@ def _not_exists_key_value2(collection, key1, value1, key2, value2):
     return collection.find({key1: value1, key2: value2}).count() == 0
 
 
+def _get_id_lookup(coll, source_names, id_key, name_key):
+    """Generic function to make the DataFrame used as a lookup table"""
+    names_and_ids = [(info[name_key], info[id_key])
+                     for info in coll.find()]
+    names = [ni[0] for ni in names_and_ids]
+    ids = [ni[1] for ni in names_and_ids]
+    names_set = set(names)
+
+    for name in source_names:
+        if name not in names_set:
+            names.append(name)
+            names_set.add(name)
+        if len(ids) > 0:
+            ids.append(max(ids) + 1)
+        else:
+            ids.append(0)
+
+    return pd.DataFrame(zip(ids, names), index=names, columns=[id_key, name_key])
+
+
+def _get_row2id(db, ratios):
+    """make row2id and id2row dicts for lookup"""
+    return _get_id_lookup(db.row_info, ratios.index.values, 'row_id', 'egrin2_row_name')
+
+
+def _get_col2id(db, ratios):
+    """make cond2id and id2cond dicts for lookup"""
+    return _get_id_lookup(db.col_info, ratios.columns.values, 'col_id', 'egrin2_col_name')
+
+
 def _get_run2id(db, db_files):
     """make run2id"""
-    run_names_and_ids = [(run_info["run_name"], run_info["run_id"])
-                         for run_info in db.ensemble_info.find()]
-    run_names = [rni[0] for rni in run_names_and_ids]
-    run_ids = [rni[1] for rni in run_names_and_ids]
-
-    for dbpath in db_files:
-        run_name = dbpath.split("/")[-2]
-        if run_name not in run_names:
-            run_names.append(run_name)
-            if len(run_ids) > 0:
-                run_ids.append(max(run_ids) + 1)
-            else:
-                run_ids.append(0)
-
-    return pd.DataFrame(zip(run_ids, run_names), index=run_names, columns=["run_id", "run_name"])
+    run_names = [dbpath.split("/")[-2] for dbpath in db_files]
+    return _get_id_lookup(db.ensemble_info, run_names, 'run_id', 'run_name')
 
 
 def _import_genome(db, genome_file, ncbi_code):
@@ -245,6 +262,169 @@ def _cond_info2dict(col_table, cond_name):
     return cond_dict
 
 
+def _get_pwm_single(cursor, iteration, run_name, cluster, motif_num, row):
+    w = (cluster, iteration, motif_num, row)
+    cursor.execute("SELECT row, a, c, g, t FROM motif_pssm_rows JOIN motif_infos ON motif_pssm_rows.motif_info_id = motif_infos.rowid WHERE motif_infos.cluster = ? AND motif_infos.iteration = ? AND motif_infos.motif_num = ? AND motif_pssm_rows.row = ?", w)
+    data = cursor.fetchone()
+
+    # TODO: WW: This format for PSSMs is not really efficient for extraction
+    # ---- We should rewrite it into arrays
+    d = {
+        "row": data[0],
+        "a": data[1],
+        "c": data[2],
+        "g": data[3],
+        "t": data[4]
+    }
+    return d
+
+
+def _get_meme_motif_site_single(db, cursor, iteration, run_name, cluster, motif_num, rowid):
+    cursor.execute("select seq_name,reverse,start,pvalue from meme_motif_sites where rowid=?", [rowid])
+    seq_name, reverse, start, pvalue = cursor.fetchone()
+
+    # try to match accession to row_id
+    try:
+        # translate from accession to row_id, requires microbes online
+        row_id = db.row_info.find({"accession": seq_name})[0]["row_id"]
+    except:
+        row_id = "NaN"
+
+    try:
+        scaffoldId = db.row_info.find({"accession": seq_name})[0]["scaffoldId"]
+    except:
+        scaffoldId = "NaN"
+
+    d = {
+        "row_id": row_id,
+        "reverse": reverse,
+        "scaffoldId": scaffoldId,
+        "start": start,
+        "pvalue": pvalue,
+    }
+    return d
+
+
+def _get_motif_info_single(db, motif2gre, cursor, iteration, run_name, cluster, motif_num, cluster_id):
+    """Convert the specified motif to a MongoDB document"""
+    cursor.execute("select seqtype,evalue from motif_infos where cluster=? and iteration=? and motif_num=?",
+                   [cluster, iteration, motif_num])
+    seqtype, evalue = cursor.fetchone()
+
+    cursor.execute("""select mms.rowid from meme_motif_sites mms join motif_infos mi on mms.motif_info_id=mi.rowid
+where mi.cluster=? and mi.iteration=? and mi.motif_num=?""", [cluster, iteration, motif_num])
+    meme_site_ids = [row[0] for row in cursor.fetchall()]
+
+    cursor.execute("""select row from motif_pssm_rows mpr join motif_infos mi on mpr.motif_info_id=mi.rowid
+where mi.cluster=? and mi.iteration=? and mi.motif_num=?""", [cluster, iteration, motif_num])
+    row_nums = [row[0] for row in cursor.fetchall()]
+
+    try:
+        gre_id = motif2gre[run_name][cluster][motif_num]
+    except:
+        gre_id = "NaN"
+
+    return {
+        "cluster_id": cluster_id,
+        "gre_id": gre_id,
+        "motif_num": motif_num,
+        "seqtype": seqtype,
+        "evalue": evalue,
+        "meme_motif_site": [_get_meme_motif_site_single(db, cursor, iteration, run_name, cluster, motif_num, site_id)
+                            for site_id in meme_site_ids],
+        "pwm": [_get_pwm_single(cursor, iteration, run_name, cluster, motif_num, row_num)
+                for row_num in row_nums]
+    }
+
+
+def _assemble_motif_info_single(db, db_file, run2id, motif2gre, cursor, iteration, cluster):
+    run_name = db_file.split("/")[-2]
+    cluster_id = list(db.bicluster_info.find({"run_id": run2id.loc[run_name].run_id, "cluster": cluster}, {"_id": 1}))
+    if len(cluster_id) > 1:
+        logging.info("Cluster %s from run %s matches more than one entry in MongoDB. You have a problem. Refusing to add motif_info.", cluster, run_name)
+        return None
+    else:
+        cluster_id = ObjectId(cluster_id[0]["_id"])
+
+    cursor.execute("select motif_num from motif_infos where cluster=? and iteration=?", [cluster, iteration])
+    motif_nums = [row[0] for row in cursor.fetchall()]
+    return [_get_motif_info_single(db, motif2gre, cursor, iteration, run_name, cluster, motif_num, cluster_id)
+            for motif_num in motif_nums]
+
+
+def _insert_motif_info(db, db_file, run2id, motif2gre):
+    conn = sqlite3.connect(db_file)
+    try:
+        c = conn.cursor()
+        c.execute("select max(iteration) from row_members")
+        last_run = c.fetchone()[0]
+
+        c.execute("select cluster from cluster_stats where iteration=?", [last_run])
+        d_f = [_assemble_motif_info_single(db, db_file, run2id, motif2gre, c, last_run, row[0])
+               for row in c.fetchall()]
+    finally:
+        conn.close()
+
+    d_f = list(itertools.chain(*d_f))
+    d_f = filter(None, d_f)
+
+    if len(d_f) > 0:
+        db.motif_info.insert(d_f)
+
+
+def _assemble_bicluster_info_single(row2id, col2id, run2id, db_file, cursor, iteration, cluster):
+    """Create python ensemble_info dictionary for bulk import into MongoDB collections"""
+    run_name = db_file.split("/")[-2]
+    w = (cluster, iteration)
+    cursor.execute("SELECT residual FROM cluster_stats WHERE cluster = ? AND iteration = ?", w)
+    residual = cursor.fetchone()[0]
+    cursor.execute("SELECT name FROM row_members JOIN row_names ON row_members.order_num = row_names.order_num WHERE row_members.cluster = ? AND row_members.iteration = ?", w)
+    rows = [row2id.loc[str(i[0])].row_id for i in cursor.fetchall()]
+    cursor.execute("SELECT name FROM column_members JOIN column_names ON column_members.order_num = column_names.order_num WHERE column_members.cluster = ? AND column_members.iteration = ?", w)
+    cols = [col2id.loc[str(i[0])].col_id for i in cursor.fetchall()]
+
+    return {
+        "run_id": run2id.loc[run_name].run_id,
+        "cluster": cluster,
+        "rows": rows,
+        "columns": cols,
+        "residual": residual,
+    }
+
+
+def _insert_bicluster_info(db, row2id, col2id, run2id, db_file):
+    """Find all biclusters in a cMonkey run, process and add as documents to bicluster collection
+
+    example queries
+    ------------------------------
+    bicluster_info_collection.find({"rows":{"$all":[26,27]}}).count()
+    """
+    # Get all biclusters from cmonkey run
+    conn = sqlite3.connect(db_file)
+    try:
+        c = conn.cursor()
+        c.execute("select max(iteration) from row_members")
+        last_run = c.fetchone()[0]
+        c.execute("select cluster from cluster_stats where iteration=?", [last_run])
+        biclusters = [_assemble_bicluster_info_single(row2id, col2id, run2id, db_file, c, last_run, row[0])
+                      for row in c.fetchall()]
+    finally:
+        conn.close()
+
+    # Check whether documents are already present in the collection before insertion
+    if db.bicluster_info.count() > 0:
+        d_f = filter(lambda doc: _not_exists_key_value2(db.bicluster_info,
+                                                        "run_id", doc["run_id"],
+                                                        "cluster", doc["cluster"]), biclusters)
+    else:
+        d_f = biclusters
+
+    logging.info("%d new bicluster info records to write", len(d_f))
+    if len(d_f) > 0:
+        db.bicluster_info.insert(d_f)
+
+    return db.bicluster_info
+
 
 ###########################################################################
 ### Result Database class
@@ -269,26 +449,6 @@ class ResultDatabase:
         self.genome_file = genome_file
         self.row_annot = row_annot
         self.row_annot_match_col = row_annot_match_col
-
-    def __get_row2id(self, ratios_standardized):
-        """make row2id and id2row dicts for lookup"""
-        row_name = []
-        row_id = []
-
-        for i in self.db.row_info.find():
-            row_name.append(i["egrin2_row_name"])
-            row_id.append(i["row_id"])
-
-        for i in ratios_standardized.index.values:
-            if i not in row_name:
-                row_name.append(i)
-            if len(row_id) > 0:
-                row_id.append(max(row_id) + 1)
-            else:
-                row_id.append(0)
-
-        row_info =  pd.DataFrame(zip(row_id, row_name), index=row_name, columns=["row_id", "egrin2_row_name"])
-        return row_info
 
     def __insert_row_info(self):
         """
@@ -353,25 +513,6 @@ class ResultDatabase:
             self.db.row_info.insert(d_f)
 
         return self.db.row_info
-
-    def __get_col2id(self, ratios_standardized):
-        """make cond2id and id2cond dicts for lookup"""
-        col_name = []
-        col_id = []
-
-        for i in self.db.col_info.find():
-            col_name.append(i["egrin2_col_name"])
-            col_id.append(i["col_id"])
-
-        for i in ratios_standardized.columns.values:
-            if i not in col_name:
-                col_name.append(i)
-                if len(col_id) > 0:
-                    col_id.append(max(col_id) + 1)
-                else:
-                    col_id.append(0)
-        col_info = pd.DataFrame(zip(col_id, col_name), index=col_name, columns=["col_id", "egrin2_col_name"])
-        return col_info
 
     def __insert_col_info(self):
         """
@@ -547,171 +688,6 @@ class ResultDatabase:
         else:
             return None
 
-    def __insert_bicluster_info(self, db_file):
-        """Find all biclusters in a cMonkey run, process and add as documents to bicluster collection
-
-        example queries
-        ------------------------------
-        bicluster_info_collection.find({"rows":{"$all":[26,27]}}).count()
-        """
-        # Get all biclusters from cmonkey run
-        conn = sqlite3.connect(db_file)
-        try:
-            c = conn.cursor()
-            c.execute("SELECT max(iteration) FROM cluster_stats")
-            last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!!
-            w = (last_run, )
-            c.execute("SELECT cluster FROM cluster_stats WHERE iteration = ?", w)
-            biclusters = [self.__assemble_bicluster_info_single(db_file, c, last_run, row[0])
-                          for row in c.fetchall()]
-        finally:
-            conn.close()
-
-        bicluster_info_collection = self.db.bicluster_info
-
-        # Check whether documents are already present in the collection before insertion
-        if bicluster_info_collection.count() > 0:
-            d_f = filter(lambda doc: _not_exists_key_value2(bicluster_info_collection,
-                                                            "run_id", doc["run_id"],
-                                                            "cluster", doc["cluster"]), biclusters)
-        else:
-            d_f = biclusters
-
-        logging.info("%d new bicluster info records to write", len(d_f))
-        if len(d_f) > 0:
-            bicluster_info_collection.insert(d_f)
-
-        return bicluster_info_collection
-
-    def __assemble_bicluster_info_single(self, db_file, cursor, iteration, cluster):
-        """Create python ensemble_info dictionary for bulk import into MongoDB collections"""
-        run_name = db_file.split("/")[-2]
-        w = (cluster, iteration)
-        cursor.execute("SELECT residual FROM cluster_stats WHERE cluster = ? AND iteration = ?", w)
-        residual = cursor.fetchone()[0]
-        cursor.execute("SELECT name FROM row_members JOIN row_names ON row_members.order_num = row_names.order_num WHERE row_members.cluster = ? AND row_members.iteration = ?", w)
-        rows = [self.row2id.loc[str(i[0])].row_id for i in cursor.fetchall()]
-        cursor.execute("SELECT name FROM column_members JOIN column_names ON column_members.order_num = column_names.order_num WHERE column_members.cluster = ? AND column_members.iteration = ?", w)
-        cols = [self.col2id.loc[str(i[0])].col_id for i in cursor.fetchall()]
-
-        d = {
-            "run_id": self.run2id.loc[run_name].run_id,
-            "cluster": cluster,
-            "rows": rows,
-            "columns": cols,
-            "residual": residual,
-        }
-
-        return d
-
-    def __insert_motif_info(self, db_file):
-        # Get all biclusters from cmonkey run
-        conn = sqlite3.connect(db_file)
-        try:
-            c = conn.cursor()
-            c.execute("SELECT max(iteration) FROM cluster_stats")
-            last_run = c.fetchone()[0] # i think there is an indexing problem in cMonkey python!!
-            w = (last_run, )
-
-            c.execute("SELECT cluster FROM cluster_stats WHERE iteration=?", w)
-            d_f = [self.__assemble_motif_info_single(db_file, c, last_run, row[0])
-                   for row in c.fetchall()]
-        finally:
-            conn.close()
-
-        d_f = list(itertools.chain(*d_f))
-        d_f = filter(None, d_f)
-
-        if len(d_f) > 0:
-            self.db.motif_info.insert(d_f)
-
-        return None
-
-    def __assemble_motif_info_single(self, db_file, cursor, iteration, cluster):
-        run_name = db_file.split("/")[-2]
-        cluster_id = list(self.db.bicluster_info.find({"run_id": self.run2id.loc[run_name].run_id, "cluster": cluster}, {"_id": 1}))
-        if len(cluster_id) > 1:
-            logging.info("Cluster %s from run %s matches more than one entry in MongoDB. You have a problem. Refusing to add motif_info.", cluster, run_name)
-            return None
-        else:
-            cluster_id = ObjectId(cluster_id[0]["_id"])
-
-        cursor.execute("select motif_num from motif_infos where cluster=? and iteration=?", [cluster, iteration])
-        motif_nums = [row[0] for row in cursor.fetchall()]
-        motif_info = [self.__get_motif_info_single(cursor, iteration, run_name, cluster, i, cluster_id)
-                      for i in motif_nums]
-
-        return motif_info
-
-    def __get_motif_info_single(self, cursor, iteration, run_name, cluster, motif_num, cluster_id):
-        w = (cluster, iteration, motif_num)
-        cursor.execute("SELECT seqtype, evalue FROM motif_infos WHERE cluster = ? AND iteration = ? AND motif_num = ?", w)
-        motif_data = cursor.fetchone()
-        cursor.execute("SELECT meme_motif_sites.rowid FROM meme_motif_sites JOIN motif_infos ON meme_motif_sites.motif_info_id = motif_infos.rowid WHERE motif_infos.cluster = ? AND motif_infos.iteration = ? AND motif_infos.motif_num = ?", w)
-        meme_site = [i[0] for i in cursor.fetchall()]
-        cursor.execute("SELECT row FROM motif_pssm_rows JOIN motif_infos ON motif_pssm_rows.motif_info_id = motif_infos.rowid WHERE motif_infos.cluster = ? AND motif_infos.iteration = ? AND motif_infos.motif_num = ?", w)
-        rows = [i[0] for i in cursor.fetchall()]
-
-        try:
-            gre_id = self.motif2gre[run_name][cluster][motif_num]
-        except:
-            gre_id = "NaN"
-
-        d = {
-            "cluster_id": cluster_id,
-            "gre_id": gre_id,
-            "motif_num": motif_num,
-            "seqtype": motif_data[0],
-            "evalue": motif_data[1],
-            "meme_motif_site": [self.__get_meme_motif_site_single(cursor, iteration, run_name, cluster, motif_num, i)
-                                                                  for i in meme_site],
-            "pwm": [self.__get_pwm_single(cursor, iteration, run_name, cluster, motif_num, i)
-                    for i in rows]
-        }
-        return d
-
-    def __get_meme_motif_site_single(self, cursor, iteration, run_name, cluster, motif_num, rowid):
-        w = (str(rowid), )
-        cursor.execute("SELECT seq_name, reverse, start, pvalue, flank_left, seq, flank_right FROM meme_motif_sites WHERE rowid = ?", w)
-        data = cursor.fetchone()
-
-        # try to match accession to row_id
-        try:
-            # translate from accession to row_id, requires microbes online
-            row_id = self.row_info_collection.find({"accession": data[0]})[0]["row_id"]
-        except:
-            row_id = "NaN"
-
-        try:
-            scaffoldId = self.row_info_collection.find({"accession": data[0]})[0]["scaffoldId"]
-        except:
-            scaffoldId = "NaN"
-
-        d = {
-            "row_id": row_id,
-            "reverse": data[1],
-            "scaffoldId": scaffoldId,
-            "start": data[2],
-            "pvalue": data[3],
-        }
-        return d
-
-    def __get_pwm_single(self, cursor, iteration, run_name, cluster, motif_num, row):
-        w = (cluster, iteration, motif_num, row)
-        cursor.execute("SELECT row, a, c, g, t FROM motif_pssm_rows JOIN motif_infos ON motif_pssm_rows.motif_info_id = motif_infos.rowid WHERE motif_infos.cluster = ? AND motif_infos.iteration = ? AND motif_infos.motif_num = ? AND motif_pssm_rows.row = ?", w)
-        data = cursor.fetchone()
-
-        # TODO: WW: This format for PSSMs is not really efficient for extraction
-        # ---- We should rewrite it into arrays
-        d = {
-            "row": data[0],
-            "a": data[1],
-            "c": data[2],
-            "g": data[3],
-            "t": data[4]
-        }
-        return d
-
     def __assemble_fimo(self):
 
         def get_fimo_scans_single(i, db, ensembledir, run2id):
@@ -762,12 +738,11 @@ class ResultDatabase:
         tmp = bcs.apply(get_fimo_scans_single, axis=1, db=self.db, ensembledir=self.ensembledir, run2id=self.run2id)
         return None
 
-    def mongo_dump(self, db, outfile, add_files=None):
+    def mongo_dump(self, dbname, outfile, add_files=None):
         """Write contents from MongoDB instance to binary file"""
         logging.info("Dumping MongoDB to BSON")
         outfile_wdir = os.path.abspath(os.path.join(self.targetdir, outfile))
-        self.db.client
-        sys_command = "mongodump --db %s --out %s" % (db, outfile_wdir)
+        sys_command = "mongodump --db %s --out %s" % (dbname, outfile_wdir)
         os.system(sys_command)
 
         logging.info("Compressing MongoDB BSON docs")
@@ -780,11 +755,6 @@ class ResultDatabase:
         logging.info("Cleaning up...")
         sys_command3 = "rm -rf " + outfile_wdir
         os.system(sys_command3)
-
-    def mongo_restore(self, db, infile):
-        """Read contents of binary MongoDB dump into MongoDB instance"""
-        sys_command = "mongorestore --db %s %s" % (db, infile)
-        os.system(sys_command)
 
     def compile(self):
         """Compile EGRIN2 ensemble"""
@@ -799,11 +769,11 @@ class ResultDatabase:
         self.expression_standardized = _standardize_ratios(self.expression)
 
         logging.info("Inserting into row_info collection")
-        self.row2id = self.__get_row2id(self.expression_standardized)
+        self.row2id = _get_row2id(self.db, self.expression_standardized)
         self.row_info_collection = self.__insert_row_info()
 
         logging.info("Inserting into col_info collection")
-        self.col2id = self.__get_col2id(self.expression_standardized)
+        self.col2id = _get_col2id(self.db, self.expression_standardized)
         self.col_info_collection = self.__insert_col_info()
 
         logging.info("Inserting gene expression into database")
@@ -818,8 +788,10 @@ class ResultDatabase:
         logging.info("Inserting into bicluster collection")
         for dbfile in self.db_files:
             logging.info("%s", str(dbfile))
-            self.bicluster_info_collection = self.__insert_bicluster_info(dbfile)
-            self.__insert_motif_info(dbfile)
+            self.bicluster_info_collection = _insert_bicluster_info(self.db, self.row2id,
+                                                                    self.col2id, self.run2id,
+                                                                    dbfile)
+            _insert_motif_info(self.db, dbfile, self.run2id, self.motif2gre)
 
         logging.info("Indexing bicluster collection")
         self.bicluster_info_collection.ensure_index("rows")
@@ -837,3 +809,10 @@ class ResultDatabase:
                                          ("stop", pymongo.ASCENDING), ("p-value", pymongo.ASCENDING),
                                          ("cluster_id", pymongo.ASCENDING)])
         return None
+
+
+
+def mongo_restore(db, infile):
+    """Read contents of binary MongoDB dump into MongoDB instance"""
+    sys_command = "mongorestore --db %s %s" % (db, infile)
+    os.system(sys_command)
