@@ -111,7 +111,6 @@ def _valid_cmonkey_results(db, resultdb_files, db_run_override):
         return db_run_override or db.ensemble_info.find({"run_name": run_name}).count() == 0
 
     result = []
-    ensemble_info_collection = db.ensemble_info
     for dbpath in resultdb_files:
         conn = sqlite3.connect(dbpath)
         c = conn.cursor()
@@ -216,8 +215,6 @@ def _import_genome(db, genome_file, ncbi_code):
     logging.info("%d new genome sequence records to write", len(seqs_f))
     if len(seqs_f) > 0:
         db.genome.insert(seqs_f)
-
-    return db.genome
 
 
 def _load_ratios(file_in):
@@ -423,8 +420,6 @@ def _insert_bicluster_info(db, row2id, col2id, run2id, db_file):
     if len(d_f) > 0:
         db.bicluster_info.insert(d_f)
 
-    return db.bicluster_info
-
 
 ###########################################################################
 ### Result Database class
@@ -450,7 +445,7 @@ class ResultDatabase:
         self.row_annot = row_annot
         self.row_annot_match_col = row_annot_match_col
 
-    def __insert_row_info(self):
+    def __insert_row_infos(self):
         """
         Insert row_info into mongoDB database
 
@@ -512,9 +507,7 @@ class ResultDatabase:
         if len(d_f) > 0:
             self.db.row_info.insert(d_f)
 
-        return self.db.row_info
-
-    def __insert_col_info(self):
+    def __insert_col_infos(self):
         """
         Insert col_info into mongoDB database
 
@@ -550,8 +543,6 @@ class ResultDatabase:
 
         if len(d_f) > 0:
             self.db.col_info.insert(d_f)
-
-        return self.db.col_info
 
     def __insert_gene_expression(self):
         """
@@ -589,9 +580,6 @@ class ResultDatabase:
                                  })
             num_rows += 1
 
-        # write to mongoDB collection
-        gene_expression_collection = self.db.gene_expression
-
         # Check whether documents are already present in the collection before insertion
         if self.db.gene_expression.count() > 0:
             d_f = filter(lambda doc: _not_exists(self.db.gene_expression, doc), exp_data)
@@ -602,8 +590,6 @@ class ResultDatabase:
 
         if len(d_f) > 0:
             self.db.gene_expression.insert(d_f)
-
-        return self.db.gene_expression
 
     def __assemble_ensemble_info(self, db_file):
         """Create python ensemble_info dictionary for bulk import into MongoDB collections"""
@@ -642,11 +628,10 @@ class ResultDatabase:
     def __insert_ensemble_info(self):
         """Compile and insert ensemble_info collection into MongoDB collection"""
         to_insert = [self.__assemble_ensemble_info(dbfile) for dbfile in self.db_files]
-        ensemble_info_collection = self.db.ensemble_info
 
         # Check whether documents are already present in the collection before insertion
-        if ensemble_info_collection.count() > 0:
-            d_f = filter(lambda doc: _not_exists_key_value(ensemble_info_collection,
+        if self.db.ensemble_info.count() > 0:
+            d_f = filter(lambda doc: _not_exists_key_value(self.db.ensemble_info,
                                                            "run_name", doc["run_name"]), to_insert)
         else:
             d_f = to_insert
@@ -654,9 +639,7 @@ class ResultDatabase:
         logging.info("%d new ensemble info records to write", len(d_f))
 
         if len(d_f) > 0:
-            ensemble_info_collection.insert(d_f)
-
-        return ensemble_info_collection
+            self.db.ensemble_info.insert(d_f)
 
     def __load_gre_map(self):
         if self.gre2motif is not None:
@@ -762,7 +745,7 @@ class ResultDatabase:
         self.db_files = _valid_cmonkey_results(self.db, self.db_files, self.db_run_override)
         self.run2id = _get_run2id(self.db, self.db_files)
 
-        self.genome_collection = _import_genome(self.db, self.genome_file, self.ncbi_code)
+        _import_genome(self.db, self.genome_file, self.ncbi_code)
         self.expression = _load_ratios(self.ratios_raw)
 
         logging.info("Standardizing gene expression...")
@@ -770,32 +753,31 @@ class ResultDatabase:
 
         logging.info("Inserting into row_info collection")
         self.row2id = _get_row2id(self.db, self.expression_standardized)
-        self.row_info_collection = self.__insert_row_info()
+        self.__insert_row_infos()
 
         logging.info("Inserting into col_info collection")
         self.col2id = _get_col2id(self.db, self.expression_standardized)
-        self.col_info_collection = self.__insert_col_info()
+        self.__insert_col_infos()
 
         logging.info("Inserting gene expression into database")
-        self.gene_expression_collection = self.__insert_gene_expression()
-        self.gene_expression_collection.ensure_index("row_id")
-        self.gene_expression_collection.ensure_index("col_id")
+        self.__insert_gene_expression()
+        self.db.gene_expression.ensure_index("row_id")
+        self.db.gene_expression.ensure_index("col_id")
 
         logging.info("Inserting into ensemble_info collection")
-        self.ensemble_info_collection = self.__insert_ensemble_info()
+        self.__insert_ensemble_info()
         self.motif2gre = self.__load_gre_map()
 
         logging.info("Inserting into bicluster collection")
         for dbfile in self.db_files:
             logging.info("%s", str(dbfile))
-            self.bicluster_info_collection = _insert_bicluster_info(self.db, self.row2id,
-                                                                    self.col2id, self.run2id,
-                                                                    dbfile)
+            _insert_bicluster_info(self.db, self.row2id, self.col2id,
+                                   self.run2id, dbfile)
             _insert_motif_info(self.db, dbfile, self.run2id, self.motif2gre)
 
         logging.info("Indexing bicluster collection")
-        self.bicluster_info_collection.ensure_index("rows")
-        self.bicluster_info_collection.ensure_index("columns")
+        self.db.bicluster_info.ensure_index("rows")
+        self.db.bicluster_info.ensure_index("columns")
         self.db.motif_info.ensure_index("cluster_id")
         self.db.motif_info.ensure_index("gre_id")
 
@@ -809,7 +791,6 @@ class ResultDatabase:
                                          ("stop", pymongo.ASCENDING), ("p-value", pymongo.ASCENDING),
                                          ("cluster_id", pymongo.ASCENDING)])
         return None
-
 
 
 def mongo_restore(db, infile):
