@@ -18,11 +18,13 @@ import argparse
 import os
 import itertools
 import logging
+import random
 
 #import cmonkey.datamatrix as dm
 # need to be in python path!!!
 import cmconfig
 import ensemble
+
 
 DESCRIPTION = "cm2sge.py - prepare cluster runs for Sun Grid Engine"
 
@@ -134,30 +136,22 @@ if __name__ == '__main__':
     config_params = {"num_cores": args.num_cores}
 
     logging.info("Writing ensemble config files")
+    sets = args.setenrich.split(",")
+    set_files = args.setenrich_files.split(",")
+    set_file_ref = dict(zip(sets, set_files))
+    combs = [[comb for comb in itertools.combinations(sets, k)] for k in range(1, len(sets) + 1)]
+    set_combs = [[]] + [list(item) for comb_k in combs for item in comb_k]
+
     for i in range(1, args.numruns + 1):
         if args.setenrich is not None:
-            # combine all possible setenrichment modes
-            sets = args.setenrich.split(",")
-            set_files = args.setenrich_files.split(",")
+            set_choices = random.sample(set_combs, 1)[0]  # choose a set enrichment mode
 
-            set_file_ref = {}
-            for j in range(0, len(sets)):
-                set_file_ref[sets[j]] = set_files[j]
-
-            # don't know how to do it without se
-            setcombinations = [None]
-
-            for j in range(1, len(sets) + 1):
-                setcombinations = setcombinations + [(",").join(x) for x in itertools.combinations(sets, j)]
-
-            # choose a set enrichment mode
-            set_choice = random.sample(setcombinations,1)[0]
-            if set_choice is None:
+            if not set_choices:
                 ini = cmconfig.ConfigFileMaker(dict(config_params.items() + [("random_seed", i)]))
             else:
-                set_choice_files = (",").join([set_file_ref[x] for x in set_choice.split(",")])
+                set_choice_files = (",").join([set_file_ref[choice] for choice in set_choices])
                 ini = cmconfig.ConfigFileMaker(dict(config_params.items() + [("random_seed", i),
-                                                                             ("set_types", set_choice),
+                                                                             ("set_types", ','.join(set_choices)),
                                                                              ("set_file", set_choice_files),
                                                                              ("pipeline_file", args.pipeline)]))
         else:
