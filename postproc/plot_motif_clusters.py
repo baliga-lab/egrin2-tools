@@ -1,9 +1,12 @@
+import os
+import glob
+import cStringIO
+
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import IUPAC
 from Bio import SeqIO
 #from Bio import motifs
-import cStringIO
 import weblogolib as wl
 import utils as ut
 
@@ -14,9 +17,8 @@ except:
 
 import cmonkey.meme as meme ## use Wei-Ju's meme parser - much better than BioPython!
 
-organism = 'eco' ##'mtu'
+organism = 'mtu' ## 'eco' ##
 print organism, param_I_str
-
 
 try:
     os.mkdir("motif_clusters_%s"%(param_I_str)) ## location of output files
@@ -155,7 +157,15 @@ def get_motif_cluster_sites( cluster_ind, force=False ):
 from cmonkeyobj import cMonkey2 as cm2
 ## pre-read in all cmonkey database objects for speed
 cmdbs = sorted( glob.glob( '%s-out-*/cmonkey_run.db'%(organism) ) )
-cms = { db:cm2(db) for db in cmdbs }
+cms = {}
+for db in cmdbs:
+    print db
+    try:
+        cms[db] = cm2(db)
+    except:
+        print 'OOPS!'
+        continue
+#cms = { db:cm2(db) for db in cmdbs }
     
 for iii in xrange( 0,len(clusters) ):
     ##df = clust_dfs.ix[iii]  # dont need for this?

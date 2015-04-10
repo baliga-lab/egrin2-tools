@@ -5,7 +5,7 @@ import bz2
 import glob
 import itertools
 #import cPickle as pickle   ## make shelve much faster!
-#import shelve ## shove    ## see http://www.evilchuck.com/2008/02/tell-python-to-shove-it.html about shove
+import shelve ## shove    ## see http://www.evilchuck.com/2008/02/tell-python-to-shove-it.html about shove
 import optparse
 import numpy as np
 import numpy.core.defchararray as npstr
@@ -20,7 +20,7 @@ def system( cmd ):
 
 op = optparse.OptionParser()
 op.add_option('-i', '--input_dir', default='tomtom_out', help="The location of tomtom results, bzip'd")
-op.add_option('-f', '--filter_motifs', default=False, action='store_true', 
+op.add_option('-f', '--filter_motifs', default=True, action='store_true', 
               help="Pre-filter motifs to include; see comments")
 op.add_option('--plot_motifs', default=False, action='store_true', 
               help="Plot motif clusters in separate PDFs")
@@ -78,7 +78,7 @@ input_dir = opt.input_dir
 files = np.sort( np.array( glob.glob( input_dir + "/*tomtom.tsv.bz2" ) ) ) # folder with the tomtom files bzip'd
 dfs = {}
 ## can pd.concat work on shelved dataframes? YES. Note protocol=2 is faster and smaller.
-#dfs = shelve.open('tomtom_shelf.db', protocol=2, writeback=False)
+dfs = shelve.open('tomtom_shelf.db', protocol=2, writeback=False)
 ##dfs = shove.Shove('sqlite:///'+input_dir+'/shove.db', compress=True) ## note this requires SQLAlchemy installed
 ##dfs = shove.Shove('file://./'+input_dir+'/shove.db', compress=True) 
 
@@ -122,8 +122,10 @@ if len(dfs) != len(files): ## if using a shelf, once this is done once, you don'
         #if f == files[20]:
         #   break
 
-##dfs2 = pd.concat( dfs.values(), axis=0 )  ## works with 'shelve's but not (compressed) 'shove's
-dfs2 = pd.concat( dfs, axis=0 )
+if type(dfs) == dict:
+    dfs2 = pd.concat( dfs, axis=0 )
+else:
+    dfs2 = pd.concat( dfs.values(), axis=0 )  ## works with 'shelve's but not (compressed) 'shove's
 #dfs.close()
 print dfs2.shape
 
@@ -176,7 +178,8 @@ gr2b.write_ncol( "mot_metaclustering.txt", weights=None ) ## no weights used - s
 
 ## now run mcl, latest version from http://www.micans.org/mcl/src/mcl-latest.tar.gz
 param_I = opt.mcl_I ##3.6 ## 3.0 ## 2.4 ## 1.2 ##4.5
-system( './progs/mcl mot_metaclustering.txt --abc -I %s -v all -te 3 -S 200000'%(param_I) )
+cmd = './progs/mcl mot_metaclustering.txt --abc -I %.1f -v all -te 3 -S 200000'%(param_I)
+ut.system( cmd )
 
 param_I_str = str(param_I).replace('.','')
 fo = open( 'out.mot_metaclustering.txt.I%s'%(param_I_str), 'r' )
@@ -204,14 +207,14 @@ print 'Fraction of motifs in >= 10-size clusters:', \
 del gr2a
 
 ## Get info on alignments for each motif cluster
-dfs3 = dfs2.set_index('#Query ID', drop=False)
+dfs2.set_index('#Query ID', drop=False, inplace=True)
 clust_dfs = {}
 for i in xrange( len(clusters) ):
     clust = clusters[i]
     print i, len(clust)
     if i in clust_dfs.keys() or len(clust) < 10 or i > 500:
         continue
-    df = dfs3.ix[ clust ] ##[ np.in1d( dfs3['#Query ID'].values, clust ) ]
+    df = dfs2.ix[ clust ] ##[ np.in1d( dfs2['#Query ID'].values, clust ) ]
     df = df.iloc[ np.in1d( df['Target ID'].values, clust ) ]
     df = df.sort( ['p-value'] )
     df = df.ix[ ~df.duplicated(['#Query ID','Target ID']) ] ## remove dupes
@@ -220,7 +223,7 @@ for i in xrange( len(clusters) ):
     print df.shape
     clust_dfs[i] = df
 
-del dfs3
+del dfs2
 clust_dfs = pd.concat( clust_dfs, axis=0 )
 print clust_dfs.shape
 ## get coding fracs per motif cluster via:
