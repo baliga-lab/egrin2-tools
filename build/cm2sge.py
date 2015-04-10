@@ -160,11 +160,7 @@ if __name__ == '__main__':
         ini.write_config(os.path.join(args.targetdir, "config-%03d.ini" % i))
 
     with open(os.path.join(args.targetdir, "%s.sh" % args.organism), 'w') as outfile:
-        if args.user is not None:
-            login = args.user
-        else:
-            login = os.getlogin()
-
+        login = args.user if args.user is not None else os.getlogin()
         outfile.write(header)
         outfile.write(template % (login,
                                   args.numruns,
