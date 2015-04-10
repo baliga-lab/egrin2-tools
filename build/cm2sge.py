@@ -117,16 +117,18 @@ if __name__ == '__main__':
     # write ratios files
     logging.info("Choosing ensemble conditions")
     if args.blocks is None:
-        # if inclusion/exlcusion blocks are not defined, simply choose at random
+        # if inclusion/exclusion blocks are not defined, simply choose at random
+        logging.info("no inclusion/exclusion blocks defined, performing random sub matrix generation...")
         dm.prepare_ensemble_matrix(args.ratios, args.targetdir, args.numfiles,
                                    args.mincols)
     else:
-      cols = ensemble.EnsemblePicker(ratios=args.ratios, blocks=args.blocks,
-                                     inclusion=args.inclusion,
-                                     exclusion=args.exclusion,
-                                     nruns=args.numruns,
-                                     ratios_file=args.targetdir)
-      cols.pickCols_all()
+        logging.info("generating sub matrices using inclusion/exclusion blocks...")
+        cols = ensemble.EnsemblePicker(ratios=args.ratios, blocks=args.blocks,
+                                       inclusion=args.inclusion,
+                                       exclusion=args.exclusion,
+                                       nruns=args.numruns,
+                                       ratios_file=args.targetdir)
+        cols.write_ensemble_ratios()
 
     # write config files
     config_params = {"num_cores": args.num_cores}
@@ -151,18 +153,17 @@ if __name__ == '__main__':
             # choose a set enrichment mode
             set_choice = random.sample(setcombinations,1)[0]
             if set_choice is None:
-                ini = cmconfig.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i)]))
-                ini.writeIni(os.path.join(args.targetdir, "config-%03d.ini" % i))
+                ini = cmconfig.ConfigFileMaker(dict(config_params.items() + [("random_seed", i)]))
             else:
                 set_choice_files = (",").join([set_file_ref[x] for x in set_choice.split(",")])
-                ini = cmconfig.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i),
-                                                                           ("set_types", set_choice),
-                                                                           ("set_file", set_choice_files),
-                                                                           ("pipeline_file", args.pipeline)]))
-                ini.writeIni(os.path.join(args.targetdir, "config-%03d.ini" % i))
+                ini = cmconfig.ConfigFileMaker(dict(config_params.items() + [("random_seed", i),
+                                                                             ("set_types", set_choice),
+                                                                             ("set_file", set_choice_files),
+                                                                             ("pipeline_file", args.pipeline)]))
         else:
-            ini = cmconfig.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i)]))
-            ini.writeIni(os.path.join(args.targetdir, "config-%03d.ini" % i))
+            ini = cmconfig.ConfigFileMaker(dict(config_params.items() + [("random_seed", i)]))
+
+        ini.write_config(os.path.join(args.targetdir, "config-%03d.ini" % i))
 
     with open(os.path.join(args.targetdir, "%s.sh" % args.organism), 'w') as outfile:
         if args.user is not None:
