@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-cMonkey ini generator for customizing ensemble runs
+cMonkey ini file generator for customizing ensemble runs
 """
 import os.path
 import random
@@ -99,7 +99,7 @@ weight = %(set_weight)s\n"""
 
 class cMonkeyIniGen:
 
-    def __init__(self, params = {}):
+    def __init__(self, params={}):
         # params is a dictionary of parameters
 
         # [General]

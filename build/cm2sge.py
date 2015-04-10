@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""cMonkeyQSub.py
+"""cm2sge.py
 This is a tool to prepare a directory for ensemble runs. Given an organism code
 and the ratios, matrix, split up the matrix into sub matrices and create
 SGE qsub shell scripts
@@ -8,11 +8,11 @@ Example:
 
 With pre-defined condition blocks:
 
-python cMonkeyQSub.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir mtu-ens-20140120 --numruns 500 --blocks 20141202.MTB.EGRIN2.blocks.csv --inclusion 20141202.MTB.EGRIN2.inclusion.blocks.csv --exclusion 20141202.MTB.EGRIN2.exclusion.blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files 20140725.MTB.ChIPSeq.csv,20140725.MTB.DE.csv --csh
+python cm2sge.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir mtu-ens-20140120 --numruns 500 --blocks 20141202.MTB.EGRIN2.blocks.csv --inclusion 20141202.MTB.EGRIN2.inclusion.blocks.csv --exclusion 20141202.MTB.EGRIN2.exclusion.blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files 20140725.MTB.ChIPSeq.csv,20140725.MTB.DE.csv --csh
 
 Without pre-defined condition blocks:
 
-python cMonkeyQSub.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir mtb-ens-20141230 --numruns 20 --mincols 50 --num_cores 1 --csh
+python cm2sge.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir mtb-ens-20141230 --numruns 20 --mincols 50 --num_cores 1 --csh
 """
 import argparse
 import os
@@ -21,10 +21,10 @@ import logging
 
 #import cmonkey.datamatrix as dm
 # need to be in python path!!!
-import cMonkeyIniGen
-import ensemblePicker
+import cmconfig
+import ensemble
 
-DESCRIPTION = """cMonkeyQSub.py - prepare cluster runs"""
+DESCRIPTION = "cm2sge.py - prepare cluster runs for Sun Grid Engine"
 
 # Templates for Bourne Shell
 QSUB_TEMPLATE_HEADER = """#!/bin/bash
@@ -121,11 +121,11 @@ if __name__ == '__main__':
         dm.prepare_ensemble_matrix(args.ratios, args.targetdir, args.numfiles,
                                    args.mincols)
     else:
-      cols = ensemblePicker.ensemblePicker(ratios=args.ratios, blocks=args.blocks,
-                                           inclusion=args.inclusion,
-                                           exclusion=args.exclusion,
-                                           nruns=args.numruns,
-                                           ratios_file=args.targetdir)
+      cols = ensemble.EnsemblePicker(ratios=args.ratios, blocks=args.blocks,
+                                     inclusion=args.inclusion,
+                                     exclusion=args.exclusion,
+                                     nruns=args.numruns,
+                                     ratios_file=args.targetdir)
       cols.pickCols_all()
 
     # write config files
@@ -151,17 +151,17 @@ if __name__ == '__main__':
             # choose a set enrichment mode
             set_choice = random.sample(setcombinations,1)[0]
             if set_choice is None:
-                ini = cMonkeyIniGen.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i)]))
+                ini = cmconfig.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i)]))
                 ini.writeIni(os.path.join(args.targetdir, "config-%03d.ini" % i))
             else:
                 set_choice_files = (",").join([set_file_ref[x] for x in set_choice.split(",")])
-                ini = cMonkeyIniGen.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i),
-                                                                                ("set_types", set_choice),
-                                                                                ("set_file", set_choice_files),
-                                                                                ("pipeline_file", args.pipeline)]))
+                ini = cmconfig.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i),
+                                                                           ("set_types", set_choice),
+                                                                           ("set_file", set_choice_files),
+                                                                           ("pipeline_file", args.pipeline)]))
                 ini.writeIni(os.path.join(args.targetdir, "config-%03d.ini" % i))
         else:
-            ini = cMonkeyIniGen.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i)]))
+            ini = cmconfig.cMonkeyIniGen(dict(config_params.items() + [("random_seed", i)]))
             ini.writeIni(os.path.join(args.targetdir, "config-%03d.ini" % i))
 
     with open(os.path.join(args.targetdir, "%s.sh" % args.organism), 'w') as outfile:

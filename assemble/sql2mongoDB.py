@@ -334,8 +334,7 @@ where mi.cluster=? and mi.iteration=? and mi.motif_num=?""", [cluster, iteration
     }
 
 
-def _assemble_motif_info_single(db, db_file, run2id, motif2gre, cursor, iteration, cluster):
-    run_name = db_file.split("/")[-2]
+def _assemble_motif_info_single(db, run_name, run2id, motif2gre, cursor, iteration, cluster):
     cluster_id = list(db.bicluster_info.find({"run_id": run2id.loc[run_name].run_id, "cluster": cluster}, {"_id": 1}))
     if len(cluster_id) > 1:
         logging.info("Cluster %s from run %s matches more than one entry in MongoDB. You have a problem. Refusing to add motif_info.", cluster, run_name)
@@ -349,18 +348,14 @@ def _assemble_motif_info_single(db, db_file, run2id, motif2gre, cursor, iteratio
             for motif_num in motif_nums]
 
 
-def _insert_motif_info(db, db_file, run2id, motif2gre):
-    conn = sqlite3.connect(db_file)
-    try:
-        c = conn.cursor()
-        c.execute("select max(iteration) from row_members")
-        last_run = c.fetchone()[0]
+def _insert_motif_info(db, conn, run_name, run2id, motif2gre):
+    c = conn.cursor()
+    c.execute("select max(iteration) from row_members")
+    last_run = c.fetchone()[0]
 
-        c.execute("select cluster from cluster_stats where iteration=?", [last_run])
-        d_f = [_assemble_motif_info_single(db, db_file, run2id, motif2gre, c, last_run, row[0])
-               for row in c.fetchall()]
-    finally:
-        conn.close()
+    c.execute("select cluster from cluster_stats where iteration=?", [last_run])
+    d_f = [_assemble_motif_info_single(db, run_name, run2id, motif2gre, c, last_run, row[0])
+           for row in c.fetchall()]
 
     d_f = list(itertools.chain(*d_f))
     d_f = filter(None, d_f)
@@ -369,9 +364,8 @@ def _insert_motif_info(db, db_file, run2id, motif2gre):
         db.motif_info.insert(d_f)
 
 
-def _assemble_bicluster_info_single(row2id, col2id, run2id, db_file, cursor, iteration, cluster):
+def _assemble_bicluster_info_single(run_name, row2id, col2id, run2id, cursor, iteration, cluster):
     """Create python ensemble_info dictionary for bulk import into MongoDB collections"""
-    run_name = db_file.split("/")[-2]
     w = (cluster, iteration)
     cursor.execute("SELECT residual FROM cluster_stats WHERE cluster = ? AND iteration = ?", w)
     residual = cursor.fetchone()[0]
@@ -389,7 +383,7 @@ def _assemble_bicluster_info_single(row2id, col2id, run2id, db_file, cursor, ite
     }
 
 
-def _insert_bicluster_info(db, row2id, col2id, run2id, db_file):
+def _insert_bicluster_info(db, conn, run_name, row2id, col2id, run2id):
     """Find all biclusters in a cMonkey run, process and add as documents to bicluster collection
 
     example queries
@@ -397,16 +391,12 @@ def _insert_bicluster_info(db, row2id, col2id, run2id, db_file):
     bicluster_info_collection.find({"rows":{"$all":[26,27]}}).count()
     """
     # Get all biclusters from cmonkey run
-    conn = sqlite3.connect(db_file)
-    try:
-        c = conn.cursor()
-        c.execute("select max(iteration) from row_members")
-        last_run = c.fetchone()[0]
-        c.execute("select cluster from cluster_stats where iteration=?", [last_run])
-        biclusters = [_assemble_bicluster_info_single(row2id, col2id, run2id, db_file, c, last_run, row[0])
-                      for row in c.fetchall()]
-    finally:
-        conn.close()
+    c = conn.cursor()
+    c.execute("select max(iteration) from row_members")
+    last_run = c.fetchone()[0]
+    c.execute("select cluster from cluster_stats where iteration=?", [last_run])
+    biclusters = [_assemble_bicluster_info_single(run_name, row2id, col2id, run2id, c, last_run, row[0])
+                  for row in c.fetchall()]
 
     # Check whether documents are already present in the collection before insertion
     if db.bicluster_info.count() > 0:
@@ -771,9 +761,14 @@ class ResultDatabase:
         logging.info("Inserting into bicluster collection")
         for dbfile in self.db_files:
             logging.info("%s", str(dbfile))
-            _insert_bicluster_info(self.db, self.row2id, self.col2id,
-                                   self.run2id, dbfile)
-            _insert_motif_info(self.db, dbfile, self.run2id, self.motif2gre)
+            run_name = dbfile.split("/")[-2]
+            conn = sqlite3.connect(dbfile)
+            try:
+                _insert_bicluster_info(self.db, conn, run_name, self.row2id, self.col2id,
+                                       self.run2id)
+                _insert_motif_info(self.db, conn, run_name, self.run2id, self.motif2gre)
+            finally:
+                conn.close()
 
         logging.info("Indexing bicluster collection")
         self.db.bicluster_info.ensure_index("rows")
