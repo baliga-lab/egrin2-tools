@@ -125,10 +125,8 @@ if __name__ == '__main__':
                                    args.mincols)
     else:
         logging.info("generating sub matrices using inclusion/exclusion blocks...")
-        cols = ensemble.EnsemblePicker(ratios=args.ratios, blocks=args.blocks,
-                                       inclusion=args.inclusion,
-                                       exclusion=args.exclusion,
-                                       nruns=args.numruns,
+        cols = ensemble.EnsemblePicker(args.ratios, args.blocks, args.exclusion,
+                                       args.inclusion, args.numruns,
                                        ratios_file=args.targetdir)
         cols.write_ensemble_ratios()
 
