@@ -126,8 +126,7 @@ if __name__ == '__main__':
     else:
         logging.info("generating sub matrices using inclusion/exclusion blocks...")
         cols = ensemble.EnsemblePicker(args.ratios, args.blocks, args.exclusion,
-                                       args.inclusion, args.numruns,
-                                       ratios_file=args.targetdir)
+                                       args.inclusion, args.numruns, args.targetdir)
         cols.write_ensemble_ratios()
 
     # write config files

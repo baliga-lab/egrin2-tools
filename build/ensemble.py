@@ -36,7 +36,7 @@ class EnsemblePicker:
     """Pick conditions for an ensemble run, biasing towards inclusion of
     blocks of conditions in the inclusion blocks while making sure that conditions
     in exclusion blocks are excluded together in at least some percentage of runs"""
-    def __init__(self, ratios, blocks, exclusion, inclusion, nruns, ratios_file,
+    def __init__(self, ratios, blocks, exclusion, inclusion, nruns, targetdir,
                  avg_col_size=150, sd_col_size=50, inclusion_weight=2,
                  exclusion_percentage=25, n_rand_exclusion=None, random_blocks=True):
         self.nruns = nruns
@@ -44,7 +44,7 @@ class EnsemblePicker:
         self.inclusion_weight = inclusion_weight
         self.avg_col_size = avg_col_size
         self.sd_col_size = sd_col_size
-        self.ratios_file = ratios_file
+        self.targetdir = targetdir
         self.random_blocks = random_blocks
         self.ratios = pd.read_csv(ratios, index_col=0, sep=",")
         self.blocks2col = pd.read_csv(blocks, sep=",", names=["sample", "block"],
@@ -205,15 +205,13 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
 
     def __write_ratios(self):
         logging.info("Writing ratio files")
-        targetdir = '.' if self.ratios_file is None else self.ratios_file
-
         for i in self.run_composition.iterkeys():
             if int(i) % 100 == 0:
                 logging.info("%.2f percent done", float(i) / float(self.nruns) * 100)
 
             cols = list(set(self.run_composition[i]["cols"]) & set(self.ratios.columns))
             to_write = self.ratios.loc[:, cols]
-            to_write.to_csv(os.path.join(targetdir, "ratios-%03d.tsv" % i), sep = "\t")
+            to_write.to_csv(os.path.join(self.targetdir, "ratios-%03d.tsv" % i), sep = "\t")
 
     def __write_reports(self):
         logging.info("Writing reports...")
