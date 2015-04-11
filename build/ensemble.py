@@ -272,20 +272,26 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
             run_df.loc[i, "blocks"] = (":::").join(self.run_composition[i]["blocks"])
             run_df.loc[i, "cols"] = (":::").join(self.run_composition[i]["cols"])
 
-        run_df.to_csv(path_or_buf=open(file + "runs.csv", mode = "w"), columns=["ncols", "excluded", "blocks", "cols"], index_label="run_num")
-        self.exclusion.to_csv(path_or_buf=open(file + "exclusionBlocks.csv", mode = "w"),
-                              columns=["block.sample.num", "r_out"], header=['block_sample_num', "excluded_freq"],
+        run_df.to_csv(path_or_buf=open(file + "runs.csv", mode="w"),
+                      cols=["ncols", "excluded", "blocks", "cols"],
+                      index_label="run_num")
+
+        self.exclusion.to_csv(path_or_buf=open(file + "exclusionBlocks.csv", mode="w"),
+                              cols=["block.sample.num", "r_out"],
+                              header=['block_sample_num', "excluded_freq"],
                               index_label="exclusion_blocks")
-        self.blocks.to_csv(path_or_buf=open(file + "blocks.csv", mode = "w"),
-                           columns=["block.sample.num", "r_in"],
+
+        self.blocks.to_csv(path_or_buf=open(file + "blocks.csv", mode="w"),
+                           cols=["block.sample.num", "r_in"],
                            header=["block_sample_num", "ensemble_freq"],
-                           index_label = "block")
-        self.blocks2col.to_csv(path_or_buf=open(file + "cols.csv", mode = "w"),
-                               columns=["block", "r_in"], header=["block", "ensemble_freq"],
-                               index_label = "sample")
+                           index_label="block")
+        self.blocks2col.to_csv(path_or_buf=open(file + "cols.csv", mode="w"),
+                               cols=["block", "r_in"],
+                               header=["block", "ensemble_freq"],
+                               index_label="sample")
         self.inclusion.to_csv(path_or_buf=open(file + "inclusionBlocks.csv", mode="w"),
-                              columns=["block.sample.num", 'freq_single', 'freq_coinclusion', 'max_coinclusion_all', 'max_coinclusion_sub'],
-                              header=[ "block_sample_num", 'freq_single', 'freq_coinclusion', 'max_coinclusion_all', 'max_coinclusion_sub'],
+                              cols=["block.sample.num", 'freq_single', 'freq_coinclusion', 'max_coinclusion_all', 'max_coinclusion_sub'],
+                              header=["block_sample_num", 'freq_single', 'freq_coinclusion', 'max_coinclusion_all', 'max_coinclusion_sub'],
                               index_label="inclusion_blocks")
 
     def write_ensemble_ratios(self):
