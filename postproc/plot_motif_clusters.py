@@ -2,6 +2,7 @@ import os
 import glob
 import cStringIO
 
+import numpy as np
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import IUPAC
@@ -179,8 +180,13 @@ for iii in xrange( 0,len(clusters) ):
     ut.writeLines( out['memeOut'].split( '\n' ), 'motif_clusters_%s/%04d_memeOut.txt'%(param_I_str,iii) )
     print iii, 'DONE'
         
-os.popen( 'pdftk motif_clusters_%s/????.pdf cat output motif_clusters_%s/ALL.pdf'%(param_I_str,param_I_str) ).read()
-os.popen( 'pdfnup --landscape --suffix nup --nup 5x6 motif_clusters_%s/ALL.pdf'%(param_I_str) ).read()
+#os.popen( 'pdftk motif_clusters_%s/????.pdf cat output motif_clusters_%s/ALL.pdf'%(param_I_str,param_I_str) ).read()
+try:
+    os.popen( ('gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile=motif_clusters_%s/ALL.pdf '
+               'motif_clusters_%s/????.pdf') % (param_I_str,param_I_str) ).read()
+    os.popen( 'pdfnup --landscape --suffix nup --nup 5x6 motif_clusters_%s/ALL.pdf'%(param_I_str) ).read()
+except:
+    print 'gs or pdfnup not available!'
 
 #     widths = np.array( [ pssm.shape[0] for pssm in all_pssms.values() ] )
 #     max_width = np.max( widths )
