@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-cMonkey ini generator for customizing ensemble runs
+cMonkey ini file generator for customizing ensemble runs
 """
 import os.path
 import random
@@ -97,9 +97,9 @@ SETENRICHMENT_TEMPLATE_IND = """
 set_file = %(set_file)s
 weight = %(set_weight)s\n"""
 
-class cMonkeyIniGen:
+class ConfigFileMaker:
 
-    def __init__(self, params = {}):
+    def __init__(self, params={}):
         # params is a dictionary of parameters
 
         # [General]
@@ -284,6 +284,6 @@ class cMonkeyIniGen:
                 setenrich_ind = SETENRICHMENT_TEMPLATE_IND % {"set_types" : set_types, "set_file": set_file, "set_weight": set_weight}
                 self.ini = self.ini + setenrich_ind
 
-    def writeIni(self, file):
-        with open(file, 'w') as outfile:
+    def write_config(self, path):
+        with open(path, 'w') as outfile:
             outfile.write(self.ini)

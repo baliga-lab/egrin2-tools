@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-"""Select ensemble conditions given defined blocks of conditions to include together (inclusion blocks) or exclude together (exclusion blocks)"""
+"""Select ensemble conditions given defined blocks of conditions to include together
+(inclusion blocks) or exclude together (exclusion blocks)"""
 
 import os
 import datetime
@@ -23,74 +24,28 @@ from pymongo import MongoClient
 import gridfs
 from Bio import SeqIO
 
-# eg. how to run
 
-# from egrin2.ensemblePicker import *
+def strip(text):
+    try:
+        return text.strip()
+    except AttributeError:
+        return text
 
-# ratios = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141130.MTB.all.ratios.csv"
-# blocks = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141202.MTB.EGRIN2.blocks.csv"
-# exclusion = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141202.MTB.EGRIN2.exclusion.blocks.csv"
-# inclusion = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/20141202.MTB.EGRIN2.inclusion.blocks.csv"
-# tfblocks = "/Users/abrooks/Dropbox/MTB.EGRIN2.0.files/TF.blocks.csv"
 
-# tmp = ensemblePicker(ratios, blocks, exclusion, inclusion, tfblocks = None, nruns=500, exclusion_percentage=25)
-# tmp.pickCols_all()
-
-class ensemblePicker:
+class EnsemblePicker:
     """Pick conditions for an ensemble run, biasing towards inclusion of
     blocks of conditions in the inclusion blocks while making sure that conditions
     in exclusion blocks are excluded together in at least some percentage of runs"""
-    def __init__(self, ratios, blocks, exclusion, inclusion, avg_col_size=None,
-                 sd_col_size=None, inclusion_weight=None, tfblocks=None, nruns=None,
-                 exclusion_percentage=None, n_rand_exclusion=None, report_file=None,
-                 random_blocks=None, ratios_file=None):
-
-        if nruns is None:
-            self.nruns = 100
-        else:
-            self.nruns = nruns
-
-        if exclusion_percentage is None:
-            self.exclusion_percentage = 25
-        else:
-            self.exclusion_percentage = exclusion_percentage
-
-        if inclusion_weight is None:
-            self.inclusion_weight = 2
-        else:
-            self.inclusion_weight = inclusion_weight
-
-        if avg_col_size is None:
-            self.avg_col_size = 150
-        else:
-            self.avg_col_size = avg_col_size
-
-        if sd_col_size is None:
-            self.sd_col_size = 50
-        else:
-            self.sd_col_size = sd_col_size
-
-        if report_file is None:
-            self.report_file = None
-        else:
-            self.report_file = report_file
-
-        if random_blocks is None:
-            self.random_blocks = True
-        else:
-            self.random_blocks = random_blocks
-
-        if ratios_file == None:
-            self.ratios_file = None
-        else:
-            self.ratios_file = ratios_file
-
-        def strip(text):
-          try:
-            return text.strip()
-          except AttributeError:
-            return text
-
+    def __init__(self, ratios, blocks, exclusion, inclusion, nruns, targetdir,
+                 avg_col_size=150, sd_col_size=50, inclusion_weight=2,
+                 exclusion_percentage=25, n_rand_exclusion=None, random_blocks=True):
+        self.nruns = nruns
+        self.exclusion_percentage = exclusion_percentage
+        self.inclusion_weight = inclusion_weight
+        self.avg_col_size = avg_col_size
+        self.sd_col_size = sd_col_size
+        self.targetdir = targetdir
+        self.random_blocks = random_blocks
         self.ratios = pd.read_csv(ratios, index_col=0, sep=",")
         self.blocks2col = pd.read_csv(blocks, sep=",", names=["sample", "block"],
                                       converters={'sample': strip, 'block': strip}).icol([0, 1])
@@ -102,7 +57,6 @@ class ensemblePicker:
         self.blocks = self.blocks[self.blocks.index != "block"]
         self.blocks2col = self.blocks2col.set_index(keys="block")
         self.blocks2col["r_in"] = 0
-
         self.exclusion = pd.read_csv(exclusion, sep=",", converters={"exclusion.blocks": strip}, index_col=0)
         self.exclusion["p"] = 1
         self.exclusion["r_out"] = 0
@@ -132,7 +86,7 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
 
         self.run_composition = {}
 
-    def chooseRandomBlocks(self):
+    def __choose_random_blocks(self):
         # maximum block size
         max_b_size = round(.10 * self.ratios.shape[1])
         names = []
@@ -153,33 +107,33 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
         self.exclusion = pd.concat([self.exclusion, tmp_df])
         return None
 
-    def weightedReservoirSample(self, n_samples, sample_df):
+    def __weighted_reservoir_sample(self, n_samples, sample_df):
         """Choose a block loosely based on weighted reservoir sampling - the easy way"""
         k = pd.DataFrame([np.power(random.random(), 1.0 / sample_df.loc[i]) for i in sample_df.index],
                          index=sample_df.index, columns=["p"]).sort("p", ascending=False)
         return k.iloc[0: n_samples].index.values
 
-    def updateWeights(self, blocks):
+    def __update_weights(self, blocks):
         """Update probability of picking blocks based on their current representation in the ensemble"""
         self.blocks.loc[blocks, "r_in"] = self.blocks.loc[blocks, "r_in"] + 1.0 / self.nruns
         self.blocks["p"] = (1 + 10e-10) - self.blocks["r_in"]
 
-    def combinedWeights(self, excluded_diff, blocks):
+    def __combined_weights(self, excluded_diff, blocks):
         tmp_m = self.inclusion_matrix.loc[blocks, excluded_diff].sum(0)
         tmp_m[tmp_m == 0] = 1
         return tmp_m
 
-    def translate_blocks(self, blocks, excluded):
+    def __translate_blocks(self, blocks, excluded):
         """Get col ids from blocks. Since a single condition can be assigned to multiple blocks, we need to make sure that conditions in a current exclusion block did not 'sneak in' to the run"""
         block_cols = self.blocks2col.loc[blocks.split(":::")]
         excluded_cols = self.blocks2col.loc[excluded.split(":::")]
         return set(block_cols.sample).difference(set(excluded_cols.sample))
 
-    def increment_column_count(self, col):
+    def __increment_column_count(self, col):
         self.blocks2col.loc[self.blocks2col.sample == col, "r_in"] += 1.0 / self.nruns
 
 
-    def findBlockInclusionFreq(self):
+    def __find_block_inclusion_freq(self):
         blocks = self.inclusion.index
         block_stats = pd.DataFrame(0, index=blocks, columns=["freq_single", "freq_coinclusion", "max_coinclusion_all", "max_coinclusion_sub"])
         for block in blocks:
@@ -195,38 +149,38 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
             block_stats.loc[block, "max_coinclusion_sub"] = round(sum(co_freq.sum(0) == co_freq.shape[0]) / float(sum(co_freq.sum(0) > 0)), 2)
         self.inclusion = pd.merge(self.inclusion, block_stats, left_index=True, right_index=True)
 
-    def findColInclusionFreq(self):
+    def __find_col_inclusion_freq(self):
         self.blocks2col["block"] = self.blocks2col.index
         self.blocks2col = self.blocks2col.set_index("sample")
         self.blocks2col = self.blocks2col.loc[self.blocks2col.block != "block", ]
         for i in self.run_composition.iterkeys():
             self.blocks2col.loc[self.run_composition[i]["cols"], "r_in"] = self.blocks2col.loc[self.run_composition[i]["cols"], "r_in"] + 1.0 / self.nruns
 
-    def findBlockFreq(self):
+    def __find_block_freq(self):
         self.blocks["r_in"] = 0
         for i in self.run_composition.iterkeys():
             self.blocks.loc[self.run_composition[i]["blocks"], "r_in"] = self.blocks.loc[self.run_composition[i]["blocks"], "r_in"] + 1.0 / self.nruns
 
-    def pickCols_single(self, n):
+    def __pick_cols_single(self, n):
         """Pick columns for a cMonkey run using predefined blocks and based on their current representation in the ensemble"""
 
         def process_block(block_one, excluded, excluded_diff, blocks, cols):
-            col_one = self.translate_blocks(block_one, excluded)
+            col_one = self.__translate_blocks(block_one, excluded)
             blocks.append(block_one)
 
             for column in col_one:
                 if column not in cols:
                     cols.append(column)
-                    self.increment_column_count(column)
+                    self.__increment_column_count(column)
 
             excluded_diff = excluded_diff.difference({block_one})
-            self.updateWeights(blocks)
+            self.__update_weights(blocks)
 
         # what is max conditions for this run?
         n_cols = round(self.avg_col_size + (self.sd_col_size) * random.gammavariate(1, 2))
 
         # first choose excluded blocks
-        excluded = self.weightedReservoirSample(1, self.exclusion["p"])[0]
+        excluded = self.__weighted_reservoir_sample(1, self.exclusion["p"])[0]
         # update its weight
         self.exclusion.loc[excluded, "r_out"] = self.exclusion.loc[excluded, "r_out"] + 1.0 / self.nruns
         self.exclusion["p"] = np.power((1 + 10e-10) - self.exclusion["r_out"], abs(self.exclusion_percentage / 100.0 - self.exclusion["r_out"]) / 1)
@@ -240,42 +194,35 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
         while len(cols) < n_cols:
             if len(cols) == 0:
                 # this is the first condition
-                block_one = self.weightedReservoirSample(1, self.blocks.loc[excluded_diff, "p"])[0]
+                block_one = self.__weighted_reservoir_sample(1, self.blocks.loc[excluded_diff, "p"])[0]
                 process_block(block_one, excluded, excluded_diff, blocks, cols)
             else:
-                block_one = self.weightedReservoirSample(1, self.blocks.loc[excluded_diff, "p"] * self.combinedWeights(excluded_diff, blocks))[0]
+                block_one = self.__weighted_reservoir_sample(1, self.blocks.loc[excluded_diff, "p"] * self.__combined_weights(excluded_diff, blocks))[0]
                 process_block(block_one, excluded, excluded_diff, blocks, cols)
 
         self.run_composition[n] = {"blocks" : blocks, "cols": cols, "excluded": excluded}
         return None
 
-    def writeRatios(self, file=None):
+    def __write_ratios(self):
         logging.info("Writing ratio files")
-
-        if file == None:
-            file = "."
-
         for i in self.run_composition.iterkeys():
             if int(i) % 100 == 0:
                 logging.info("%.2f percent done", float(i) / float(self.nruns) * 100)
 
             cols = list(set(self.run_composition[i]["cols"]) & set(self.ratios.columns))
             to_write = self.ratios.loc[:, cols]
-            to_write.to_csv(os.path.join(file, "ratios-%03d.tsv" % i), sep = "\t")
+            to_write.to_csv(os.path.join(self.targetdir, "ratios-%03d.tsv" % i), sep = "\t")
 
+    def __write_reports(self):
+        logging.info("Writing reports...")
 
-    def report(self, file=None):
+        path_prefix = 'ensembleReport_'  # note this is fixed for now
+        self.__find_block_inclusion_freq()
+        self.__find_col_inclusion_freq()
+        self.__find_block_freq()
 
-        if file == None:
-            file = "./ensembleReport_"
-
-        logging.info("Writing reports")
-
-        self.findBlockInclusionFreq()
-        self.findColInclusionFreq()
-        self.findBlockFreq()
-
-        run_df = pd.DataFrame(0, index = range(1, self.nruns + 1), columns=["ncols", "excluded", "blocks", "cols"])
+        run_df = pd.DataFrame(0, index = range(1, self.nruns + 1),
+                              columns=["ncols", "excluded", "blocks", "cols"])
 
         for i in self.run_composition.iterkeys():
             run_df.loc[i, "ncols"] = len(self.run_composition[i]["cols"])
@@ -283,32 +230,37 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
             run_df.loc[i, "blocks"] = (":::").join(self.run_composition[i]["blocks"])
             run_df.loc[i, "cols"] = (":::").join(self.run_composition[i]["cols"])
 
-        run_df.to_csv(path_or_buf=open(file + "runs.csv", mode = "w"), columns=["ncols", "excluded", "blocks", "cols"], index_label="run_num")
-        self.exclusion.to_csv(path_or_buf=open(file + "exclusionBlocks.csv", mode = "w"),
-                              columns=["block.sample.num", "r_out"], header=['block_sample_num', "excluded_freq"],
+        run_df.to_csv(path_or_buf=open("%sruns.csv" % path_prefix, mode="w"),
+                      cols=["ncols", "excluded", "blocks", "cols"],
+                      index_label="run_num")
+
+        self.exclusion.to_csv(path_or_buf=open("%sexclusionBlocks.csv" % path_prefix, mode="w"),
+                              cols=["block.sample.num", "r_out"],
+                              header=['block_sample_num', "excluded_freq"],
                               index_label="exclusion_blocks")
-        self.blocks.to_csv(path_or_buf=open(file + "blocks.csv", mode = "w"),
-                           columns=["block.sample.num", "r_in"],
+
+        self.blocks.to_csv(path_or_buf=open("%sblocks.csv" % path_prefix, mode="w"),
+                           cols=["block.sample.num", "r_in"],
                            header=["block_sample_num", "ensemble_freq"],
-                           index_label = "block")
-        self.blocks2col.to_csv(path_or_buf=open(file + "cols.csv", mode = "w"),
-                               columns=["block", "r_in"], header=["block", "ensemble_freq"],
-                               index_label = "sample")
-        self.inclusion.to_csv(path_or_buf=open(file + "inclusionBlocks.csv", mode="w"),
-                              columns=["block.sample.num", 'freq_single', 'freq_coinclusion', 'max_coinclusion_all', 'max_coinclusion_sub'],
-                              header=[ "block_sample_num", 'freq_single', 'freq_coinclusion', 'max_coinclusion_all', 'max_coinclusion_sub'],
+                           index_label="block")
+        self.blocks2col.to_csv(path_or_buf=open("%scols.csv" % path_prefix, mode="w"),
+                               cols=["block", "r_in"],
+                               header=["block", "ensemble_freq"],
+                               index_label="sample")
+        self.inclusion.to_csv(path_or_buf=open("%sinclusionBlocks.csv" % path_prefix, mode="w"),
+                              cols=["block.sample.num", 'freq_single', 'freq_coinclusion', 'max_coinclusion_all', 'max_coinclusion_sub'],
+                              header=["block_sample_num", 'freq_single', 'freq_coinclusion', 'max_coinclusion_all', 'max_coinclusion_sub'],
                               index_label="inclusion_blocks")
 
-    def pickCols_all(self):
-        # get random blocks
-        if self.random_blocks:
-            if self.n_rand_exclusion > 0:
-                self.chooseRandomBlocks()
+    def write_ensemble_ratios(self):
+        if self.random_blocks and self.n_rand_exclusion > 0:
+            self.__choose_random_blocks()
+
         for i in range(1, self.nruns + 1):
             if i % 100 == 0:
-                logging.info("%.2f percent done", float(i) / float(self.nruns) * 100)
-            self.pickCols_single(i)
+                logging.info("picking columns %.2f percent done", float(i) / float(self.nruns) * 100)
+            self.__pick_cols_single(i)
 
-        self.report(self.report_file)
-        self.writeRatios(self.ratios_file)
+        self.__write_reports()
+        self.__write_ratios()
         logging.info('Done')
