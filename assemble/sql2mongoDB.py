@@ -25,7 +25,7 @@ from bson.objectid import ObjectId
 from Bio import SeqIO
 
 
-DEFAULT_MOTIF_OUT_FILENAME = "out.mot_metaclustering.txt.I45.txt"
+DEFAULT_MOTIF_OUT_FILENAME = "out.mot_metaclustering.txt.I24"
 
 
 ###########################################################################
