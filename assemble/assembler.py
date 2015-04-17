@@ -43,7 +43,7 @@ python resample.py --host %(host)s --db %(db)s --n_rows %(n_rows)i --n_resamples
 """
 
 RUN_ALL_TEMPLATE = """#!/bin/bash
-for FILE in %s *; do
+for FILE in %s*.sh; do
         qsub $FILE
 done
 """
@@ -101,7 +101,7 @@ def __generate_resample_sge_scripts(db, organism, targetdir, n_resamples, user, 
             outfile.write(QSUB_TEMPLATE_CSH % argss)
 
     with open(os.path.join(os.path.abspath(os.path.join(targetdir, "qsub")), "resample.sh"), 'w') as outfile:
-        outfile.write(RUN_ALL_TEMPLATE % organism + "_r_" )
+        outfile.write(RUN_ALL_TEMPLATE % (organism + "_r_") )
 
     logging.info("""Output Qsub scripts to %s.
 Transfer these documents to the cluster. Run 'resample.sh' with resample.py in your working directory to compute all resamples.
