@@ -123,9 +123,9 @@ def __compute_and_write_col(db, corem, cond_ids, n_resamples=1000):
 
     pvals["col_id"] = pvals.index
     d = pvals.to_dict('records')
-    print "corem %s -> %s" % (str(corem['_id']), str(d))
+    print "corem %s -> %s\n" % (str(corem['_id']), str(d))
     # TODO: enable this line when everything works
-    #self.db.corem.update({"_id": corem._id}, {"$set": {"cols": d}})
+    self.db.corem.update({"_id": corem._id}, {"$set": {"cols": d}})
 
 
 def finish_corems(db):
