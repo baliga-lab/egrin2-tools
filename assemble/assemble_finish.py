@@ -134,8 +134,10 @@ def finish_corems(db):
     cond_ids = [entry['col_id'] for entry in db["col_info"].find({}, {"_id": 0, "col_id": 1})]
 
     for corem in db["corem"].find({}, {'_id': 1, "rows": 1, "corem_id": 1}):
-        __compute_and_write_col(db, corem, cond_ids)
-
+        try:
+            __compute_and_write_col(db, corem, cond_ids)
+        except:
+            print 'ERROR on corem %d %s' % (corem['corem_id'], str(corem['_id']))
 
 if __name__ == '__main__':
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
