@@ -133,7 +133,7 @@ def finish_corems(db):
     """Finish adding corem info (cols) after resampling. Assumes corem docs already exist"""
     cond_ids = [entry['col_id'] for entry in db["col_info"].find({}, {"_id": 0, "col_id": 1})]
 
-    for corem in db["corem"].find({}, {'_id': 1, "rows": 1, "corem_id": 1}).batch_size(30):
+    for corem in db["corem"].find({}, {'_id': 1, "rows": 1, "corem_id": 1}).batch_size(3):
         try:
             __compute_and_write_col(db, corem, cond_ids)
         except:
