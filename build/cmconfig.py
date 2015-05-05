@@ -5,6 +5,9 @@ cMonkey ini file generator for customizing ensemble runs
 """
 import os.path
 import random
+import logging
+import itertools
+
 
 CMONKEY_INI_TEMPLATE = """[General]
 normalize_ratios = %(normalize_ratios)s
@@ -287,3 +290,27 @@ class ConfigFileMaker:
     def write_config(self, path):
         with open(path, 'w') as outfile:
             outfile.write(self.ini)
+
+
+def make_config_files(num_cores, sets, set_files, num_runs, pipeline_file, targetdir):
+    logging.info("Writing ensemble config files")
+    config_params = {"num_cores": num_cores}
+    set_file_ref = dict(zip(sets, set_files))
+    combs = [[comb for comb in itertools.combinations(sets, k)] for k in range(1, len(sets) + 1)]
+    set_combs = [[]] + [list(item) for comb_k in combs for item in comb_k]
+
+    for i in range(1, num_runs + 1):
+        if len(sets) > 0:
+            set_choices = random.sample(set_combs, 1)[0]  # choose a set enrichment mode
+
+            if not set_choices:
+                ini = ConfigFileMaker(dict(config_params.items() + [("random_seed", i)]))
+            else:
+                set_choice_files = (",").join([set_file_ref[choice] for choice in set_choices])
+                ini = ConfigFileMaker(dict(config_params.items() + [("random_seed", i),
+                                                                    ("set_types", ','.join(set_choices)),
+                                                                    ("set_file", set_choice_files),
+                                                                    ("pipeline_file", pipeline_file)]))
+        else:
+            ini = ConfigFileMaker(dict(config_params.items() + [("random_seed", i)]))
+        ini.write_config(os.path.join(targetdir, "config-%03d.ini" % i))

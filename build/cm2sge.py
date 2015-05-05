@@ -83,6 +83,8 @@ LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
 LOG_LEVEL = logging.DEBUG
 LOG_FILE = None  # "make_ensemble.log"
 
+
+
 if __name__ == '__main__':
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
                         level=LOG_LEVEL, filename=LOG_FILE)
@@ -124,37 +126,12 @@ if __name__ == '__main__':
         dm.prepare_ensemble_matrix(args.ratios, args.targetdir, args.numfiles,
                                    args.mincols)
     else:
-        logging.info("generating sub matrices using inclusion/exclusion blocks...")
-        cols = ensemble.EnsemblePicker(args.ratios, args.blocks, args.exclusion,
-                                       args.inclusion, args.numruns, args.targetdir)
-        cols.write_ensemble_ratios()
-
-    # write config files
-    config_params = {"num_cores": args.num_cores}
-
-    logging.info("Writing ensemble config files")
-    sets = args.setenrich.split(",")
-    set_files = args.setenrich_files.split(",")
-    set_file_ref = dict(zip(sets, set_files))
-    combs = [[comb for comb in itertools.combinations(sets, k)] for k in range(1, len(sets) + 1)]
-    set_combs = [[]] + [list(item) for comb_k in combs for item in comb_k]
-
-    for i in range(1, args.numruns + 1):
-        if args.setenrich is not None:
-            set_choices = random.sample(set_combs, 1)[0]  # choose a set enrichment mode
-
-            if not set_choices:
-                ini = cmconfig.ConfigFileMaker(dict(config_params.items() + [("random_seed", i)]))
-            else:
-                set_choice_files = (",").join([set_file_ref[choice] for choice in set_choices])
-                ini = cmconfig.ConfigFileMaker(dict(config_params.items() + [("random_seed", i),
-                                                                             ("set_types", ','.join(set_choices)),
-                                                                             ("set_file", set_choice_files),
-                                                                             ("pipeline_file", args.pipeline)]))
-        else:
-            ini = cmconfig.ConfigFileMaker(dict(config_params.items() + [("random_seed", i)]))
-
-        ini.write_config(os.path.join(args.targetdir, "config-%03d.ini" % i))
+        ensemble.make_ensemble_ratios(args.ratios, args.blocks, args.exclusion, args.inclusion,
+                                      args.numruns, args.targetdir)
+    
+    cmconfig.make_config_files(args.num_cores, args.setenrich.split(','),
+                               args.setenrich_files.split(","), args.numruns,
+                               args.pipeline, args.targetdir)
 
     with open(os.path.join(args.targetdir, "%s.sh" % args.organism), 'w') as outfile:
         login = args.user if args.user is not None else os.getlogin()

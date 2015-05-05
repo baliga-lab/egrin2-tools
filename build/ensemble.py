@@ -264,3 +264,10 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
         self.__write_reports()
         self.__write_ratios()
         logging.info('Done')
+
+
+def make_ensemble_ratios(ratios, blocks, exclusion, inclusion, num_runs, targetdir):
+    logging.info("generating sub matrices using inclusion/exclusion blocks...")
+    cols = EnsemblePicker(ratios, blocks, exclusion, inclusion, num_runs, targetdir)
+    cols.write_ensemble_ratios()
+
