@@ -127,10 +127,12 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
         """Get col ids from blocks. Since a single condition can be assigned to multiple blocks, we need to make sure that conditions in a current exclusion block did not 'sneak in' to the run"""
         block_cols = self.blocks2col.loc[blocks.split(":::")]
         excluded_cols = self.blocks2col.loc[excluded.split(":::")]
-        return set(block_cols.sample).difference(set(excluded_cols.sample))
+        # note: DataFrame.sample() is a method in pandas 0.16.0
+        return set(block_cols.sample()).difference(set(excluded_cols.sample()))
 
     def __increment_column_count(self, col):
-        self.blocks2col.loc[self.blocks2col.sample == col, "r_in"] += 1.0 / self.nruns
+        # note: DataFrame.sample() is a method in pandas 0.16.0
+        self.blocks2col.loc[self.blocks2col.sample() == col, "r_in"] += 1.0 / self.nruns
 
 
     def __find_block_inclusion_freq(self):
