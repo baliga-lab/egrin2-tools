@@ -7,6 +7,8 @@ import random
 
 import cmconfig
 import ensemble
+import shock
+import tempfile
 
 
 DESCRIPTION = "cm2awe.py - prepare cluster runs for KBase AWE"
@@ -22,15 +24,19 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('--organism', required=True, help="3 letter organism code")
     parser.add_argument('--ratios', required=True, help="Path to ratios file")
-    parser.add_argument('--targetdir', required=True, help="Path to output directory")
+    parser.add_argument('--outfile', required=True, help="file describing the Shock nodes of generated data")
     parser.add_argument('--blocks', default=None, help="Path to block definitions")
     parser.add_argument('--inclusion', default=None, help="Path to inclusion block definitions")
     parser.add_argument('--exclusion', default=None, help="Path to exclusion block definitions")
     parser.add_argument('--nruns', type=int, default=100, help="Number of cMonkey2 runs")
     args = parser.parse_args()
 
-    if not os.path.exists(args.targetdir):
-        os.makedirs(args.targetdir)
+    targetdir = tempfile.mkdtemp(suffix='cmsplit')
     ensemble.make_ensemble_ratios(args.ratios, args.blocks, args.exclusion, args.inclusion,
-                                  args.nruns, args.targetdir)
-    cmconfig.make_config_files(1, "set1", "setfile1", args.nruns, None, args.targetdir)
+                                  args.nruns, targetdir)
+    cmconfig.make_config_files(1, "set1", "setfile1", args.nruns, None, targetdir)
+    with open(args.outfile, 'w') as outfile:
+        outfile.write("this is a test")
+        outfile.write("SHOCK_URL: %s" % os.environ['SHOCK_URL'])
+        outfile.write("TOKEN: %s" % os.environ['KB_AUTH_TOKEN'])
+    
