@@ -23,9 +23,9 @@ def config2shock(targetdir):
     service_url = os.environ['SHOCK_URL']
     auth_token = os.environ['KB_AUTH_TOKEN']
     logging.info("SHOCK SERVICE: %s", service_url)
-    logging.info("AUTH TOKEN: %s", auth_token
+    logging.info("AUTH TOKEN: %s", auth_token)
 
-    shock_client = ShockClient(service_url, auth_token)
+    shock_client = shock.ShockClient(service_url, auth_token)
     result = {}
     for filename in os.listdir(targetdir):
         #result.append(filename)
