@@ -9,6 +9,7 @@ import cmconfig
 import ensemble
 import shock
 import tempfile
+import json
 
 
 DESCRIPTION = "cm2awe.py - prepare cluster runs for KBase AWE"
@@ -16,6 +17,15 @@ DESCRIPTION = "cm2awe.py - prepare cluster runs for KBase AWE"
 LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
 LOG_LEVEL = logging.DEBUG
 LOG_FILE = None
+
+
+def config2shock(targetdir):
+    #outfile.write("SHOCK_URL: %s" % os.environ['SHOCK_URL'])
+    #outfile.write("TOKEN: %s" % os.environ['KB_AUTH_TOKEN'])
+
+    result = []
+    for filename in os.listdir(targetdir):
+        result.append(filename)
 
 
 if __name__ == '__main__':
@@ -35,8 +45,7 @@ if __name__ == '__main__':
     ensemble.make_ensemble_ratios(args.ratios, args.blocks, args.exclusion, args.inclusion,
                                   args.nruns, targetdir)
     cmconfig.make_config_files(1, "set1", "setfile1", args.nruns, None, targetdir)
+
+    outinfo = config2shock(targetdir)
     with open(args.outfile, 'w') as outfile:
-        outfile.write("this is a test")
-        outfile.write("SHOCK_URL: %s" % os.environ['SHOCK_URL'])
-        outfile.write("TOKEN: %s" % os.environ['KB_AUTH_TOKEN'])
-    
+        outfile.write(json.dumps(outinfo))
