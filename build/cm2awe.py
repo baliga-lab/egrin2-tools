@@ -23,9 +23,20 @@ def config2shock(targetdir):
     #outfile.write("SHOCK_URL: %s" % os.environ['SHOCK_URL'])
     #outfile.write("TOKEN: %s" % os.environ['KB_AUTH_TOKEN'])
 
-    result = []
+    shock_client = ShockClient(service_url, auth_token)
+    result = {}
     for filename in os.listdir(targetdir):
-        result.append(filename)
+        #result.append(filename)
+        path = os.path.join(targetdir, filename)
+        try:
+            print "uploading input file ..."
+            shock_result = shock_client.upload_file(path)
+            shock_node_id = shock_result['data']['id']
+            result[filename] = shock_node_id
+        except:
+            print "error uploading file"
+            traceback.print_exc()
+
     return result
 
 if __name__ == '__main__':
