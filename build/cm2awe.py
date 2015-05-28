@@ -29,12 +29,12 @@ def config2shock(targetdir):
         #result.append(filename)
         path = os.path.join(targetdir, filename)
         try:
-            print "uploading input file ..."
+            logging.info("uploading input file '%s' ...", path)
             shock_result = shock_client.upload_file(path)
             shock_node_id = shock_result['data']['id']
             result[filename] = shock_node_id
         except:
-            print "error uploading file"
+            logging.error("error uploading file '%s'", path)
             traceback.print_exc()
 
     return result
