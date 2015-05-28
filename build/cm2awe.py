@@ -20,8 +20,8 @@ LOG_FILE = '/home/ubuntu/cm2awe.log'
 
 
 def config2shock(targetdir):
-    #outfile.write("SHOCK_URL: %s" % os.environ['SHOCK_URL'])
-    #outfile.write("TOKEN: %s" % os.environ['KB_AUTH_TOKEN'])
+    service_url = os.environ['SHOCK_URL'])
+    auth_token = os.environ['KB_AUTH_TOKEN']
 
     shock_client = ShockClient(service_url, auth_token)
     result = {}
