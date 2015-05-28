@@ -16,7 +16,7 @@ DESCRIPTION = "cm2awe.py - prepare cluster runs for KBase AWE"
 
 LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
 LOG_LEVEL = logging.DEBUG
-LOG_FILE = None
+LOG_FILE = '/home/ubuntu/cm2awe.log'
 
 
 def config2shock(targetdir):
@@ -26,7 +26,7 @@ def config2shock(targetdir):
     result = []
     for filename in os.listdir(targetdir):
         result.append(filename)
-
+    return result
 
 if __name__ == '__main__':
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
