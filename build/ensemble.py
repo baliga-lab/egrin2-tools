@@ -191,6 +191,7 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
         # pick a single from blocks remaining
         blocks = []
         cols = []
+        last_len = 0
 
         while len(cols) < n_cols:
             if len(cols) == 0:
@@ -201,8 +202,13 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
                 block_one = self.__weighted_reservoir_sample(1, self.blocks.loc[excluded_diff, "p"] * self.__combined_weights(excluded_diff, blocks))[0]
                 process_block(block_one, excluded, excluded_diff, blocks, cols)
 
+            # avoid the case that we run into an endless loop
+            if len(cols) == last_len:
+                logging.warn("run %d: endless loop avoidance break", n)
+                break
+            last_len = len(cols)
+
         self.run_composition[n] = {"blocks" : blocks, "cols": cols, "excluded": excluded}
-        return None
 
     def __write_ratios(self):
         logging.info("Writing ratio files")
