@@ -47,8 +47,8 @@ class EnsemblePicker:
         self.targetdir = targetdir
         self.random_blocks = random_blocks
         self.ratios = pd.read_csv(ratios, index_col=0, sep=",")
-        self.blocks2col = pd.read_csv(blocks, sep=",", names=["sample", "block"],
-                                      converters={'sample': strip, 'block': strip}).icol([0, 1])
+        self.blocks2col = pd.read_csv(blocks, sep=",").icol([0, 1]) ##, names=["sample", "block"],
+                                      #converters={'sample': strip, 'block': strip}).icol([0, 1])
         self.blocks =  pd.DataFrame(zip(self.blocks2col.block.value_counts().keys(),
                                         self.blocks2col.block.value_counts()), columns=["block", "block.sample.num"])
         self.blocks["p"] = 1
@@ -57,32 +57,36 @@ class EnsemblePicker:
         self.blocks = self.blocks[self.blocks.index != "block"]
         self.blocks2col = self.blocks2col.set_index(keys="block")
         self.blocks2col["r_in"] = 0
-        self.exclusion = pd.read_csv(exclusion, sep=",", converters={"exclusion.blocks": strip}, index_col=0)
-        self.exclusion["p"] = 1
-        self.exclusion["r_out"] = 0
-        self.inclusion = pd.read_csv(inclusion, sep=",", converters={"inclusion.blocks": strip}, index_col=0)
-        self.inclusion_matrix = pd.DataFrame(0, index=self.blocks.index, columns=self.blocks.index)
+        self.n_rand_exclusion = 0
+        if exclusion is not None:
+            self.exclusion = pd.read_csv(exclusion, sep=",", converters={"exclusion.blocks": strip}, index_col=0)
+            self.exclusion["p"] = 1
+            self.exclusion["r_out"] = 0
 
-        # fill out inclusion matrix
-        for i in self.inclusion.index:
-            blocks = i.split(":::")
-            for i, j in itertools.combinations(blocks, 2):
-                i = i.strip()
-                j = j.strip()
-                self.inclusion_matrix.loc[i, j] = self.inclusion_weight
-                self.inclusion_matrix.loc[j, i] = self.inclusion_weight
+            if n_rand_exclusion is None:
+                self.n_rand_exclusion = int(1 / (float(self.exclusion_percentage) / 100.0)) - self.exclusion.shape[0]
+                if self.n_rand_exclusion < 0:
+                    self.n_rand_exclusion = 0
+            else:
+                self.n_rand_exclusion = n_rand_exclusion
 
-        if n_rand_exclusion is None:
-            self.n_rand_exclusion = int(1 / (float(self.exclusion_percentage) / 100.0)) - self.exclusion.shape[0]
             if self.n_rand_exclusion < 0:
-                self.n_rand_exclusion = 0
-        else:
-            self.n_rand_exclusion = n_rand_exclusion
-
-        if self.n_rand_exclusion < 0:
-            logging.info("""You have defined more exclusion blocks than can be excluded given the number
+                logging.info("""You have defined more exclusion blocks than can be excluded given the number
 of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %d percent!""",
-                         self.nruns, self.nruns / self.exclusion.shape[0])
+                             self.nruns, self.nruns / self.exclusion.shape[0])
+
+        if inclusion is not None:
+            self.inclusion = pd.read_csv(inclusion, sep=",", converters={"inclusion.blocks": strip}, index_col=0)
+            self.inclusion_matrix = pd.DataFrame(0, index=self.blocks.index, columns=self.blocks.index)
+
+            # fill out inclusion matrix
+            for i in self.inclusion.index:
+                blocks = i.split(":::")
+                for i, j in itertools.combinations(blocks, 2):
+                    i = i.strip()
+                    j = j.strip()
+                    self.inclusion_matrix.loc[i, j] = self.inclusion_weight
+                    self.inclusion_matrix.loc[j, i] = self.inclusion_weight
 
         self.run_composition = {}
 
