@@ -1,6 +1,7 @@
 import requests
 import tempfile
 import os
+import traceback
 
 
 class ShockClient:
@@ -22,12 +23,14 @@ class ShockClient:
         files = {'upload': open(path)}
         r = requests.post(self.base_url + '/node', files=files,
                           headers=self.auth_headers())
-        return r.json
+        # requests version >= 2.x: json was changed to a method !!!
+        return r.json()
 
     def node_info(self, node_id):
         r = requests.get(self.base_url + '/node/%s' % node_id,
                          headers=self.auth_headers())
-        return r.json
+        # requests version >= 2.x: json was changed to a method !!!
+        return r.json()
 
     def download_file(self, node_id, target_path):
         r = requests.get(self.base_url + '/node/%s?download_raw' % node_id,
