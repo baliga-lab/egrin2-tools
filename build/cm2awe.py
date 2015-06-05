@@ -61,7 +61,7 @@ if __name__ == '__main__':
     try:
         ensemble.make_ensemble_ratios(args.ratios, args.blocks, args.exclusion, args.inclusion,
                                     args.nruns, targetdir)
-        cmconfig.make_config_files(1, "set1", "setfile1", args.nruns, None, targetdir)
+        cmconfig.make_config_files(num_cores=1, sets=[], set_files=[], num_runs=args.nruns, pipeline_file='', targetdir=targetdir)
 
         outinfo = config2shock(targetdir)
         with open(args.outfile, 'w') as outfile:
