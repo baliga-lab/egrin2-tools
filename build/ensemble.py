@@ -240,7 +240,11 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
             run_df.loc[i, "excluded"] = self.run_composition[i]["excluded"]
             run_df.loc[i, "blocks"] = (":::").join(self.run_composition[i]["blocks"])
             try:
-                run_df.loc[i, "cols"] = (":::").join(self.run_composition[i]["cols"])
+                # note: for some reason, we will occationally get NaNs in the
+                # columns, what we really need to do is to check why
+                columns = self.run_composition[i]["cols"]
+                columns = filter(lambda c: isinstance(c, basestring), columns)
+                run_df.loc[i, "cols"] = (":::").join(columns)
             except:
                 logging.exception("buggy run composition")
                 raise
