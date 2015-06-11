@@ -41,6 +41,7 @@ class ShockClient:
                          headers=self.auth_headers(), stream=True)
         for chunk in r.iter_content(256):
             outfile.write(chunk)
+        outfile.close()
 
 def upload_data(data, service_url, auth_token):
     tmpfile = tempfile.NamedTemporaryFile(mode='w', delete=False)
