@@ -16,7 +16,6 @@ DESCRIPTION = "cm2awe.py - prepare cluster runs for KBase AWE"
 
 LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
 LOG_LEVEL = logging.DEBUG
-LOG_FILE = '/home/ubuntu/cm2awe.log'
 
 
 def config2shock(targetdir):
@@ -42,8 +41,12 @@ def config2shock(targetdir):
     return result
 
 if __name__ == '__main__':
+    if 'LOG_DIRECTORY' in os.environ:
+        logfile = os.path.join(os.environ['LOG_DIRECTORY'], 'cm2awe.log')
+    else:
+        logfile = None
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
-                        level=LOG_LEVEL, filename=LOG_FILE)
+                        level=LOG_LEVEL, filename=logfile)
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('--organism', required=True, help="3 letter organism code")
     parser.add_argument('--ratios', required=True, help="Path to ratios file")
@@ -55,10 +58,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     targetdir = tempfile.mkdtemp(suffix='cmsplit')
-    ensemble.make_ensemble_ratios(args.ratios, args.blocks, args.exclusion, args.inclusion,
-                                  args.nruns, targetdir)
-    cmconfig.make_config_files(1, "set1", "setfile1", args.nruns, None, targetdir)
+    try:
+        ensemble.make_ensemble_ratios(args.ratios, args.blocks, args.exclusion, args.inclusion,
+                                    args.nruns, targetdir)
+        cmconfig.make_config_files(num_cores=1, sets=[], set_files=[], num_runs=args.nruns, pipeline_file='', targetdir=targetdir)
 
-    outinfo = config2shock(targetdir)
-    with open(args.outfile, 'w') as outfile:
-        outfile.write(json.dumps(outinfo))
+        outinfo = config2shock(targetdir)
+        with open(args.outfile, 'w') as outfile:
+            outfile.write(json.dumps(outinfo))
+    except:
+        logging.exception("Exception while running")
+        raise
