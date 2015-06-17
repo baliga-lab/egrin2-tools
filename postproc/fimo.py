@@ -179,7 +179,7 @@ def main():
         lines = seqsfile_in.readlines()
         genomeseq = lines[0].upper() # to upper may not be necessary
 
-        out.write(">"+fname[-11:]+'\n') ##os.path.basename(fname)+"\n") # The short little header needed by fimo
+        out.write(">"+fname.find('_NC_')+1:]+'\n') ## just use chromosome NCBI code in fasta header - is this robust enough?
         out.write(genomeseq)
     out.close()
 
