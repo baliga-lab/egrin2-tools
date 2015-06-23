@@ -119,9 +119,11 @@ def get_in_coding_rgn( input_dir, features ):
             is_bad = np.zeros( fimo.shape[0], dtype=bool )
             for i in xrange(fimo.shape[0]):
                 row = fimo.ix[i]
-                hits = np.sum( (start_pos <= row.start) & (end_pos >= row.start) )
+                hits = np.sum( (features.contig == row['sequence name']) & (start_pos <= row.start) & \
+                                   (end_pos >= row.start) )
                 if hits <= 0:
-                    hits = np.sum( (start_pos <= row.stop) & (end_pos >= row.stop) )
+                    hits = np.sum( (features.contig == row['sequence name']) & (start_pos <= row.stop) & \
+                                       (end_pos >= row.stop) )
                 if hits > 0:
                     is_bad[i] = True
             
