@@ -11,13 +11,12 @@ DESCRIPTION = 'a mock cmonkey2 runner'
 
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(description=DESCRIPTION)
-  parser.add_argument('--organism', required=True)
-  parser.add_argument('--inputfile', required=True)
-  parser.add_argument('--run_num', type=int, required=True)
-  parser.add_argument('--outdb', required=True)
-  args = parser.parse_args()
+    parser = argparse.ArgumentParser(description=DESCRIPTION)
+    parser.add_argument('--organism', required=True)
+    parser.add_argument('--inputfile', required=True)
+    parser.add_argument('--run_num', type=int, required=True)
+    parser.add_argument('--outdb', required=True)
+    args = parser.parse_args()
     
-  with open(args.outdb, 'w') as outfile:
-    outfile.write('this is empty')
-
+    with open(args.outdb, 'w') as outfile:
+        outfile.write('this is empty')
