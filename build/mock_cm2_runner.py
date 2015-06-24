@@ -7,6 +7,9 @@ A mock cm2_runner. It accepts the same input parameters and generates
 the same output file, but it does nothing.
 """
 
+DESCRIPTION = 'a mock cmonkey2 runner'
+
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description=DESCRIPTION)
   parser.add_argument('--organism', required=True)

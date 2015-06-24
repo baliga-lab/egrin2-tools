@@ -11,6 +11,8 @@ import argparse
 import json
 
 
+DESCRIPTION = 'a mock splitter tool'
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('--organism', required=True, help="3 letter organism code")
