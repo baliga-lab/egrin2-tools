@@ -199,6 +199,9 @@ if __name__ == '__main__':
 
     db = client[dbname]
 
+    if not os.path.exists(targetdir):
+        os.mkdir(targetdir)
+
     with open(os.path.abspath(os.path.join(targetdir, "ensemble.info")), 'w') as outfile:
         outfile.write(RUN_INFO_TEMPLATE % info_d)
 
