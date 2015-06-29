@@ -3,6 +3,14 @@ import argparse
 import logging
 import os
 
+"""
+merge_runner.py
+
+merges all the cmonkey runs in previous steps and builds a database of Corems
+(co-regulated modules).
+
+It will then generate input for a set of resampling runs
+"""
 DESCRIPTION = "merge_runner.py - merge multiple cmonkey results"
 
 LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
