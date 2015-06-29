@@ -93,6 +93,10 @@ def create_tables(conn):
     conn.execute('create table bicluster_rows (cluster_id int, row_id int)')
     conn.execute('create table bicluster_cols (cluster_id int, col_id int)')
 
+    conn.execute('create table motif_infos (cluster_id int, seqtype text, motif_num int, evalue decimal)')
+    conn.execute('create table motif_pssm_rows (motif_info_id int, row int, a decimal, c decimal, g decimal, t decimal)')
+    conn.execute('create table meme_motif_sites (motif_info_id int, seq_name text, reverse boolean, start int, pvalue decimal)')
+
     # indexes
     conn.execute('create index rows_idx on rows (name)')
     conn.execute('create index row_annotations_idx on row_annotations (name)')
@@ -216,6 +220,7 @@ def store_biclusters(conn, src_conn, run_id, row2id, col2id):
     src_cursor = src_conn.cursor()
     src_cursor2 = src_conn.cursor()
     cursor = conn.cursor()
+    cluster2id = {}
     try:
         src_cursor.execute('select max(iteration) from cluster_stats')
         last_iter = src_cursor.fetchone()[0]
@@ -230,6 +235,7 @@ def store_biclusters(conn, src_conn, run_id, row2id, col2id):
             cursor.execute('insert into biclusters (run_id,cluster_num,residual) values (?,?,?)',
                            [run_id, cluster, residual])
             cluster_id = cursor.lastrowid
+            cluster2id[cluster] = cluster_id
 
             for rowname in rownames:
                 cursor.execute('insert into bicluster_rows (cluster_id,row_id) values (?,?)',
@@ -239,10 +245,41 @@ def store_biclusters(conn, src_conn, run_id, row2id, col2id):
                                [cluster_id, col2id[colname]])
 
         conn.commit()
+        return cluster2id
     finally:
         cursor.close()
         src_cursor.close()
         src_cursor2.close()
+
+
+def store_motifs(conn, src_conn, cluster2id):
+    src_cursor = src_conn.cursor()
+    src_cursor2 = src_conn.cursor()
+    cursor = conn.cursor()
+    try:
+        src_cursor.execute('select max(iteration) from cluster_stats')
+        last_iter = src_cursor.fetchone()[0]
+        src_cursor.execute('select rowid,cluster,seqtype,motif_num,evalue from motif_infos where iteration=?', [last_iter])
+        for motif_info_id, cluster, seqtype, motif_num, evalue in src_cursor.fetchall():
+            cursor.execute('insert into motif_infos (cluster_id,seqtype,motif_num,evalue) values (?,?,?,?)', [cluster2id[cluster], seqtype, motif_num, evalue])
+            motif_id = cursor.lastrowid
+
+            # PSSMs
+            src_cursor2.execute('select row,a,c,g,t from motif_pssm_rows where motif_info_id=? order by row', [motif_info_id])
+            for row, a, c, g, t in src_cursor2.fetchall():
+                cursor.execute('insert into motif_pssm_rows (motif_info_id,row,a,c,g,t) values (?,?,?,?,?,?)', [motif_id, row, a, c, g, t])
+
+            # Sites
+            src_cursor2.execute('select seq_name,reverse,start,pvalue from meme_motif_sites where motif_info_id=?', [motif_info_id])
+            for seqname, reverse, start, pvalue in src_cursor2.fetchall():
+                cursor.execute('insert into meme_motif_sites (motif_info_id,seq_name,reverse,start,pvalue) values (?,?,?,?,?)', [motif_id, seqname, reverse, start, pvalue])
+
+        conn.commit()
+    finally:
+        src_cursor.close()
+        src_cursor2.close()
+        cursor.close()
+
 
 if __name__ == '__main__':
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
@@ -273,7 +310,8 @@ if __name__ == '__main__':
                 src_conn = sqlite3.connect(cmonkey_db)
                 try:
                     run_id = store_run_info(conn, src_conn, row2id, col2id)
-                    store_biclusters(conn, src_conn, run_id, row2id, col2id)
+                    cluster2id = store_biclusters(conn, src_conn, run_id, row2id, col2id)
+                    store_motifs(conn, src_conn, cluster2id)
                 finally:
                     src_conn.close()
     finally:
@@ -288,25 +326,83 @@ if __name__ == '__main__':
 "additional_info" : [ ]
 }
 """
-"""Mongo BiclusterInfo
-{
-    "_id" : ObjectId("558c781077ffbc5e877ab582"),
-"rows" : [  972,  1810,  2124,  1047,  789,  2400,  265,  3092,  3727 ],
-"run_id" : 0,
-"residual" : 0.5492853502653435,
-"cluster" : 19,
-"columns" : [ 	982, 	692, 	693, 	494, 	739, 	737, 	738, 	701, 	984, 	985, 	981, 	292, 	967, 	966, 	746, 	947, 	753, 	752, 	291, 	920, 	290, 	919, 	937, 	485, 	487, 	482, 	483, 	484, 	491, 	490, 	289, 	288, 	159, 	1638, 	1640, 	1641, 	1170, 	344, 	496, 	346, 	347, 	349, 	707, 	705, 	706, 	704, 	731, 	1166, 	730, 	729, 	740, 	741, 	479, 	723, 	721, 	722, 	708, 	709, 	710, 	711, 	1168, 	974, 	972, 	973, 	970, 	971, 	969, 	1167, 	960, 	509, 	747, 	744, 	1164, 	745, 	951, 	952, 	953, 	954, 	1639, 	284, 	748, 	749, 	1169, 	156, 	507, 	503, 	506, 	388, 	714, 	713, 	712, 	286, 	287 ]
-}
-"""
-"""Mongo EnsembleInfo
-{ "_id" : ObjectId("558c77f877ffbc5e877ab56f"), "run_id" : 4, "added_to_ensemble" : ISODate("2015-06-25T21:51:52.020Z"), "start_time" : "2015-01-23 13:22:07.160374", "run_name" : "mtu-out-008", "cols" : [ 1642, 	413, 	1685, 	1244, ... ], "num_columns" : 184, "species" : "Mycobacterium_tuberculosis_H37Rv", "git_sha" : "$Id: 69b1afe09739513dfe1102407ea04fe0e5c65e9e $", "rows" : [ 0, 1, 2, 3, 4, 5, ...], "finish_time" : "2015-01-24 11:46:47.914951", "num_iterations" : 2000, "num_rows" : 3923, "num_clusters" : 420, "organism" : "mtu" }
-"""
 """Mongo Corem
-{ "_id" : ObjectId("558c79f277ffbc5e87859004"), "rows" : [  3219,  3461,  3462 ], "density" : 1, "corem_id" : 20, "cols" : [ ], "edges" : [  "3219-3462",  "3219-3461",  "3462-3461" ], "weighted_density" : 0.03213 }
+{
+  "_id" : ObjectId("558c79f277ffbc5e87859004"),
+  "rows" : [  3219,  3461,  3462 ],
+  "density" : 1,
+  "corem_id" : 20,
+  "cols" : [ ],
+  "edges" : [  "3219-3462",  "3219-3461",  "3462-3461" ],
+  "weighted_density" : 0.03213
+}
 """
 """Mongo genome: is DNA sequence"""
 """Mongo motif info
-{ "_id" : ObjectId("558c783777ffbc5e877ab78e"), "meme_motif_site" : [ 	{ 	"start" : 86, 	"row_id" : 1602, "scaffoldId" : 7022, 	"reverse" : 0, 	"pvalue" : 8.05e-7 }, 	{ 	"start" : 50, 	"row_id" : 511, 	"scaffoldId" : 7022, 	"reverse" : 0, 	"pvalue" : 0.00000189 }, 	{ 	"start" : 63, 	"row_id" : 289, "scaffoldId" : 7022, 	"reverse" : 1, 	"pvalue" : 0.0000271 }, 	{ 	"start" : 78, 	"row_id" : 49, 	"scaffoldId" : 7022, 	"reverse" : 0, 	"pvalue" : 0.0000316 }, 	{ 	"start" : 59, 	"row_id" : 1121, "scaffoldId" : 7022, 	"reverse" : 0, 	"pvalue" : 0.0000356 }, 	{ 	"start" : 87, 	"row_id" : 2172, "scaffoldId" : 7022, 	"reverse" : 1, 	"pvalue" : 0.0000744 }, 	{ 	"start" : 67, 	"row_id" : 2214, "scaffoldId" : 7022, 	"reverse" : 0, 	"pvalue" : 0.000197 } ], "evalue" : 1900, "gre_id" : "NaN", "cluster_id" : ObjectId("558c781077ffbc5e877ab57a"), "motif_num" : 2, "seqtype" : "upstream", "pwm" : [ 	{ 	"a" : 0.857143, 	"c" : 0, 	"t" : 0.142857, 	"g" : 0, 	"row" : 0 }, 	{ 	"a" : 0.714286, 	"c" : 0, 	"t" : 0.285714, 	"g" : 0, 	"row" : 1 }, 	{ 	"a" : 0.571429, 	"c" : 0, "t" : 0.428571, 	"g" : 0, 	"row" : 2 }, 	{ 	"a" : 0, 	"c" : 0.285714, 	"t" : 0.142857, 	"g" : 0.571429, 	"row" : 3 }, 	{ 	"a" : 0, 	"c" : 0, 	"t" : 0, 	"g" : 1, "row" : 4 }, 	{ 	"a" : 0.142857, 	"c" : 0, 	"t" : 0.428571, 	"g" : 0.428571, 	"row" : 5 }, 	{ 	"a" : 0.142857, 	"c" : 0.714286, 	"t" : 0, 	"g" : 0.142857, 	"row" : 6 }, 	{ 	"a" : 0, 	"c" : 0, 	"t" : 0.714286, 	"g" : 0.285714, 	"row" : 7 }, 	{ 	"a" : 1, 	"c" : 0, 	"t" : 0, 	"g" : 0, 	"row" : 8 }, 	{ 	"a" : 0, "c" : 0.857143, 	"t" : 0, 	"g" : 0.142857, 	"row" : 9 } ] }
+{
+  "_id" : ObjectId("558c783777ffbc5e877ab78e"),
+  "meme_motif_site" : [
+    {
+      "start" : 86,
+      "row_id" : 1602,
+      "scaffoldId" : 7022,
+      "reverse" : 0,
+      "pvalue" : 8.05e-7
+    },
+    {
+      "start" : 50,
+      "row_id" : 511,
+      "scaffoldId" : 7022,
+      "reverse" : 0,
+      "pvalue" : 0.00000189
+    },
+    {
+      "start" : 63,
+      "row_id" : 289,
+      "scaffoldId" : 7022,
+      "reverse" : 1,
+      "pvalue" : 0.0000271
+    },
+    {
+      "start" : 78,
+      "row_id" : 49,
+      "scaffoldId" : 7022,
+      "reverse" : 0,
+      "pvalue" : 0.0000316
+    },
+    {
+      "start" : 59,
+      "row_id" : 1121,
+      "scaffoldId" : 7022,
+      "reverse" : 0,
+      "pvalue" : 0.0000356
+    },
+    {
+      "start" : 87,
+      "row_id" : 2172,
+      "scaffoldId" : 7022,
+      "reverse" : 1,
+      "pvalue" : 0.0000744
+    },
+    {
+      "start" : 67,
+      "row_id" : 2214,
+      "scaffoldId" : 7022,
+      "reverse" : 0,
+      "pvalue" : 0.000197
+    }
+  ],
+  "evalue" : 1900,
+  "gre_id" : "NaN",
+  "cluster_id" : ObjectId("558c781077ffbc5e877ab57a"),
+  "motif_num" : 2,
+  "seqtype" : "upstream",
+  "pwm" : [
+    { "a" : 0.857143, "c" : 0, "t" : 0.142857, "g" : 0, "row" : 0 },
+    { "a" : 0.714286, "c" : 0, 	"t" : 0.285714, "g" : 0, "row" : 1 },
+    { "a" : 0.571429, 	"c" : 0, "t" : 0.428571, "g" : 0,"row" : 2 },
+    { "a" : 0, "c" : 0.285714, "t" : 0.142857, "g" : 0.571429, "row" : 3 },
+    { 	"a" : 0, 	"c" : 0, 	"t" : 0, 	"g" : 1, "row" : 4 }, 	{ 	"a" : 0.142857, 	"c" : 0, 	"t" : 0.428571, 	"g" : 0.428571, 	"row" : 5 }, 	{ 	"a" : 0.142857, 	"c" : 0.714286, 	"t" : 0, 	"g" : 0.142857, 	"row" : 6 }, 	{ 	"a" : 0, 	"c" : 0, 	"t" : 0.714286, 	"g" : 0.285714, 	"row" : 7 }, 	{ 	"a" : 1, 	"c" : 0, 	"t" : 0, 	"g" : 0, 	"row" : 8 }, 	{ 	"a" : 0, "c" : 0.857143, 	"t" : 0, 	"g" : 0.142857, 	"row" : 9 } ] }
 """
 """Mongo rowrow
 { "_id" : ObjectId("558c798177ffbc5e877acd5e"), "row_ids" : [  238,  3779 ], "counts" : 2, "backbone_pval" : 0.17728185409972097, "weight" : 0.009950248756218905 }
