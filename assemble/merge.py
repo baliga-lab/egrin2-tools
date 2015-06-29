@@ -7,6 +7,7 @@ import logging
 import gzip
 import pandas as pd
 import requests
+from datetime import datetime
 
 """
 This merger tool outfactors the merging process, and merges into
@@ -56,7 +57,9 @@ def standardize_ratios(ratios):
     return ratios_standardized
 
 
-def read_ratios(path):    
+def read_ratios(path):
+    """reads the specified gene expression and returns both
+    raw matrix and standardized matrix"""
     ratios = pd.read_csv(gzip.open(path, 'rb'), index_col=0, sep="\t")
 
     if ratios.shape[1] == 0:  # attempt using comma as a delimiter if tab failed
@@ -64,7 +67,7 @@ def read_ratios(path):
 
     if ratios.shape[1] == 0:
         raise Exception("Cannot read ratios file. Check delimiter. Should be '\t' or ',' ")
-    return standardize_ratios(ratios)
+    return ratios, standardize_ratios(ratios)
 
 
 def create_tables(conn):
@@ -76,6 +79,28 @@ def create_tables(conn):
     conn.execute('create table columns (name text)')
     conn.execute('create table col_annotations (name text)')
     conn.execute('create table col_annotation_values (col_id int, annot_id int, value text)')
+
+    # holds both original and standardized values
+    conn.execute('create table expr_values (row_id int,col_id,value decimal,std_value decimal)')
+
+    # information about individual ensemble runs
+    conn.execute('create table ensemble_runs (date_added timestamp,start_time timestamp,finish_time timestamp,num_iterations int,organism text,species text,num_rows int,num_columns,num_clusters int,git_sha text)')
+    conn.execute('create table ensemble_run_rows (run_id int, row_id int)')
+    conn.execute('create table ensemble_run_cols (run_id int, col_id int)')
+
+    # bicluster information
+    conn.execute('create table biclusters (run_id int, cluster_num int, residual decimal)')
+    conn.execute('create table bicluster_rows (cluster_id int, row_id int)')
+    conn.execute('create table bicluster_cols (cluster_id int, col_id int)')
+
+    # indexes
+    conn.execute('create index rows_idx on rows (name)')
+    conn.execute('create index row_annotations_idx on row_annotations (name)')
+
+    conn.execute('create index cols_idx on columns (name)')
+    conn.execute('create index col_annotations_idx on col_annotations (name)')
+
+    conn.execute('create index expr_values_idx on expr_values (row_id,col_id)')
 
 
 def annotate_microbes_online(conn, row2id, ncbi_code):
@@ -98,7 +123,6 @@ def annotate_microbes_online(conn, row2id, ncbi_code):
             if len(line) < sysname_col + 1:  # line too short ?
                 continue
             sysname = line[sysname_col]
-            print "processing ", sysname
             if sysname in row2id:
                 row_pk = row2id[sysname]
                 for col_idx in range(len(line)):
@@ -134,6 +158,92 @@ def db_insert_cols(conn, cols):
     return result
 
 
+def store_ratios(conn, raw_ratios, std_ratios, row2id, col2id):
+    """Store gene expressions"""
+    logging.info("Storing gene expressions...")
+    num_rows = 0
+    for rowidx, rowname in enumerate(raw_ratios.index.values):
+        if num_rows % 200 == 0:
+            logging.info("%.2f percent done (%d rows)",
+                         round((float(num_rows) / raw_ratios.shape[0]) * 100, 1), num_rows)
+        row_pk = row2id[rowname]
+        for colidx, colname in enumerate(raw_ratios.columns.values):
+            col_pk = col2id[colname]
+            raw_value = raw_ratios.values[rowidx, colidx]
+            std_value = std_ratios.values[rowidx, colidx]
+            conn.execute('insert into expr_values (row_id,col_id,value,std_value) values (?,?,?,?)',
+                         [row_pk, col_pk, raw_value, std_value])
+        num_rows += 1
+
+    conn.commit()
+    logging.info("done.")
+
+
+def store_run_info(conn, src_conn, row2id, col2id):
+    """Stores the information about an individual ensemble run in the database"""
+    logging.info("Store individual run information...")
+    src_cur = src_conn.cursor()
+    cursor = conn.cursor()
+    try:
+        src_cur.execute('select start_time,finish_time,num_iterations,organism,species,num_rows,num_columns,num_clusters,git_sha from run_infos')
+        run_info = src_cur.fetchone()
+        cursor.execute('insert into ensemble_runs (date_added,start_time,finish_time,num_iterations,organism,species,num_rows,num_columns,num_clusters,git_sha) values (?,?,?,?,?,?,?,?,?,?)',
+                        [datetime.now(), run_info[0], run_info[1], run_info[2],
+                        run_info[3], run_info[4], run_info[5], run_info[6],
+                        run_info[7], run_info[8]])
+        run_id = cursor.lastrowid
+        src_cur.execute('select name from row_names')
+        row_names = [row[0] for row in src_cur.fetchall()]
+        src_cur.execute('select name from column_names')
+        col_names = [row[0] for row in src_cur.fetchall()]
+        for rowname in row_names:
+            cursor.execute('insert into ensemble_run_rows (run_id,row_id) values (?,?)',
+                           [run_id, row2id[rowname]])
+        for colname in col_names:
+            cursor.execute('insert into ensemble_run_cols (run_id,col_id) values (?,?)',
+                           [run_id, col2id[colname]])
+
+        conn.commit()
+        return run_id
+    finally:
+        cursor.close()
+        src_cur.close()
+
+
+def store_biclusters(conn, src_conn, run_id, row2id, col2id):
+    """copy bicluster information for the specified run"""
+    logging.info("copying biclusters...")
+    src_cursor = src_conn.cursor()
+    src_cursor2 = src_conn.cursor()
+    cursor = conn.cursor()
+    try:
+        src_cursor.execute('select max(iteration) from cluster_stats')
+        last_iter = src_cursor.fetchone()[0]
+        src_cursor.execute('select cluster,residual from cluster_stats where iteration=?',
+                           [last_iter])
+        for cluster, residual in src_cursor.fetchall():
+            src_cursor2.execute('select name from row_members rm join row_names rn on rm.order_num=rn.order_num where rm.iteration=? and rm.cluster=?', [last_iter, cluster])
+            rownames = [row[0] for row in src_cursor2.fetchall()]
+            src_cursor2.execute('select name from column_members cm join column_names cn on cm.order_num=cn.order_num where cm.iteration=? and cm.cluster=?', [last_iter, cluster])
+            colnames = [row[0] for row in src_cursor2.fetchall()]
+
+            cursor.execute('insert into biclusters (run_id,cluster_num,residual) values (?,?,?)',
+                           [run_id, cluster, residual])
+            cluster_id = cursor.lastrowid
+
+            for rowname in rownames:
+                cursor.execute('insert into bicluster_rows (cluster_id,row_id) values (?,?)',
+                               [cluster_id, row2id[rowname]])
+            for colname in colnames:
+                cursor.execute('insert into bicluster_cols (cluster_id,col_id) values (?,?)',
+                               [cluster_id, col2id[colname]])
+
+        conn.commit()
+    finally:
+        cursor.close()
+        src_cursor.close()
+        src_cursor2.close()
+
 if __name__ == '__main__':
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
                         level=LOG_LEVEL, filename=LOG_FILE)
@@ -150,46 +260,26 @@ if __name__ == '__main__':
     try:
         create_tables(conn)
         cmonkey_dbs = filter(is_valid_db, args.result_dbs)
-        print cmonkey_dbs
         if len(cmonkey_dbs) > 0:
             ncbi_code = extract_ncbi_code(cmonkey_dbs[0])
             print "NCBI code: ", ncbi_code
-            ratios = read_ratios(args.ratios)
-            row2id = db_insert_rows(conn, ratios.index.values)
-            col2id = db_insert_cols(conn, ratios.columns.values)
-            print col2id
-            #row2id = { name: i for i, name in enumerate(ratios.index.values) }
-            #col2id = { name: i for i, name in enumerate(ratios.columns.values) }
-            annotate_microbes_online(conn, row2id, ncbi_code)
+            raw_ratios, std_ratios = read_ratios(args.ratios)
+            row2id = db_insert_rows(conn, raw_ratios.index.values)
+            col2id = db_insert_cols(conn, raw_ratios.columns.values)
+            #annotate_microbes_online(conn, row2id, ncbi_code)
+            #store_ratios(conn, raw_ratios, std_ratios, row2id, col2id)
+
+            for cmonkey_db in cmonkey_dbs:
+                src_conn = sqlite3.connect(cmonkey_db)
+                try:
+                    run_id = store_run_info(conn, src_conn, row2id, col2id)
+                    store_biclusters(conn, src_conn, run_id, row2id, col2id)
+                finally:
+                    src_conn.close()
     finally:
         conn.close()
 
     
-"""Mongo RowInfo
-{
-    "_id" : ObjectId("558c770b77ffbc5e8711a251"),
-"sysName" : "Rv0020c",
-"TIGRRoles" : NaN,
-"scaffoldId" : 7022,
-"name" : "TB39.8",
-"locusId" : 31791,
-"egrin2_row_name" : "Rv0020c",
-"COGDesc" : NaN,
-"stop" : 23861,
-"accession" : "NP_214534.1",
-"EC" : NaN,
-"start" : 25444,
-"COGFun" : NaN,
-"strand" : "-",
-"COG" : NaN,
-"TIGRFam" : NaN,
-"row_id" : 19,
-"ECDesc" : NaN,
-"GO" : NaN,
-"GI" : 15607162,
-"desc" : "hypothetical protein (NCBI)"
-}
-"""
 """Mongo ColInfo
 {
     "_id" : ObjectId("558c770c77ffbc5e8711b198"),
@@ -213,9 +303,6 @@ if __name__ == '__main__':
 """
 """Mongo Corem
 { "_id" : ObjectId("558c79f277ffbc5e87859004"), "rows" : [  3219,  3461,  3462 ], "density" : 1, "corem_id" : 20, "cols" : [ ], "edges" : [  "3219-3462",  "3219-3461",  "3462-3461" ], "weighted_density" : 0.03213 }
-"""
-"""Mongo expression
-{ "_id" : ObjectId("558c775277ffbc5e8711b871"), "col_id" : 19, "raw_expression" : 0.667, "row_id" : 0, "standardized_expression" : 0.9155509215108877 }
 """
 """Mongo genome: is DNA sequence"""
 """Mongo motif info
