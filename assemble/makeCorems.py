@@ -79,17 +79,30 @@ class MongoDB:
             id2col[i["col_id"]] = i["egrin2_col_name"]
         return col2id, id2col
 
+    def num_row_co_occurence(self, rowname, row2id, id2row):
+        """Given a row (gene), count all of the other rows that occur with it in a bicluster"""
+        data = []
+        for i in self.dbclient.bicluster_info.find({"rows": {"$all": [row2id[rowname]]}}, {"rows": "1"}):
+            for j in i["rows"]:
+                try:
+                    data.append(id2row[j])
+                except:
+                    continue
+        data_counts = pd.Series(data).value_counts()
+        return data_counts
+
 
 class CoremMaker:
 
-    def __init__(self, organism, db, db_service, backbone_pval, out_dir, n_subs, link_comm_score,
+    def __init__(self, organism, db, db_client, backbone_pval, out_dir, n_subs, link_comm_score,
                  link_comm_increment, link_comm_density_score, corem_size_threshold,
                  n_resamples):
 
         self.organism = organism
         self.db = db  # keep for now, legacy
-        self.row2id, self.id2row = db_service.get_row_maps()
-        self.col2id, self.id2col = db_service.get_column_maps()
+        self.db_client = db_client
+        self.row2id, self.id2row = db_client.get_row_maps()
+        self.col2id, self.id2col = db_client.get_column_maps()
         self.backbone_pval = backbone_pval
         self.cFail = check_c_code_exists()
 
@@ -106,8 +119,9 @@ class CoremMaker:
         self.cutoff = None
         self.n_resamples = n_resamples
 
+    """
     def __num_row_co_occurence(self, row_id):
-        """Given a row (gene), count all of the other rows that occur with it in a bicluster"""
+        #Given a row (gene), count all of the other rows that occur with it in a bicluster
         data = []
         for i in self.db.bicluster_info.find({"rows": {"$all": [self.row2id[row_id]]}}, {"rows": "1"}):
             for j in i["rows"]:
@@ -116,7 +130,7 @@ class CoremMaker:
                 except:
                     continue
         data_counts = pd.Series(data).value_counts()
-        return data_counts
+        return data_counts"""
 
     def __extract_backbone(self, data_counts):
         """Extract the significant elements from rBr co-occurrence matrix"""
@@ -189,7 +203,7 @@ class CoremMaker:
                 logging.info("%.2f percent done", round(float(counter) / len(self.row2id.keys()), 2) * 100.0)
 
             # check if already exists in DB
-            data_counts = self.__num_row_co_occurence(i)
+            data_counts = self.db_client.num_row_co_occurence(i, self.row2id, self.id2row)
 
             # set self counts to 0 and normalize other counts
             data_counts[i] = 0
