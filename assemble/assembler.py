@@ -18,7 +18,7 @@ import datetime
 import pymongo
 
 import assemble.sql2mongoDB as rdb
-from assemble.makeCorems import CoremMaker
+from assemble.makeCorems import CoremMaker, MongoDB
 
 
 QSUB_TEMPLATE_HEADER_CSH = """#!/bin/csh
@@ -211,7 +211,7 @@ if __name__ == '__main__':
                                   args.row_annot_match_col, targetdir, db_run_override=False)
 
     if args.finish_only:
-        corems = CoremMaker(args.organism, db, args.backbone_pval, targetdir,
+        corems = CoremMaker(args.organism, db, MongoDB(db), args.backbone_pval, targetdir,
                             args.cores, args.link_comm_score,
                             args.link_comm_increment,
                             args.link_comm_density_score,
@@ -222,7 +222,7 @@ if __name__ == '__main__':
     else:
         if len(resultdb.db_files) > 0:
             resultdb.compile()  # Merge sql into mongoDB
-            corems = CoremMaker(args.organism, db, args.backbone_pval, targetdir,
+            corems = CoremMaker(args.organism, db, MongoDB(db), args.backbone_pval, targetdir,
                                 args.cores, args.link_comm_score,
                                 args.link_comm_increment,
                                 args.link_comm_density_score,

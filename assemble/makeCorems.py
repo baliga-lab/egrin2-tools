@@ -29,47 +29,69 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 
+def command_exists(command):
+    return subprocess.call(["which", command], stdout=open(os.devnull, 'wb')) == 0
+
+def check_c_code_exists():
+    """checks whether the C commands required exist"""
+    result = False
+    if not command_exists("adjmat2wpairs"):
+        logging.warn("You need to compile adjmat2wpairs.cpp to adjmat2wpairs and add its location to your path to detect corems")
+        result = True
+
+    if not command_exists("compute_tanimoto"):
+        logging.warn("You need to compile compute_tanimoto.cpp to compute_tanimoto and add its location to your path to detect corems")
+        result = True
+
+    if not command_exists("cluster_communities"):
+        logging.warn("You need to compile cluster_communities.cpp to cluster_communities and add its location to your path to detect corems")
+        result = True
+
+    if not command_exists("getting_communities"):
+        logging.warn("You need to compile getting_communities.cpp to getting_communities and add its location to your path to detect corems")
+        result = True
+
+    return result
+
+
+class SqliteDB:
+    """database interface to sqlite"""
+    pass
+
+class MongoDB:
+    """database interface to mongo"""
+    def __init__(self, dbclient):
+        self.dbclient = dbclient
+
+    def get_row_maps(self):
+        row2id = {}
+        id2row = {}
+        for i in self.dbclient.row_info.find({}, {"egrin2_row_name": "1", "row_id": "1"}):
+            row2id[i["egrin2_row_name"]] = i["row_id"]
+            id2row[i["row_id"]] = i["egrin2_row_name"]
+        return row2id, id2row
+
+    def get_column_maps(self):
+        col2id = {}
+        id2col = {}
+        for i in self.dbclient.col_info.find({}, {"egrin2_col_name": "1", "col_id": "1"}):
+            col2id[i["egrin2_col_name"]] = i["col_id"]
+            id2col[i["col_id"]] = i["egrin2_col_name"]
+        return col2id, id2col
+
+
 class CoremMaker:
 
-    def __check_c_code_exists(self):
-        self.cFail = False
-        if subprocess.call(["which", "adjmat2wpairs"], stdout=open(os.devnull, 'wb')) != 0:
-            logging.warn("You need to compile adjmat2wpairs.cpp to adjmat2wpairs and add its location to your path to detect corems")
-            self.cFail = True
-
-        if subprocess.call(["which", "compute_tanimoto"], stdout=open(os.devnull, 'wb')) != 0:
-            logging.warn("You need to compile compute_tanimoto.cpp to compute_tanimoto and add its location to your path to detect corems")
-            self.cFail = True
-
-        if subprocess.call(["which", "cluster_communities"], stdout=open(os.devnull, 'wb')) != 0:
-            logging.warn("You need to compile cluster_communities.cpp to cluster_communities and add its location to your path to detect corems")
-            self.cFail = True
-
-        if subprocess.call(["which", "getting_communities"], stdout=open(os.devnull, 'wb')) != 0:
-            logging.warn("You need to compile getting_communities.cpp to getting_communities and add its location to your path to detect corems")
-            self.cFail = True
-
-    def __init__(self, organism, db, backbone_pval, out_dir, n_subs, link_comm_score,
+    def __init__(self, organism, db, db_service, backbone_pval, out_dir, n_subs, link_comm_score,
                  link_comm_increment, link_comm_density_score, corem_size_threshold,
                  n_resamples):
 
         self.organism = organism
-        self.db = db
-
-        self.row2id = {}
-        self.id2row = {}
-        for i in self.db.row_info.find({}, {"egrin2_row_name": "1", "row_id": "1"}):
-            self.row2id[i["egrin2_row_name"]] = i["row_id"]
-            self.id2row[i["row_id"]] = i["egrin2_row_name"]
-
-        self.col2id = {}
-        self.id2col = {}
-        for i in self.db.col_info.find({}, {"egrin2_col_name": "1", "col_id": "1"}):
-            self.col2id[i["egrin2_col_name"]] = i["col_id"]
-            self.id2col[i["col_id"]] = i["egrin2_col_name"]
-
+        self.db = db  # keep for now, legacy
+        self.row2id, self.id2row = db_service.get_row_maps()
+        self.col2id, self.id2col = db_service.get_column_maps()
         self.backbone_pval = backbone_pval
-        self.__check_c_code_exists()
+        self.cFail = check_c_code_exists()
 
         self.out_dir = os.path.abspath(os.path.join(out_dir, "corem_data"))
         if not os.path.isdir(self.out_dir):
