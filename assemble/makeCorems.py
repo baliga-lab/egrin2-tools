@@ -91,15 +91,27 @@ class MongoDB:
         data_counts = pd.Series(data).value_counts()
         return data_counts
 
+    def drop_row_rows(self):
+        self.dbclient.row_row.drop()
+
+    def update_row_row(self, keyrow_pk, subrow_pk, data_counts_norm, backbone_pval):
+        self.dbclient.row_row.update({"row_ids": [subrow_pk, keyrow_pk]},
+                                     {"$set": {"weight": data_counts_norm, "backbone_pval": backbone_pval}})
+
+    def insert_row_row(self, rowrow_docs):
+        self.dbclient.row_row.insert(rowrow_docs)
+
+    def insert_corem(self, corem_docs):
+        self.dbclient.corem.insert(corem_docs)
+
 
 class CoremMaker:
 
-    def __init__(self, organism, db, db_client, backbone_pval, out_dir, n_subs, link_comm_score,
+    def __init__(self, organism, db_client, backbone_pval, out_dir, n_subs, link_comm_score,
                  link_comm_increment, link_comm_density_score, corem_size_threshold,
                  n_resamples):
 
         self.organism = organism
-        self.db = db  # keep for now, legacy
         self.db_client = db_client
         self.row2id, self.id2row = db_client.get_row_maps()
         self.col2id, self.id2col = db_client.get_column_maps()
@@ -119,19 +131,6 @@ class CoremMaker:
         self.cutoff = None
         self.n_resamples = n_resamples
 
-    """
-    def __num_row_co_occurence(self, row_id):
-        #Given a row (gene), count all of the other rows that occur with it in a bicluster
-        data = []
-        for i in self.db.bicluster_info.find({"rows": {"$all": [self.row2id[row_id]]}}, {"rows": "1"}):
-            for j in i["rows"]:
-                try:
-                    data.append(self.id2row[j])
-                except:
-                    continue
-        data_counts = pd.Series(data).value_counts()
-        return data_counts"""
-
     def __extract_backbone(self, data_counts):
         """Extract the significant elements from rBr co-occurrence matrix"""
         backbone_data_counts = data_counts.copy()
@@ -148,15 +147,13 @@ class CoremMaker:
     def __row_row(self):
         """Construct row-row co-occurrence matrix (ie gene-gene co-occurrence)"""
 
-        row_row_collection = self.db.row_row
-
         # remove existing edgeList file if it exists
         if os.path.exists(os.path.abspath(os.path.join(self.out_dir, "edgeList"))):
             logging.info("Found edgeList file at '%s'. Removing it.",
                          os.path.abspath(os.path.join(self.out_dir, "edgeList")))
             os.remove(os.path.abspath(os.path.join(self.out_dir, "edgeList")))
             logging.info("Dropping row_row MongoDB collection as a precaution.")
-            row_row_collection.drop()
+            self.db_client.drop_row_rows()
 
         def addToD(d, ind1, ind2, val):
             if ind1 not in d.iterkeys():
@@ -164,27 +161,28 @@ class CoremMaker:
             d[ind1][ind2] = val
             return d
 
-        def writeRowRow(row):
+        def writeRowRow(f, row):
             """Only write rows with significant backbone pvals to edgeList file"""
             if float(row["backbone_pval"]) <= self.backbone_pval:
                 f.write((" ").join([self.id2row[row["row_ids"][0]], self.id2row[row["row_ids"][1]], str(row["weight"]), "\n"]))
 
-        def structureRowRow(key_row, sub_row, data_counts, data_counts_norm, backbone_pval, row_row_collection):
+        def structureRowRow(key_row, sub_row, data_counts, data_counts_norm, backbone_pval):
+            keyrow_pk = self.row2id[key_row]
+            subrow_pk = self.row2id[sub_row]
             try:
                 # check to see if this pair already exists and if current weight is greater
-                weight = self.rowrow_ref[self.row2id[sub_row]][self.row2id[key_row]]
+                weight = self.rowrow_ref[subrow_pk][keyrow_pk]
 
                 if (data_counts_norm > weight) and (backbone_pval <= self.backbone_pval):
                     # if current weight is greater and backbone_pval is significant, update the weight in MongoDB
-                    row_row_collection.update({"row_ids": [self.row2id[sub_row], self.row2id[key_row]]},
-                                              {"$set": {"weight": data_counts_norm, "backbone_pval": backbone_pval}})
+                    self.db_client.update_row_row(keyrow_pk, subrow_pk, data_counts_norm, backbone_pval)
 
-                    self.rowrow_ref = addToD(self.rowrow_ref, self.row2id[sub_row], self.row2id[key_row], data_counts_norm)
+                    self.rowrow_ref = addToD(self.rowrow_ref, subrow_pk, keyrow_pk, data_counts_norm)
                 d = None
             except Exception:
-                self.rowrow_ref = addToD(self.rowrow_ref, self.row2id[sub_row], self.row2id[key_row], data_counts_norm)
+                self.rowrow_ref = addToD(self.rowrow_ref, subrow_pk, keyrow_pk, data_counts_norm)
                 d = {
-                    "row_ids": [self.row2id[key_row], self.row2id[sub_row]],
+                    "row_ids": [keyrow_pk, subrow_pk],
                     "counts": data_counts,
                     "weight": data_counts_norm,
                     "backbone_pval": backbone_pval
@@ -214,16 +212,17 @@ class CoremMaker:
             # only keep values > 0
             backbone_data_counts = self.__extract_backbone(data_counts_norm)
 
-            to_write = [structureRowRow(i, j, data_counts[j], data_counts_norm[j], backbone_data_counts[j], row_row_collection)
+            to_write = [structureRowRow(i, j, data_counts[j], data_counts_norm[j], backbone_data_counts[j])
                         for j in data_counts.index]
             to_write = [i for i in to_write if i is not None]
 
             # write edgeList file
             with open(os.path.abspath(os.path.join(self.out_dir, "edgeList")), mode="a+") as f:
-                [writeRowRow(j) for j in to_write]
+                for j in to_write:
+                    writeRowRow(f, j)
 
-            row_row_collection.insert(to_write)
-            counter = counter + 1
+            self.db_client.insert_row_row(to_write)
+            counter += 1
 
         # clean up
         del self.rowrow_ref
@@ -476,7 +475,7 @@ class CoremMaker:
         logging.info("Adding basic corem information to MongoDB")
 
         to_write = [coremStruct(i, corems) for i in corems.Community_ID.unique()]
-        self.db.corem.insert(to_write)
+        self.db_client.insert_corem(to_write)
 
     def make_corems(self):
         """top-level corem making function"""
