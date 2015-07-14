@@ -72,39 +72,39 @@ def read_ratios(path):
 
 def create_tables(conn):
     """Create tables in the result database"""
-    conn.execute('create table rows (name text)')
-    conn.execute('create table row_annotations (name text)')
-    conn.execute('create table row_annotation_values (row_id int, annot_id int, value text)')
+    conn.execute('create table if not exists rows (name text)')
+    conn.execute('create table if not exists row_annotations (name text)')
+    conn.execute('create table if not exists row_annotation_values (row_id int, annot_id int, value text)')
 
-    conn.execute('create table columns (name text)')
-    conn.execute('create table col_annotations (name text)')
-    conn.execute('create table col_annotation_values (col_id int, annot_id int, value text)')
+    conn.execute('create table if not exists columns (name text)')
+    conn.execute('create table if not exists col_annotations (name text)')
+    conn.execute('create table if not exists col_annotation_values (col_id int, annot_id int, value text)')
 
     # holds both original and standardized values
-    conn.execute('create table expr_values (row_id int,col_id,value decimal,std_value decimal)')
+    conn.execute('create table if not exists expr_values (row_id int,col_id,value decimal,std_value decimal)')
 
     # information about individual ensemble runs
-    conn.execute('create table ensemble_runs (date_added timestamp,start_time timestamp,finish_time timestamp,num_iterations int,organism text,species text,num_rows int,num_columns,num_clusters int,git_sha text)')
-    conn.execute('create table ensemble_run_rows (run_id int, row_id int)')
-    conn.execute('create table ensemble_run_cols (run_id int, col_id int)')
+    conn.execute('create table if not exists ensemble_runs (date_added timestamp,start_time timestamp,finish_time timestamp,num_iterations int,organism text,species text,num_rows int,num_columns,num_clusters int,git_sha text)')
+    conn.execute('create table if not exists ensemble_run_rows (run_id int, row_id int)')
+    conn.execute('create table if not exists ensemble_run_cols (run_id int, col_id int)')
 
     # bicluster information
-    conn.execute('create table biclusters (run_id int, cluster_num int, residual decimal)')
-    conn.execute('create table bicluster_rows (cluster_id int, row_id int)')
-    conn.execute('create table bicluster_cols (cluster_id int, col_id int)')
+    conn.execute('create table if not exists biclusters (run_id int, cluster_num int, residual decimal)')
+    conn.execute('create table if not exists bicluster_rows (cluster_id int, row_id int)')
+    conn.execute('create table if not exists bicluster_cols (cluster_id int, col_id int)')
 
-    conn.execute('create table motif_infos (cluster_id int, seqtype text, motif_num int, evalue decimal)')
-    conn.execute('create table motif_pssm_rows (motif_info_id int, row int, a decimal, c decimal, g decimal, t decimal)')
-    conn.execute('create table meme_motif_sites (motif_info_id int, seq_name text, reverse boolean, start int, pvalue decimal)')
+    conn.execute('create table if not exists motif_infos (cluster_id int, seqtype text, motif_num int, evalue decimal)')
+    conn.execute('create table if not exists motif_pssm_rows (motif_info_id int, row int, a decimal, c decimal, g decimal, t decimal)')
+    conn.execute('create table if not exists meme_motif_sites (motif_info_id int, seq_name text, reverse boolean, start int, pvalue decimal)')
 
     # indexes
-    conn.execute('create index rows_idx on rows (name)')
-    conn.execute('create index row_annotations_idx on row_annotations (name)')
+    conn.execute('create index if not exists rows_idx on rows (name)')
+    conn.execute('create index if not exists row_annotations_idx on row_annotations (name)')
 
-    conn.execute('create index cols_idx on columns (name)')
-    conn.execute('create index col_annotations_idx on col_annotations (name)')
+    conn.execute('create index if not exists cols_idx on columns (name)')
+    conn.execute('create index if not exists col_annotations_idx on col_annotations (name)')
 
-    conn.execute('create index expr_values_idx on expr_values (row_id,col_id)')
+    conn.execute('create index if not exists expr_values_idx on expr_values (row_id,col_id)')
 
 
 def annotate_microbes_online(conn, row2id, ncbi_code):
@@ -281,17 +281,7 @@ def store_motifs(conn, src_conn, cluster2id):
         cursor.close()
 
 
-if __name__ == '__main__':
-    logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
-                        level=LOG_LEVEL, filename=LOG_FILE)
-
-    parser = argparse.ArgumentParser(description=DESCRIPTION)
-    parser.add_argument('--organism', required=True, type=str,
-                        help="3 letter organism code")
-    parser.add_argument('--ratios', required=True)
-    parser.add_argument('--targetdb', required=True)
-    parser.add_argument('result_dbs', nargs='*')
-    args = parser.parse_args()
+def merge(args):
     conn = sqlite3.connect(args.targetdb, 15, isolation_level='DEFERRED')
     #conn = sqlite3.connect(args.targetdb)
     try:
@@ -316,6 +306,20 @@ if __name__ == '__main__':
                     src_conn.close()
     finally:
         conn.close()
+
+if __name__ == '__main__':
+    logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
+                        level=LOG_LEVEL, filename=LOG_FILE)
+
+    parser = argparse.ArgumentParser(description=DESCRIPTION)
+    parser.add_argument('--organism', required=True, type=str,
+                        help="3 letter organism code")
+    parser.add_argument('--ratios', required=True)
+    parser.add_argument('--targetdb', required=True)
+    parser.add_argument('result_dbs', nargs='*')
+    args = parser.parse_args()
+    merge(args)
+
 
     
 """Mongo ColInfo

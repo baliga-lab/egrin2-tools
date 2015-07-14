@@ -22,7 +22,6 @@ import pdb
 import numpy as np
 import pandas as pd
 
-import sqlite3
 from Bio import SeqIO
 from scipy.integrate import quad
 import matplotlib.pyplot as plt
@@ -53,10 +52,6 @@ def check_c_code_exists():
 
     return result
 
-
-class SqliteDB:
-    """database interface to sqlite"""
-    pass
 
 class MongoDB:
     """database interface to mongo"""
