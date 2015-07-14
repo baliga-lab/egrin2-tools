@@ -304,6 +304,8 @@ def merge(args):
                     store_motifs(conn, src_conn, cluster2id)
                 finally:
                     src_conn.close()
+        else:
+            raise Exception('no input databases provided !!!')
     finally:
         conn.close()
 

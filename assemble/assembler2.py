@@ -5,6 +5,7 @@ import logging
 from assemble.makeCorems import CoremMaker
 import merge
 import sqlite3
+import pandas as pd
 
 
 DESCRIPTION = """assemble2.py - prepare cluster runs"""
@@ -17,7 +18,7 @@ class SqliteDB:
     def __init__(self, conn):
         self.conn = conn
         self.conn.execute('create table if not exists row_row (keyrow_id int, subrow_id int, counts int, weight decimal, backbone_pval decimal)')
-        self.conn.execute('create table if not exists corems (density decimal, corem_id int, weighted_density decimal)')
+        self.conn.execute('create table if not exists corems (density decimal, corem_num int, weighted_density decimal)')
         self.conn.execute('create table if not exists corem_rows (corem_id int, row_id int)')
         self.conn.execute('create table if not exists corem_cols (corem_id int, col_id int)')
         self.conn.execute('create table if not exists corem_edges (corem_id int, row1_id int, row2_id int)')
@@ -48,17 +49,18 @@ class SqliteDB:
         finally:
             cursor.close()
 
-    # def num_row_co_occurence(self, rowname, row2id, id2row):
-    #     """Given a row (gene), count all of the other rows that occur with it in a bicluster"""
-    #     data = []
-    #     for i in self.dbclient.bicluster_info.find({"rows": {"$all": [row2id[rowname]]}}, {"rows": "1"}):
-    #         for j in i["rows"]:
-    #             try:
-    #                 data.append(id2row[j])
-    #             except:
-    #                 continue
-    #     data_counts = pd.Series(data).value_counts()
-    #     return data_counts
+    def num_row_co_occurence(self, rowname, row2id, id2row):
+        """for a given row, return the number of co-occurences with genes in all
+        biclusters. The result is a Series using the gene names as indexes and
+        counts as values"""
+        row_pk = row2id[rowname]
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('select row_id, count(cluster_id) from bicluster_rows where cluster_id in (select cluster_id from bicluster_rows where row_id=?) group by row_id', [row_pk])
+            result = {id2row[row_pk]: count for row_pk, count in cursor.fetchall()}
+            return pd.Series(result)
+        finally:
+            cursor.close()
 
     def drop_row_rows(self):
         self.conn.execute('delete from row_row')
@@ -114,6 +116,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_resamples', default=10000, type=int, help="Number resamples to compute for corem condition assignment. Default = 10,000")
 
     args = parser.parse_args()
+
     merge.merge(args)
     conn = sqlite3.connect(args.targetdb, 15, isolation_level='DEFERRED')
     try:
