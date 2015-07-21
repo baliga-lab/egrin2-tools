@@ -55,9 +55,9 @@ def __row2id(db, row, return_field="row_id"):
 
 def row2id_batch(db, rows, return_field="row_id", input_type=None):
     """Check name format of rows. If necessary, translate."""
-
     if return_field == input_type:
-        return rows
+        # returned its input previously, but just don't call this function !!
+        raise Exception('come on, that does not make any sense !')
 
     query = pd.DataFrame(list(db.row_info.find({"$or": [{"row_id": {"$in": rows}},
                                                         {"egrin2_row_name": {"$in": rows}},
@@ -103,9 +103,10 @@ def __col2id(db, col, return_field="col_id"):
 
 def col2id_batch(db, cols, return_field="col_id", input_type=None):
     """Check name format of rows. If necessary, translate."""
-
     if return_field == input_type:
-        return cols
+        # just here to remove previous calls, this only returned the
+        # cols argument, simply don't call that function !!!
+        raise Exception('come on, that does not make any sense !!!')
 
     query = pd.DataFrame(list(db.col_info.find({ "$or": [{"col_id": {"$in": cols}},
                                                          {"egrin2_col_name": {"$in": cols}}]},

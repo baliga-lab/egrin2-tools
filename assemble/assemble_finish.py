@@ -68,12 +68,6 @@ class MongoDB:
     def find_col_resamples(self, rows, cols):
         return list(self.dbclient.col_resample.find({"n_rows": len(rows), "col_id": {"$in": cols}}, {"_id": 0}))
 
-    def get_row2ids(self, rows, row_type):
-        return e2q.row2id_batch(self.dbclient, rows, input_type=row_type)
-
-    def get_col2ids(self, cols, col_type):
-        return e2q.col2id_batch(self.dbclient, cols, input_type=col_type)
-
     def get_col2ids_colout(self, cols, col_outtype):
         return e2q.col2id_batch(self.dbclient, cols, input_type="col_id", return_field=col_outtype)
 
@@ -82,7 +76,7 @@ class MongoDB:
         self.dbclient['corem'].update({"_id": corem['_id']}, {"$set": {"cols": new_cols}})
 
 
-def __col_resample_pval(dbclient, rows, row_type, cols, col_type, n_resamples,
+def __col_resample_pval(dbclient, rows, cols, n_resamples,
                         standardized=True, sig_cutoff=0.05,
                         sort=True, add_override=False, n_jobs=4, keepP=0.1, verbose=False,
                         col_outtype="col_id"):
@@ -99,15 +93,9 @@ def __col_resample_pval(dbclient, rows, row_type, cols, col_type, n_resamples,
             else:
                 return val
 
-    rows_o = rows
-    rows = dbclient.get_row2ids(rows, row_type)
-
     if len(rows) == 0:
         logging.info("Please provide an appropriately named array of rows")
         return None
-
-    cols_o = cols
-    cols = dbclient.get_col2ids(cols, col_type)
 
     if len(cols) == 0:
         logging.info("Please provide an appropriately named array of cols")
@@ -138,8 +126,8 @@ or change 'add_override' flag of this function to 'True' to build the resample n
     random_rsd = pd.DataFrame(dbclient.find_col_resamples(rows, cols))
 
     if random_rsd.shape[0] == 0:
-        logging.info("Could not find resample DB entry for %d rows in cols %s", len(rows_o),
-                     cols_o)
+        logging.info("Could not find resample DB entry for %d rows in cols %s",
+                     len(rows_o), cols)
         return None
     else:
         random_rsd.index = random_rsd["col_id"]
@@ -176,8 +164,7 @@ or change 'add_override' flag of this function to 'True' to build the resample n
 
 def __compute_and_write_col(dbclient, corem, cond_ids, n_resamples=1000):
     logging.info("Adding conditions for corem %d", corem['corem_id'])
-    pvals = __col_resample_pval(dbclient, corem['rows'], "row_id", cond_ids, "col_id",
-                                n_resamples, keepP=0.05)
+    pvals = __col_resample_pval(dbclient, corem['rows'], cond_ids, n_resamples, keepP=0.05)
     if pvals is not None:
         pvals["col_id"] = pvals.index
         d = pvals.to_dict('records')
@@ -216,6 +203,8 @@ if __name__ == '__main__':
     elif args.dbengine == 'mongodb':
         client = pymongo.MongoClient(host=args.host, port=args.port)
         dbclient = MongoDB(client[args.db])
+    else:
+        raise Exception('please specify a supported database engine !!')
     try:
         finish_corems(dbclient)
     finally:
