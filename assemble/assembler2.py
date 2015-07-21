@@ -20,7 +20,7 @@ class SqliteDB:
         self.conn.execute('create table if not exists row_row (keyrow_id int, subrow_id int, counts int, weight decimal, backbone_pval decimal)')
         self.conn.execute('create table if not exists corems (density decimal, corem_num int, weighted_density decimal)')
         self.conn.execute('create table if not exists corem_rows (corem_id int, row_id int)')
-        self.conn.execute('create table if not exists corem_cols (corem_id int, col_id int)')
+        self.conn.execute('create table if not exists corem_cols (corem_id int, col_id int, pval decimal)')
         self.conn.execute('create table if not exists corem_edges (corem_id int, row1_id int, row2_id int)')
 
     def get_row_maps(self):

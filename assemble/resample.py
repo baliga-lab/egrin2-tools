@@ -105,7 +105,6 @@ class SqliteDB:
                                  for col_id, value, std_value in cursor.fetchall()])
         finally:
             cursor.close()
-        return result
 
     def get_col_nums(self):
         cursor = self.conn.cursor()

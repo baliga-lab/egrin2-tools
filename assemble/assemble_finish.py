@@ -10,6 +10,7 @@ import itertools
 import query.egrin2_query as e2q
 import assemble.resample as resample
 import pandas as pd
+import json
 
 
 DESCRIPTION = """assemble_finish.py - finish and dump mongodb"""
@@ -44,6 +45,50 @@ class SqliteDB:
         finally:
             cursor.close()
 
+    def no_col_resamples(self, col_id, nrows, nresamples):
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute("select count(*) from col_resamples where col_id=? and nrows=? and nresamples >= ?",
+                           [col_id, nrows, nresamples])
+            return cursor.fetchone()[0] == 0
+        finally:
+            cursor.close()
+
+    def find_gene_expressions(self, row_pks, column_pks):
+        cursor = self.conn.cursor()
+        try:
+            row_in_list = '(%s)' % ','.join(map(str, row_pks))
+            col_in_list = '(%s)' % ','.join(map(str, column_pks))
+            query = 'select col_id,value,std_value from expr_values where row_id in %s and col_id in %s' % (row_in_list, col_in_list)
+            cursor.execute(query)
+            return pd.DataFrame([{'col_id':  col_id, 'raw_expression': value, 'standardized_expression': std_value}
+                                 for col_id, value, std_value in cursor.fetchall()])
+        finally:
+            cursor.close()
+
+    def find_col_resamples(self, nrows, col_pks):
+        cursor = self.conn.cursor()
+        try:
+            in_list = '(%s)' % ','.join(map(str, col_pks))
+            query = 'select col_id,nresamples,lowest_raw_exps,lowest_std_exps from col_resamples where nrows=? and col_id in ' + in_list
+            cursor.execute(query, [nrows])
+            result = []
+            for col_id, nresamples, lowest_raw, lowest_std in cursor.fetchall():
+                result.append({'col_id': col_id, 'n_rows': nrows,
+                               'resamples': nresamples,
+                               'lowest_raw': json.loads(lowest_raw),
+                               'lowest_standardized': json.loads(lowest_std)})
+            return pd.DataFrame(result)
+        finally:
+            cursor.close()
+
+    def update_corem(self, corem, new_cols):
+        corem_pk = corem['corem_id']
+        self.conn.execute('delete from corem_cols where corem_id=?', [corem_pk])
+        for col in new_cols:
+            self.conn.execute('insert into corem_cols (corem_id,col_id,pval) values (?,?,?)',
+                              [corem_pk, int(col['col_id']), col['pval']])
+
 class MongoDB:
     def __init__(self, dbclient):
         self.dbclient = dbclient
@@ -57,29 +102,24 @@ class MongoDB:
     def get_corems(self):
         return [corem for corem in self.dbclient["corem"].find({}, {'_id': 1, "rows": 1, "corem_id": 1})]
 
-    def check_col_resamples(self, col, n_rows, n_resamples):
-        return self.dbclient.col_resample.find_one({"n_rows": n_rows, "col_id": col, "resamples": {"$gte": n_resamples}}) is None
+    def no_col_resamples(self, col, nrows, nresamples):
+        return self.dbclient.col_resample.find_one({"n_rows": nrows, "col_id": col, "resamples": {"$gte": nresamples}}) is None
 
     def find_gene_expressions(self, rows, cols):
-        return list(self.dbclient.gene_expression.find({"col_id": {"$in": cols}, "row_id": {"$in": rows}},
-                                                    { "_id": 0, "col_id": 1, "normalized_expression": 1,
-                                                        "standardized_expression": 1}))
+        return pd.DataFrame(list(self.dbclient.gene_expression.find({"col_id": {"$in": cols}, "row_id": {"$in": rows}},
+                                                                    { "_id": 0, "col_id": 1, "raw_expression": 1,
+                                                                      "standardized_expression": 1})))
 
-    def find_col_resamples(self, rows, cols):
-        return list(self.dbclient.col_resample.find({"n_rows": len(rows), "col_id": {"$in": cols}}, {"_id": 0}))
-
-    def get_col2ids_colout(self, cols, col_outtype):
-        return e2q.col2id_batch(self.dbclient, cols, input_type="col_id", return_field=col_outtype)
+    def find_col_resamples(self, nrows, cols):
+        return pd.DataFrame(list(self.dbclient.col_resample.find({"n_rows": nrows, "col_id": {"$in": cols}}, {"_id": 0})))
 
     def update_corem(self, corem, new_cols):
-        #print "update_corem()", corem, " conds: ", new_cols
         self.dbclient['corem'].update({"_id": corem['_id']}, {"$set": {"cols": new_cols}})
 
 
 def __col_resample_pval(dbclient, rows, cols, n_resamples,
                         standardized=True, sig_cutoff=0.05,
-                        sort=True, add_override=False, n_jobs=4, keepP=0.1, verbose=False,
-                        col_outtype="col_id"):
+                        sort=True, add_override=False, n_jobs=4, keepP=0.1, verbose=False):
 
     def empirical_pval(i, random_rsd, resamples):
         for x in range(0, len(i)):
@@ -102,7 +142,7 @@ def __col_resample_pval(dbclient, rows, cols, n_resamples,
         return None
 
     # Determine what/how many resamples need to be added to db
-    to_add = filter(lambda col: dbclient.check_col_resamples(col, len(rows), n_resamples), cols)
+    to_add = filter(lambda col: dbclient.no_col_resamples(col, len(rows), n_resamples), cols)
 
     count = 1
     if len(to_add) > 0:
@@ -122,12 +162,12 @@ or change 'add_override' flag of this function to 'True' to build the resample n
     if verbose:
         logging.info("Calculating pvals...")
 
-    exp_df = pd.DataFrame(dbclient.find_gene_expressions(rows, cols))
-    random_rsd = pd.DataFrame(dbclient.find_col_resamples(rows, cols))
+    exp_df = dbclient.find_gene_expressions(rows, cols)
+    random_rsd = dbclient.find_col_resamples(len(rows), cols)
 
     if random_rsd.shape[0] == 0:
         logging.info("Could not find resample DB entry for %d rows in cols %s",
-                     len(rows_o), cols)
+                     len(rows), cols)
         return None
     else:
         random_rsd.index = random_rsd["col_id"]
@@ -145,7 +185,7 @@ or change 'add_override' flag of this function to 'True' to build the resample n
 
     pvals = exp_df_rsd.groupby(level=0).aggregate(empirical_pval, random_rsd, resamples)
     pvals.columns = ["pval"]
-    pvals.index = dbclient.get_col2ids_colout(pvals.index.values, col_outtype)
+    pvals.index = pvals.index.values # dbclient.get_col2ids_colout(pvals.index.values)
 
     if sig_cutoff is not None:
         pvals = pvals[pvals <= sig_cutoff]
@@ -168,7 +208,6 @@ def __compute_and_write_col(dbclient, corem, cond_ids, n_resamples=1000):
     if pvals is not None:
         pvals["col_id"] = pvals.index
         d = pvals.to_dict('records')
-        print "corem %s\n" % (str(corem['_id']))
         dbclient.update_corem(corem, d)
 
 
