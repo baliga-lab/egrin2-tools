@@ -19,7 +19,8 @@ from pymongo import MongoClient
 import numpy as np
 import pandas as pd
 
-from query.egrin2_query import *
+import sqlite3
+import json
 
 DESCRIPTION = """resample.py - prepare brute force random resamples"""
 
@@ -58,6 +59,62 @@ class MongoDB:
 
     def get_col_nums(self):
         return pd.DataFrame(list(self.dbclient["col_info"].find({}, {"col_id": 1}))).col_id.tolist()
+
+
+class SqliteDB:
+    def __init__(self, conn):
+        self.conn = conn
+        self.__create_tables()
+
+    def __create_tables(self):
+        """we store arrays of decimals into the lowest_raw_exps and
+        lowest_std_exps columns by serializing them with the json.dumps/json.loads functions"""
+        self.conn.execute('create table if not exists col_resamples (col_id int, nrows int, nresamples int, lowest_raw_exps text, lowest_std_exps text)')
+
+    def insert_col_resample(self, doc):
+        self.conn.execute('insert into col_resamples (col_id,nrows,nresamples,lowest_raw_exps,lowest_std_exps) values (?,?,?,?,?)',
+                          [doc['col_id'], doc['n_rows'], doc['resamples'],
+                           json.dumps(doc['lowest_raw']), json.dumps(doc['lowest_standardized'])])
+
+    def update_col_resample(self, nrows, col_pk, nresamples, lowest_raw, lowest_std):
+        self.conn.execute('update col_resamples set nresamples=?,lowest_raw=?,lowest_std=? where col_id=? and nrows=?',
+                          [nresamples, json.dumps(lowest_raw), json.dumps(lowest_std), col_pk, nrows])
+
+    def find_col_resamples(self, nrows, col_ids):
+        cursor = self.conn.cursor()
+        try:
+            in_clause = "(%s)" % ",".join(map(str, col_ids))
+            query = 'select rowid,col_id,nrows,nresamples,lowest_raw_exps,lowest_std_exps from col_resamples where nrows=? and col_id in ' + in_clause
+            print query
+            cursor.execute(query, [nrows])
+            result = []
+            for rowid, col_pk, nrows, nresamples, lowest_raw, lowest_std in cursor.fetchall():
+                result.append({'_id': rowid, 'col_id': col_pk, 'n_rows': nrows,
+                               'resamples': resamples,
+                               'lowest_raw': json.loads(lowest_raw),
+                               'lowest_standardized': json.loads(lowest_std)})
+        finally:
+            cursor.close()
+        return result
+
+    def find_gene_expressions(self, column_pks):
+        cursor = self.conn.cursor()
+        try:
+            in_list = '(%s)' % ','.join(map(str, column_pks))
+            cursor.execute('select col_id,value,std_value from expr_values where col_id in ' + in_list)
+            return pd.DataFrame([{'col_id':  col_id, 'raw_expression': value, 'standardized_expression': std_value}
+                                 for col_id, value, std_value in cursor.fetchall()])
+        finally:
+            cursor.close()
+        return result
+
+    def get_col_nums(self):
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('select rowid from columns')
+            return [row[0] for row in cursor.fetchall()]
+        finally:
+            cursor.close()
 
 
 def __choose_n(dbclient, col, vals, n, add, n_rows, n_resamples, old_records, keepP):
@@ -138,6 +195,8 @@ def col_resample_ind(dbclient, n_rows, cols, n_resamples=1000, keepP=0.1):
                 for i in df_rsd_gb.groups.keys():
                     __choose_n(dbclient, int(i), df_rsd_gb.get_group(i), n2keep, True, n_rows,
                                n_resamples, old_records, keepP)
+            else:
+                print "no gene expressions found"
 
     # toUpdate
     if len(toUpdate) > 0:
@@ -178,25 +237,30 @@ if __name__ == '__main__':
                         level=LOG_LEVEL, filename=LOG_FILE)
 
     parser = argparse.ArgumentParser( description=DESCRIPTION )
-    parser.add_argument('--host', required=True, type=str, help="Host for MongoDB" )
-    parser.add_argument('--db', required=True, type=str, help="Database name")
+    parser.add_argument('--host', default='localhost', help="Host for MongoDB" )
+    parser.add_argument('--db', required=True, help="Database name")
     parser.add_argument('--n_rows', required=True, type=int, help="Gene set size to test")
     parser.add_argument('--n_resamples', default=1000, type=int, help="Number of resamples to compute")
     parser.add_argument('--port', default=27017, help="MongoDB port", type=int )
     parser.add_argument('--keep_p', default=0.1, help="Lowest percent to store", type=int )
-    parser.add_argument('--cols', default=None, help="Columns (experiments) for resampling. Should be path to tab-delimited file containing column names that map to egrin2_col_names in MongoDB database, eg experiment names.", type=str )
+    parser.add_argument('--dbengine', default='sqlite', help="Database Engine (sqlite|mongodb)")
 
     args = parser.parse_args()
-    client = MongoClient(host=args.host, port=args.port)
-    dbclient = MongoDB(client[args.db])
-
-    if args.cols is None:
-        cols = dbclient.get_col_nums()
+    if args.dbengine == 'sqlite':
+        conn = sqlite3.connect(args.db)
+        dbclient = SqliteDB(conn)
+    elif args.dbengine == 'mongodb':
+        client = MongoClient(host=args.host, port=args.port)
+        dbclient = MongoDB(client[args.db])
     else:
-        # not supported yet
-        logging.error("Not supported yet")
-        cols = None
+        raise Exception('please specify a database engine')
 
+    cols = dbclient.get_col_nums()
     logging.info("Starting resample for n_rows = %d", args.n_rows)
     col_resample_ind(dbclient, n_rows=args.n_rows, cols=cols, n_resamples=args.n_resamples, keepP=args.keep_p)
-    client.close()
+
+    if args.dbengine == 'sqlite':
+        conn.commit()
+        conn.close()
+    elif args.dbengine == 'mongodb':
+        client.close()

@@ -47,9 +47,8 @@ class MongoDB:
         return e2q.col2id_batch(self.dbclient, cols, input_type="col_id", return_field=col_outtype)
 
     def update_corem(self, corem, new_cols):
-        # TODO: enable this line when everything works
-        #self.dbclient['corem'].update({"_id": corem['_id']}, {"$set": {"cols": new_cols}})
-        print "update_corem()", corem, " conds: ", new_cols
+        #print "update_corem()", corem, " conds: ", new_cols
+        self.dbclient['corem'].update({"_id": corem['_id']}, {"$set": {"cols": new_cols}})
 
 
 def __col_resample_pval(dbclient, rows, row_type, cols, col_type, n_resamples,

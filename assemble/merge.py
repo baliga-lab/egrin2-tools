@@ -293,8 +293,8 @@ def merge(args):
             raw_ratios, std_ratios = read_ratios(args.ratios)
             row2id = db_insert_rows(conn, raw_ratios.index.values)
             col2id = db_insert_cols(conn, raw_ratios.columns.values)
-            #annotate_microbes_online(conn, row2id, ncbi_code)
-            #store_ratios(conn, raw_ratios, std_ratios, row2id, col2id)
+            annotate_microbes_online(conn, row2id, ncbi_code)
+            store_ratios(conn, raw_ratios, std_ratios, row2id, col2id)
 
             for cmonkey_db in cmonkey_dbs:
                 src_conn = sqlite3.connect(cmonkey_db)
