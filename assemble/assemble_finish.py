@@ -94,7 +94,7 @@ class MongoDB:
         self.dbclient = dbclient
 
     def close(self):
-        self.dbclient.close()
+        pass
 
     def get_cond_ids(self):
         return [entry['col_id'] for entry in self.dbclient["col_info"].find({}, {"_id": 0, "col_id": 1})]
