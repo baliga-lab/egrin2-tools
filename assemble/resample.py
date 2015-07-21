@@ -85,7 +85,6 @@ class SqliteDB:
         try:
             in_clause = "(%s)" % ",".join(map(str, col_ids))
             query = 'select rowid,col_id,nrows,nresamples,lowest_raw_exps,lowest_std_exps from col_resamples where nrows=? and col_id in ' + in_clause
-            print query
             cursor.execute(query, [nrows])
             result = []
             for rowid, col_pk, nrows, nresamples, lowest_raw, lowest_std in cursor.fetchall():
