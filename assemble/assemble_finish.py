@@ -3,7 +3,9 @@
 import argparse
 import logging
 import pymongo
+import sqlite3
 from collections import namedtuple
+import itertools
 
 import query.egrin2_query as e2q
 import assemble.resample as resample
@@ -16,9 +18,38 @@ LOG_LEVEL = logging.DEBUG
 LOG_FILE = None
 
 
+class SqliteDB:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def close(self):
+        self.conn.close()
+
+    def get_cond_ids(self):
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('select rowid from columns')
+            return [row[0] for row in cursor.fetchall()]
+        finally:
+            cursor.close()
+
+    def get_corems(self):
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('select corem_id, row_id from corem_rows')
+            corem_rows = [(corem_id, row_id) for corem_id, row_id in cursor.fetchall()]
+            result = [{'_id': corem_id, 'corem_id': corem_id, 'rows': map(lambda x: x[1], row_ids)}
+                      for corem_id, row_ids in itertools.groupby(corem_rows, lambda x: x[0])]
+            return result
+        finally:
+            cursor.close()
+
 class MongoDB:
     def __init__(self, dbclient):
         self.dbclient = dbclient
+
+    def close(self):
+        self.dbclient.close()
 
     def get_cond_ids(self):
         return [entry['col_id'] for entry in self.dbclient["col_info"].find({}, {"_id": 0, "col_id": 1})]
@@ -172,13 +203,20 @@ if __name__ == '__main__':
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
                         level=LOG_LEVEL, filename=LOG_FILE)
     parser = argparse.ArgumentParser(description=DESCRIPTION)
-    parser.add_argument('db', help="MongoDB database name")
-    parser.add_argument('--host', default='localhost', required=False, help="MongoDB database host")
-    parser.add_argument('--port', default=27017, type=int, required=False, help="MongoDB database port")
+    parser.add_argument('db', help="database name")
+    parser.add_argument('--host', default='localhost', help="MongoDB database host")
+    parser.add_argument('--port', default=27017, type=int, help="MongoDB database port")
+    parser.add_argument('--dbengine', default='sqlite', help="Database engine (mongodb|sqlite)")
     args = parser.parse_args()
+
     print "Connecting to database: ", args.db
-    client = pymongo.MongoClient(host=args.host, port=args.port)
+    if args.dbengine == 'sqlite':
+        conn = sqlite3.connect(args.db)
+        dbclient = SqliteDB(conn)
+    elif args.dbengine == 'mongodb':
+        client = pymongo.MongoClient(host=args.host, port=args.port)
+        dbclient = MongoDB(client[args.db])
     try:
-        finish_corems(MongoDB(client[args.db]))
+        finish_corems(dbclient)
     finally:
-        client.close()
+        dbclient.close()
