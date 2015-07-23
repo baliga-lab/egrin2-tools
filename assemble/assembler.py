@@ -17,6 +17,7 @@ import logging
 import datetime
 import pymongo
 
+import merge
 import assemble.sql2mongoDB as rdb
 from assemble.makeCorems import CoremMaker, MongoDB
 
@@ -77,11 +78,8 @@ LOG_LEVEL = logging.DEBUG
 LOG_FILE = None # "assembler.log"
 
 
-def __generate_resample_sge_scripts(db, organism, targetdir, n_resamples, user, host, port):
-    logging.debug("connecting to db: '%s'", db.name)
-    corem_sizes = list(set([len(i["rows"] ) for i in db["corem"].find({}, {"rows": 1})]))
-    logging.debug("corem sizes: '%s'", str(corem_sizes))
-
+def __generate_resample_sge_scripts(corem_sizes, dbname, organism, targetdir, n_resamples,
+                                    user, host, port):
     if not os.path.isdir(os.path.abspath(os.path.join(targetdir, "qsub"))):
         os.makedirs(os.path.abspath(os.path.join(targetdir, "qsub")))
 
@@ -93,7 +91,7 @@ def __generate_resample_sge_scripts(db, organism, targetdir, n_resamples, user, 
                 "n_resamples": n_resamples,
                 "name": name + ".sh",
                 "host": host,
-                "db": db.name,
+                "db": dbname,
                 "n_rows": corem_size,
                 "port": port
             }
@@ -108,34 +106,35 @@ Transfer these documents to the cluster. Run 'resample.sh' with resample.py in y
 Once this is done, return here to finish processing corems.""", os.path.abspath(os.path.join(targetdir, "qsub")))
     logging.info("Done.")
 
-    # TODO: Split into 2 parts, because waiting makes this process interactive
-    """
-    ready = None
 
-    while ready != "Done":
-        ready = raw_input("Please type: 'Done' to continue\n")
-        """
+def make_resample_scripts(args, dbname, targetdir, corem_sizes):
+    if args.cluster_arch == 'sge':
+        __generate_resample_sge_scripts(corem_sizes, dbname, args.organism,
+                                        targetdir, args.n_resamples,
+                                        args.sge_user, args.host, args.port)
+    else:
+        logging.error("""Non-cluster setup currently not supported. Consider running resamples on a cluster.
+This will dramatically speed up this step.""")
 
-def __finish_and_dump(corems, resultdb, targetdir):
-    corems.finishCorems()
-    outfile =  resultdb.prefix + str(datetime.datetime.utcnow()).split(" ")[0] + ".mongodump"
-    logging.info("Writing EGRIN2 MongoDB to %s", os.path.join(resultdb.targetdir, outfile))
-    add_files = " "
-    info = os.path.abspath(os.path.join(targetdir, "ensemble.info"))
 
-    if os.path.isfile(info):
-        add_files = add_files + info
+def merge_sqlite(args, db):
+    merge.merge(args)
+    return True
 
-    pdf = os.path.join(corems.out_dir, "density_stats.pdf")
-    if os.path.isfile(pdf):
-        add_files = add_files + pdf
-    resultdb.mongo_dump(resultdb.dbname, outfile, add_files=add_files.strip())
 
-    logging.info("Done.")
-
-def merge_runs(args, db, dbname):
-    out_prefix = '%s-out-' % args.organism if args.prefix is None else args.prefix
+def merge_mongodb(args, db):
+    out_prefix = '%s-out-' % args.organism if args.prefix is None else args.prefix    
+    resultdb = rdb.ResultDatabase(args.organism, db, args.ensembledir, out_prefix,
+                                  args.ratios, args.gre2motif, args.col_annot, args.ncbi_code,
+                                  args.genome_annot, args.row_annot,
+                                  args.row_annot_match_col, args.targetdir, db_run_override=False)
+    if len(resultdb.db_files) > 0:
+        resultdb.compile()  # Merge sql into mongoDB
+        return True
+    else:
+        return False
     
+def merge_runs(args, db, dbname):
     info_d = {
         "date": str(datetime.datetime.utcnow()),
         "user": args.sge_user,
@@ -152,14 +151,26 @@ def merge_runs(args, db, dbname):
         "n_resamples": args.n_resamples
     }
 
-    
     with open(os.path.abspath(os.path.join(args.targetdir, "ensemble.info")), 'w') as outfile:
         outfile.write(RUN_INFO_TEMPLATE % info_d)
 
-    return rdb.ResultDatabase(args.organism, db, args.ensembledir, out_prefix,
-                              args.ratios, args.gre2motif, args.col_annot, args.ncbi_code,
-                              args.genome_annot, args.row_annot,
-                              args.row_annot_match_col, args.targetdir, db_run_override=False)
+    if args.dbengine == 'mongodb':
+        return merge_mongodb(args, db)
+    elif args.dbengine == 'sqlite':
+        return merge_sqlite(args)
+    else:
+        raise Exception('Unsupported database engine: %s' % args.dbengine)
+
+
+def make_corems(args, dbclient):
+    """db: use the db client adapter"""
+    corems = CoremMaker(args.organism, dbclient, args.backbone_pval, targetdir,
+                        args.cores, args.link_comm_score,
+                        args.link_comm_increment,
+                        args.link_comm_density_score,
+                        args.corem_size_threshold,
+                        args.n_resamples)
+    corems.make_corems()
 
 
 if __name__ == '__main__':
@@ -187,6 +198,8 @@ if __name__ == '__main__':
     parser.add_argument('--cluster_arch', default='sge', help="where to run resampling on")
     parser.add_argument('--sge_user', default=os.getlogin(), help="Cluster user name")
 
+    parser.add_argument('--dbengine', default='mongodb')
+
     # MongoDB specific
     parser.add_argument('--host', default="localhost", help="MongoDB host. Default 'localhost'")
     parser.add_argument('--port', default=27017, help="MongoDB port", type=int)
@@ -202,8 +215,6 @@ if __name__ == '__main__':
     parser.add_argument('--row_annot_match_col', default=None, help="Name of column in row_annot that matches row names in ratios file.")
     parser.add_argument('--gre2motif', default=None, help="Motif->GRE clustering file")
     parser.add_argument('--genome_annot', default=None, help="Optional genome annotation file. Automatically downloaded from MicrobesOnline using --ncbi_code")
-    parser.add_argument('--finish_only', default=False, help="Finish corems only. In case session gets dropped")
-
 
     args = parser.parse_args()
 
@@ -212,45 +223,19 @@ if __name__ == '__main__':
 
     # connect to MongoDB and check for the database
     client = pymongo.MongoClient(host=args.host, port=args.port)
-    if not args.finish_only:
-        if dbname in client.database_names():
-            logging.warn("WARNING: %s database already exists!!!", dbname)
-        else:
-            logging.info("Initializing MongoDB database: %s", dbname)
+    if dbname in client.database_names():
+        logging.warn("WARNING: %s database already exists!!!", dbname)
+    else:
+        logging.info("Initializing MongoDB database: %s", dbname)
     db = client[dbname]
 
     if not os.path.exists(targetdir):
         os.mkdir(targetdir)
 
-    resultdb = merge_runs(args, db, dbname)
-
-    if args.finish_only:
-        corems = CoremMaker(args.organism, MongoDB(db), args.backbone_pval, targetdir,
-                            args.cores, args.link_comm_score,
-                            args.link_comm_increment,
-                            args.link_comm_density_score,
-                            args.corem_size_threshold,
-                            args.n_resamples)
-
-        __finish_and_dump(corems, resultdb, targetdir)
+    if merge_runs(args, db, dbname):
+        make_corems(args, MongoDB(db))
+        corem_sizes = list(set([len(i["rows"] ) for i in db["corem"].find({}, {"rows": 1})]))
+        logging.debug("corem sizes: '%s'", str(corem_sizes))
+        make_resample_scripts(args, dbname, targetdir, corem_sizes)
     else:
-        if len(resultdb.db_files) > 0:
-            resultdb.compile()  # Merge sql into mongoDB
-            corems = CoremMaker(args.organism, MongoDB(db), args.backbone_pval, targetdir,
-                                args.cores, args.link_comm_score,
-                                args.link_comm_increment,
-                                args.link_comm_density_score,
-                                args.corem_size_threshold,
-                                args.n_resamples)
-            corems.make_corems()
-
-            if args.cluster_arch == 'sge':
-                __generate_resample_sge_scripts(db, args.organism, targetdir, args.n_resamples,
-                                                args.sge_user, args.host, args.port)
-            else:
-                logging.error("""Non-cluster setup currently not supported. Consider running resamples on a cluster.
-This will dramatically speed up this step.""")
-
-            # __finish_and_dump(corems, resultdb, targetdir)
-        else:
-            logging.error("Could not locate cMonkey2 result files. Please specify --ensembledir")
+        logging.error("Could not locate cMonkey2 result files. Please specify --ensembledir")
