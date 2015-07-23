@@ -90,7 +90,14 @@ class SqliteDB:
                                    [corem_id, int(row1), int(row2)])
         finally:
             cursor.close()
-            
+
+    def corem_sizes(self):
+        cursor = conn.cursor()
+        try:
+            cursor.execute('select distinct count(row_id) as corem_size from corem_rows group by corem_id order by corem_size')
+            return [row[0] for row in cursor.fetchall()]
+        finally:
+            cursor.close()
 
 
 if __name__ == '__main__':

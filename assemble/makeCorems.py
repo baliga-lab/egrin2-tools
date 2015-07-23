@@ -99,6 +99,9 @@ class MongoDB:
     def insert_corem(self, corem_docs):
         self.dbclient.corem.insert(corem_docs)
 
+    def corem_sizes(self):
+        return list(set([len(i["rows"] ) for i in self.dbclient["corem"].find({}, {"rows": 1})]))
+
 
 class CoremMaker:
 

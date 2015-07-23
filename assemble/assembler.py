@@ -122,9 +122,10 @@ def merge_sqlite(args, db):
     return True
 
 
-def merge_mongodb(args, db):
+def merge_mongodb(args, dbclient):
     out_prefix = '%s-out-' % args.organism if args.prefix is None else args.prefix    
-    resultdb = rdb.ResultDatabase(args.organism, db, args.ensembledir, out_prefix,
+    resultdb = rdb.ResultDatabase(args.organism, dbclient.dbclient,
+                                  args.ensembledir, out_prefix,
                                   args.ratios, args.gre2motif, args.col_annot, args.ncbi_code,
                                   args.genome_annot, args.row_annot,
                                   args.row_annot_match_col, args.targetdir, db_run_override=False)
@@ -133,8 +134,9 @@ def merge_mongodb(args, db):
         return True
     else:
         return False
-    
-def merge_runs(args, db, dbname):
+
+
+def merge_runs(args, dbclient, dbname):
     info_d = {
         "date": str(datetime.datetime.utcnow()),
         "user": args.sge_user,
@@ -155,7 +157,7 @@ def merge_runs(args, db, dbname):
         outfile.write(RUN_INFO_TEMPLATE % info_d)
 
     if args.dbengine == 'mongodb':
-        return merge_mongodb(args, db)
+        return merge_mongodb(args, dbclient)
     elif args.dbengine == 'sqlite':
         return merge_sqlite(args)
     else:
@@ -171,6 +173,17 @@ def make_corems(args, dbclient):
                         args.corem_size_threshold,
                         args.n_resamples)
     corems.make_corems()
+
+
+def make_dbclient(args, dbname):
+    # connect to MongoDB and check for the database
+    client = pymongo.MongoClient(host=args.host, port=args.port)
+    if dbname in client.database_names():
+        logging.warn("WARNING: %s database already exists!!!", dbname)
+    else:
+        logging.info("Initializing MongoDB database: %s", dbname)
+    db = client[dbname]
+    return MongoDB(db)
 
 
 if __name__ == '__main__':
@@ -220,21 +233,13 @@ if __name__ == '__main__':
 
     dbname = args.db if args.db is not None else "%s_db" % args.organism
     targetdir = args.targetdir
-
-    # connect to MongoDB and check for the database
-    client = pymongo.MongoClient(host=args.host, port=args.port)
-    if dbname in client.database_names():
-        logging.warn("WARNING: %s database already exists!!!", dbname)
-    else:
-        logging.info("Initializing MongoDB database: %s", dbname)
-    db = client[dbname]
-
     if not os.path.exists(targetdir):
         os.mkdir(targetdir)
+    dbclient = make_dbclient(args, dbname)
 
-    if merge_runs(args, db, dbname):
-        make_corems(args, MongoDB(db))
-        corem_sizes = list(set([len(i["rows"] ) for i in db["corem"].find({}, {"rows": 1})]))
+    if merge_runs(args, dbclient, dbname):
+        make_corems(args, dbclient)
+        corem_sizes = dbclient.corem_sizes()
         logging.debug("corem sizes: '%s'", str(corem_sizes))
         make_resample_scripts(args, dbname, targetdir, corem_sizes)
     else:
