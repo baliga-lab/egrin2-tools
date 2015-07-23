@@ -96,14 +96,12 @@ class SqliteDB:
 if __name__ == '__main__':
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
                         level=LOG_LEVEL, filename=LOG_FILE)
+
     parser = argparse.ArgumentParser(description=DESCRIPTION)
-    parser = argparse.ArgumentParser(description=DESCRIPTION)
-    parser.add_argument('--organism', required=True, type=str,
-                        help="3 letter organism code")
+    parser.add_argument('--organism', required=True, help="3 letter organism code")
     parser.add_argument('--ratios', required=True)
     parser.add_argument('--targetdb', required=True)
-    parser.add_argument('--targetdir', required=True,
-                        help="Storage path for MongoDB and corem data")
+    parser.add_argument('--targetdir', required=True, help="Storage path for MongoDB and corem data")
     parser.add_argument('result_dbs', nargs='*')
 
     # can be overridden

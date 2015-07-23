@@ -133,50 +133,12 @@ def __finish_and_dump(corems, resultdb, targetdir):
 
     logging.info("Done.")
 
-
-if __name__ == '__main__':
-    import argparse
-    import os
-    import itertools
-
-    logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
-                        level=LOG_LEVEL, filename=LOG_FILE)
-
-    parser = argparse.ArgumentParser(description=DESCRIPTION)
-    parser.add_argument('--organism', required=True, type=str, help="3 letter organism code")
-    parser.add_argument('--ratios', required=True, help="Path to ratios file. Should be 'raw' (normalized) ratios, not the standardized ratios used by cMonkey")
-    parser.add_argument('--targetdir', default='.', required=True, help="Storage path for MongoDB and corem data")
-    parser.add_argument('--ncbi_code', required=True, help="NCBI organism code")
-    parser.add_argument('--cores', default=3, type=int, help="Number local cores to use for corem C++ scripts")
-    parser.add_argument('--ensembledir', default='.', help="Path to ensemble runs. Default: cwd")
-    parser.add_argument('--col_annot', default=None, help="Tab-delimited file with experiment annotations")
-    parser.add_argument('--host', default="localhost", help="MongoDB host. Default 'localhost'")
-    parser.add_argument('--port', default=27017, help="MongoDB port", type=int)
-    parser.add_argument('--prefix', default=None, help="Ensemble run prefix. Default: *organism*-out-")
-    parser.add_argument('--row_annot', default=None, help="Optional row (gene) annotation tab-delimited file. If not specified, annotations will be downloaded from MicrobesOnline using --ncbi_code.")
-    parser.add_argument('--row_annot_match_col', default=None, help="Name of column in row_annot that matches row names in ratios file.")
-    parser.add_argument('--gre2motif', default=None, help="Motif->GRE clustering file")
-    parser.add_argument('--db', default=None, help="Optional ensemble MongoDB database name")
-    parser.add_argument('--genome_annot', default=None, help="Optional genome annotation file. Automatically downloaded from MicrobesOnline using --ncbi_code")
-    parser.add_argument('--backbone_pval', default=0.05, type=float, help="Significance pvalue for gene-gene backbone. Default = 0.05.")
-    parser.add_argument('--link_comm_score', default=0, type=int, help="Scoring metric for link communities" )
-    parser.add_argument('--link_comm_increment', default=0.1, type=float, help="Height increment for cutting agglomerative clustering of link communities" )
-    parser.add_argument('--link_comm_density_score', default=5, type=int,  help="Density score for evaluating link communities")
-    parser.add_argument('--corem_size_threshold', default=3, type=int, help="Defines minimum corem size. Default = 3." )
-    parser.add_argument('--n_resamples', default=10000, type=int, help="Number resamples to compute for corem condition assignment. Default = 10,000")
-    parser.add_argument('--cluster', default=True, help="Run re-samples on cluster? Boolean.")
-    parser.add_argument('--finish_only', default=False, help="Finish corems only. In case session gets dropped")
-    parser.add_argument('--user', default=os.getlogin(), help="Cluster user name")
-
-    args = parser.parse_args()
-
-    dbname = args.db if args.db is not None else "%s_db" % args.organism
-    targetdir = args.targetdir
+def merge_runs(args, db, dbname):
     out_prefix = '%s-out-' % args.organism if args.prefix is None else args.prefix
-
+    
     info_d = {
         "date": str(datetime.datetime.utcnow()),
-        "user": args.user,
+        "user": args.sge_user,
         "organism": args.organism,
         "ncbi_code": args.ncbi_code,
         "host": args.host,
@@ -189,26 +151,78 @@ if __name__ == '__main__':
         "corem_size_threshold": args.corem_size_threshold,
         "n_resamples": args.n_resamples
     }
-    client = pymongo.MongoClient(host=args.host, port=args.port)
 
+    
+    with open(os.path.abspath(os.path.join(args.targetdir, "ensemble.info")), 'w') as outfile:
+        outfile.write(RUN_INFO_TEMPLATE % info_d)
+
+    return rdb.ResultDatabase(args.organism, db, args.ensembledir, out_prefix,
+                              args.ratios, args.gre2motif, args.col_annot, args.ncbi_code,
+                              args.genome_annot, args.row_annot,
+                              args.row_annot_match_col, args.targetdir, db_run_override=False)
+
+
+if __name__ == '__main__':
+    import argparse
+    import os
+    import itertools
+
+    logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
+                        level=LOG_LEVEL, filename=LOG_FILE)
+
+    parser = argparse.ArgumentParser(description=DESCRIPTION)
+    parser.add_argument('--organism', required=True, help="3 letter organism code")
+    parser.add_argument('--ratios', required=True, help="Path to ratios file. Should be 'raw' (normalized) ratios, not the standardized ratios used by cMonkey")
+    parser.add_argument('--ncbi_code', required=True, help="NCBI organism code")
+    parser.add_argument('--targetdir', default='.', help="Storage path for MongoDB and corem data")
+    parser.add_argument('--backbone_pval', default=0.05, type=float, help="Significance pvalue for gene-gene backbone. Default = 0.05.")
+    parser.add_argument('--cores', default=3, type=int, help="Number local cores to use for corem C++ scripts")
+    parser.add_argument('--link_comm_score', default=0, type=int, help="Scoring metric for link communities" )
+    parser.add_argument('--link_comm_increment', default=0.1, type=float, help="Height increment for cutting agglomerative clustering of link communities" )
+    parser.add_argument('--link_comm_density_score', default=5, type=int,  help="Density score for evaluating link communities")
+    parser.add_argument('--corem_size_threshold', default=3, type=int, help="Defines minimum corem size. Default = 3." )
+    parser.add_argument('--n_resamples', default=10000, type=int, help="Number resamples to compute for corem condition assignment. Default = 10,000")
+
+    #  options for running on Sun Grid Engine
+    parser.add_argument('--cluster_arch', default='sge', help="where to run resampling on")
+    parser.add_argument('--sge_user', default=os.getlogin(), help="Cluster user name")
+
+    # MongoDB specific
+    parser.add_argument('--host', default="localhost", help="MongoDB host. Default 'localhost'")
+    parser.add_argument('--port', default=27017, help="MongoDB port", type=int)
+    parser.add_argument('--db', default=None, help="Optional ensemble MongoDB database name")
+    
+    # reading from an ensemble directory using directory pattern
+    parser.add_argument('--prefix', default=None, help="Ensemble run prefix. Default: *organism*-out-")
+    parser.add_argument('--ensembledir', default='.', help="Path to ensemble runs. Default: cwd")
+
+    # These arguments are optional steps
+    parser.add_argument('--col_annot', default=None, help="Tab-delimited file with experiment annotations")
+    parser.add_argument('--row_annot', default=None, help="Optional row (gene) annotation tab-delimited file. If not specified, annotations will be downloaded from MicrobesOnline using --ncbi_code.")
+    parser.add_argument('--row_annot_match_col', default=None, help="Name of column in row_annot that matches row names in ratios file.")
+    parser.add_argument('--gre2motif', default=None, help="Motif->GRE clustering file")
+    parser.add_argument('--genome_annot', default=None, help="Optional genome annotation file. Automatically downloaded from MicrobesOnline using --ncbi_code")
+    parser.add_argument('--finish_only', default=False, help="Finish corems only. In case session gets dropped")
+
+
+    args = parser.parse_args()
+
+    dbname = args.db if args.db is not None else "%s_db" % args.organism
+    targetdir = args.targetdir
+
+    # connect to MongoDB and check for the database
+    client = pymongo.MongoClient(host=args.host, port=args.port)
     if not args.finish_only:
         if dbname in client.database_names():
             logging.warn("WARNING: %s database already exists!!!", dbname)
         else:
             logging.info("Initializing MongoDB database: %s", dbname)
-
     db = client[dbname]
 
     if not os.path.exists(targetdir):
         os.mkdir(targetdir)
 
-    with open(os.path.abspath(os.path.join(targetdir, "ensemble.info")), 'w') as outfile:
-        outfile.write(RUN_INFO_TEMPLATE % info_d)
-
-    resultdb = rdb.ResultDatabase(args.organism, db, args.ensembledir, out_prefix,
-                                  args.ratios, args.gre2motif, args.col_annot, args.ncbi_code,
-                                  args.genome_annot, args.row_annot,
-                                  args.row_annot_match_col, targetdir, db_run_override=False)
+    resultdb = merge_runs(args, db, dbname)
 
     if args.finish_only:
         corems = CoremMaker(args.organism, MongoDB(db), args.backbone_pval, targetdir,
@@ -230,9 +244,9 @@ if __name__ == '__main__':
                                 args.n_resamples)
             corems.make_corems()
 
-            if args.cluster:
-                __generate_resample_sge_scripts(db, args.organism, targetdir, args.n_resamples, args.user,
-                                                args.host, args.port)
+            if args.cluster_arch == 'sge':
+                __generate_resample_sge_scripts(db, args.organism, targetdir, args.n_resamples,
+                                                args.sge_user, args.host, args.port)
             else:
                 logging.error("""Non-cluster setup currently not supported. Consider running resamples on a cluster.
 This will dramatically speed up this step.""")
