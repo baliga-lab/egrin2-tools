@@ -16,8 +16,9 @@ import itertools
 import logging
 import datetime
 import pymongo
+import sqlite3
 
-import merge
+import assemble_sqlite as asl
 import assemble.sql2mongoDB as rdb
 from assemble.makeCorems import CoremMaker, MongoDB
 
@@ -117,8 +118,8 @@ def make_resample_scripts(args, dbname, targetdir, corem_sizes):
 This will dramatically speed up this step.""")
 
 
-def merge_sqlite(args, db):
-    merge.merge(args)
+def merge_sqlite(args):
+    asl.merge(args)
     return True
 
 
@@ -176,14 +177,20 @@ def make_corems(args, dbclient):
 
 
 def make_dbclient(args, dbname):
-    # connect to MongoDB and check for the database
-    client = pymongo.MongoClient(host=args.host, port=args.port)
-    if dbname in client.database_names():
-        logging.warn("WARNING: %s database already exists!!!", dbname)
+    if args.dbengine == 'mongodb':
+        # connect to MongoDB and check for the database
+        client = pymongo.MongoClient(host=args.host, port=args.port)
+        if dbname in client.database_names():
+            logging.warn("WARNING: %s database already exists!!!", dbname)
+        else:
+            logging.info("Initializing MongoDB database: %s", dbname)
+        db = client[dbname]
+        return MongoDB(db)
+    elif args.dbengine == 'sqlite':
+        conn = sqlite3.connect(dbname)
+        return asl.SqliteDB(conn)
     else:
-        logging.info("Initializing MongoDB database: %s", dbname)
-    db = client[dbname]
-    return MongoDB(db)
+        raise Exception('unknown dbengine: %s' % args.dbengine)
 
 
 if __name__ == '__main__':
@@ -216,7 +223,7 @@ if __name__ == '__main__':
     # MongoDB specific
     parser.add_argument('--host', default="localhost", help="MongoDB host. Default 'localhost'")
     parser.add_argument('--port', default=27017, help="MongoDB port", type=int)
-    parser.add_argument('--db', default=None, help="Optional ensemble MongoDB database name")
+    parser.add_argument('--targetdb', default=None, help="Optional ensemble MongoDB database name")
     
     # reading from an ensemble directory using directory pattern
     parser.add_argument('--prefix', default=None, help="Ensemble run prefix. Default: *organism*-out-")
@@ -229,9 +236,12 @@ if __name__ == '__main__':
     parser.add_argument('--gre2motif', default=None, help="Motif->GRE clustering file")
     parser.add_argument('--genome_annot', default=None, help="Optional genome annotation file. Automatically downloaded from MicrobesOnline using --ncbi_code")
 
+    # This is alternatively to ensembledir, used by the sqlite merger:
+    # specify the input databases individually
+    parser.add_argument('result_dbs', nargs='*')
     args = parser.parse_args()
 
-    dbname = args.db if args.db is not None else "%s_db" % args.organism
+    dbname = args.targetdb if args.targetdb is not None else "%s_db" % args.organism
     targetdir = args.targetdir
     if not os.path.exists(targetdir):
         os.mkdir(targetdir)
