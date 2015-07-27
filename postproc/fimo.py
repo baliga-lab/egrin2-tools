@@ -20,7 +20,7 @@ Note:  if you are using c-shell make sure to use the --csh flag when running thi
 
 Example:
 
-python fimo.py --genome cache/Escherichia_coli_K12_NC_000913.2 --user mharris 
+python fimo.py --genome 'cache/Escherichia_coli_K12_NC_*' --user mharris 
                 --qsub_script fimo_batch_script.sh --csh --organism eco
 
 Output will be in subdirectory to input directory (<prefix>001/fimo_outs/ for example will have all fimo 
@@ -31,8 +31,6 @@ import optparse
 import sys
 import os
 import glob
-
-import util
 
 #  TODO:
 #	-Instead of creating a fimo_script.sh for every run with simple multiple calls to fimo
@@ -136,7 +134,7 @@ def fix_meme_file(meme_files):
 def main():
     #  Collect & check args
     op = optparse.OptionParser()
-    op.add_option('-g', '--genome', help='The sequence file (genome) (found in cache/<organism name>')
+    op.add_option('-g', '--genome', help='The genome sequence file glob (i.e., cache/<organism name>_NC_*')
     op.add_option('-o', '--organism', help='KEGG name for organism (e.g. eco, hal')
     op.add_option('-u', '--user', help='User name on cluster')
     #op.add_option('-i', '--base_dir', default='.', help='Cmonkey-python base directory.')
@@ -171,15 +169,18 @@ def main():
         template = QSUB_TEMPLATE
         shellheader = SHELL_HEADER
 
-    # Fix genome seqs file for fimo (to upper and add header), ouput to new file, put in input dir (might be better way)
-    seqsfile_in = open(opt.genome, 'rb')
-    lines = seqsfile_in.readlines()
-    genomeseq = lines[0].upper() # to upper may not be necessary
-
-    seqsfile_out = os.path.join(opt.genome)+'_fimo'
+    # Fix genome seqs file(s) for fimo (to upper and add header for fasta format), ouput to new file, 
+    # put in cache dir (might be better way)
+    seqsfiles = glob.glob(opt.genome)
+    seqsfile_out = os.path.join(os.path.dirname(seqsfiles[0]), opt.organism)+'_genome.fst'
     out = open(seqsfile_out, 'wb')
-    out.write(">"+os.path.basename(opt.genome)+"\n") # The short little header needed by fimo
-    out.write(genomeseq)
+    for fname in seqsfiles:
+        seqsfile_in = open(fname, 'rb')
+        lines = seqsfile_in.readlines()
+        genomeseq = lines[0].upper() # to upper may not be necessary
+
+        out.write(">"+fname[fname.find('_NC_')+1:]+'\n') ## just use chromosome NCBI code in fasta header - is this robust enough?
+        out.write(genomeseq)
     out.close()
 
     #  Create a dict of run output dirs with array of meme file names
@@ -209,9 +210,9 @@ def main():
         for meme in meme_files:
             num = os.path.basename(meme).split('-')[3] # Get the bicluster number
             #num = num[1:] # remove leading 0
-            if util.file_exists( os.path.join(org_dir, "fimo-outs/fimo-out-%s.bz2" % num) ):
+            if os.path.isfile( os.path.join(org_dir, "fimo-outs/fimo-out-%s.bz2" % num) ):
                 print 'SKIPPING:', os.path.join(org_dir, "fimo-outs/fimo-out-%s.bz2" % num)
-                fimo_cmd += '\n' + 'echo SKIPPING "%s"' % (meme) + '\n'
+                fimo_cmd += '\n' + 'echo SKIPPING, already exists "%s"' % (meme) + '\n'
             else:
                 fimo_cmd += '\n' + 'echo "%s"' % (meme) + '\n'
                 fimo_cmd += '\n' + FIMO_TEMPLATE % (meme, seqsfile_out, 
