@@ -22,54 +22,99 @@ import pdb
 import numpy as np
 import pandas as pd
 
-import sqlite3
 from Bio import SeqIO
 from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 
+def command_exists(command):
+    return subprocess.call(["which", command], stdout=open(os.devnull, 'wb')) == 0
+
+def check_c_code_exists():
+    """checks whether the C commands required exist"""
+    result = False
+    if not command_exists("adjmat2wpairs"):
+        logging.warn("You need to compile adjmat2wpairs.cpp to adjmat2wpairs and add its location to your path to detect corems")
+        result = True
+
+    if not command_exists("compute_tanimoto"):
+        logging.warn("You need to compile compute_tanimoto.cpp to compute_tanimoto and add its location to your path to detect corems")
+        result = True
+
+    if not command_exists("cluster_communities"):
+        logging.warn("You need to compile cluster_communities.cpp to cluster_communities and add its location to your path to detect corems")
+        result = True
+
+    if not command_exists("getting_communities"):
+        logging.warn("You need to compile getting_communities.cpp to getting_communities and add its location to your path to detect corems")
+        result = True
+
+    return result
+
+
+class MongoDB:
+    """database interface to mongo"""
+    def __init__(self, dbclient):
+        self.dbclient = dbclient
+
+    def get_row_maps(self):
+        row2id = {}
+        id2row = {}
+        for i in self.dbclient.row_info.find({}, {"egrin2_row_name": "1", "row_id": "1"}):
+            row2id[i["egrin2_row_name"]] = i["row_id"]
+            id2row[i["row_id"]] = i["egrin2_row_name"]
+        return row2id, id2row
+
+    def get_column_maps(self):
+        col2id = {}
+        id2col = {}
+        for i in self.dbclient.col_info.find({}, {"egrin2_col_name": "1", "col_id": "1"}):
+            col2id[i["egrin2_col_name"]] = i["col_id"]
+            id2col[i["col_id"]] = i["egrin2_col_name"]
+        return col2id, id2col
+
+    def num_row_co_occurence(self, rowname, row2id, id2row):
+        """Given a row (gene), count all of the other rows that occur with it in a bicluster"""
+        data = []
+        for i in self.dbclient.bicluster_info.find({"rows": {"$all": [row2id[rowname]]}}, {"rows": "1"}):
+            for j in i["rows"]:
+                try:
+                    data.append(id2row[j])
+                except:
+                    continue
+        data_counts = pd.Series(data).value_counts()
+        return data_counts
+
+    def drop_row_rows(self):
+        self.dbclient.row_row.drop()
+
+    def update_row_row(self, keyrow_pk, subrow_pk, data_counts_norm, backbone_pval):
+        self.dbclient.row_row.update({"row_ids": [subrow_pk, keyrow_pk]},
+                                     {"$set": {"weight": data_counts_norm, "backbone_pval": backbone_pval}})
+
+    def insert_row_row(self, rowrow_docs):
+        self.dbclient.row_row.insert(rowrow_docs)
+
+    def insert_corem(self, corem_docs):
+        self.dbclient.corem.insert(corem_docs)
+
+    def corem_sizes(self):
+        return list(set([len(i["rows"] ) for i in self.dbclient["corem"].find({}, {"rows": 1})]))
+
+
 class CoremMaker:
 
-    def __check_c_code_exists(self):
-        self.cFail = False
-        if subprocess.call(["which", "adjmat2wpairs"], stdout=open(os.devnull, 'wb')) != 0:
-            logging.warn("You need to compile adjmat2wpairs.cpp to adjmat2wpairs and add its location to your path to detect corems")
-            self.cFail = True
-
-        if subprocess.call(["which", "compute_tanimoto"], stdout=open(os.devnull, 'wb')) != 0:
-            logging.warn("You need to compile compute_tanimoto.cpp to compute_tanimoto and add its location to your path to detect corems")
-            self.cFail = True
-
-        if subprocess.call(["which", "cluster_communities"], stdout=open(os.devnull, 'wb')) != 0:
-            logging.warn("You need to compile cluster_communities.cpp to cluster_communities and add its location to your path to detect corems")
-            self.cFail = True
-
-        if subprocess.call(["which", "getting_communities"], stdout=open(os.devnull, 'wb')) != 0:
-            logging.warn("You need to compile getting_communities.cpp to getting_communities and add its location to your path to detect corems")
-            self.cFail = True
-
-    def __init__(self, organism, db, backbone_pval, out_dir, n_subs, link_comm_score,
+    def __init__(self, organism, db_client, backbone_pval, out_dir, n_subs, link_comm_score,
                  link_comm_increment, link_comm_density_score, corem_size_threshold,
                  n_resamples):
 
         self.organism = organism
-        self.db = db
-
-        self.row2id = {}
-        self.id2row = {}
-        for i in self.db.row_info.find({}, {"egrin2_row_name": "1", "row_id": "1"}):
-            self.row2id[i["egrin2_row_name"]] = i["row_id"]
-            self.id2row[i["row_id"]] = i["egrin2_row_name"]
-
-        self.col2id = {}
-        self.id2col = {}
-        for i in self.db.col_info.find({}, {"egrin2_col_name": "1", "col_id": "1"}):
-            self.col2id[i["egrin2_col_name"]] = i["col_id"]
-            self.id2col[i["col_id"]] = i["egrin2_col_name"]
-
+        self.db_client = db_client
+        self.row2id, self.id2row = db_client.get_row_maps()
+        self.col2id, self.id2col = db_client.get_column_maps()
         self.backbone_pval = backbone_pval
-        self.__check_c_code_exists()
+        self.cFail = check_c_code_exists()
 
         self.out_dir = os.path.abspath(os.path.join(out_dir, "corem_data"))
         if not os.path.isdir(self.out_dir):
@@ -83,18 +128,6 @@ class CoremMaker:
         self.corem_size_threshold = corem_size_threshold
         self.cutoff = None
         self.n_resamples = n_resamples
-
-    def __num_row_co_occurence(self, row_id):
-        """Given a row (gene), count all of the other rows that occur with it in a bicluster"""
-        data = []
-        for i in self.db.bicluster_info.find({"rows": {"$all": [self.row2id[row_id]]}}, {"rows": "1"}):
-            for j in i["rows"]:
-                try:
-                    data.append(self.id2row[j])
-                except:
-                    continue
-        data_counts = pd.Series(data).value_counts()
-        return data_counts
 
     def __extract_backbone(self, data_counts):
         """Extract the significant elements from rBr co-occurrence matrix"""
@@ -112,15 +145,13 @@ class CoremMaker:
     def __row_row(self):
         """Construct row-row co-occurrence matrix (ie gene-gene co-occurrence)"""
 
-        row_row_collection = self.db.row_row
-
         # remove existing edgeList file if it exists
         if os.path.exists(os.path.abspath(os.path.join(self.out_dir, "edgeList"))):
             logging.info("Found edgeList file at '%s'. Removing it.",
                          os.path.abspath(os.path.join(self.out_dir, "edgeList")))
             os.remove(os.path.abspath(os.path.join(self.out_dir, "edgeList")))
             logging.info("Dropping row_row MongoDB collection as a precaution.")
-            row_row_collection.drop()
+            self.db_client.drop_row_rows()
 
         def addToD(d, ind1, ind2, val):
             if ind1 not in d.iterkeys():
@@ -128,27 +159,28 @@ class CoremMaker:
             d[ind1][ind2] = val
             return d
 
-        def writeRowRow(row):
+        def writeRowRow(f, row):
             """Only write rows with significant backbone pvals to edgeList file"""
             if float(row["backbone_pval"]) <= self.backbone_pval:
                 f.write((" ").join([self.id2row[row["row_ids"][0]], self.id2row[row["row_ids"][1]], str(row["weight"]), "\n"]))
 
-        def structureRowRow(key_row, sub_row, data_counts, data_counts_norm, backbone_pval, row_row_collection):
+        def structureRowRow(key_row, sub_row, data_counts, data_counts_norm, backbone_pval):
+            keyrow_pk = self.row2id[key_row]
+            subrow_pk = self.row2id[sub_row]
             try:
                 # check to see if this pair already exists and if current weight is greater
-                weight = self.rowrow_ref[self.row2id[sub_row]][self.row2id[key_row]]
+                weight = self.rowrow_ref[subrow_pk][keyrow_pk]
 
                 if (data_counts_norm > weight) and (backbone_pval <= self.backbone_pval):
                     # if current weight is greater and backbone_pval is significant, update the weight in MongoDB
-                    row_row_collection.update({"row_ids": [self.row2id[sub_row], self.row2id[key_row]]},
-                                              {"$set": {"weight": data_counts_norm, "backbone_pval": backbone_pval}})
+                    self.db_client.update_row_row(keyrow_pk, subrow_pk, data_counts_norm, backbone_pval)
 
-                    self.rowrow_ref = addToD(self.rowrow_ref, self.row2id[sub_row], self.row2id[key_row], data_counts_norm)
+                    self.rowrow_ref = addToD(self.rowrow_ref, subrow_pk, keyrow_pk, data_counts_norm)
                 d = None
             except Exception:
-                self.rowrow_ref = addToD(self.rowrow_ref, self.row2id[sub_row], self.row2id[key_row], data_counts_norm)
+                self.rowrow_ref = addToD(self.rowrow_ref, subrow_pk, keyrow_pk, data_counts_norm)
                 d = {
-                    "row_ids": [self.row2id[key_row], self.row2id[sub_row]],
+                    "row_ids": [keyrow_pk, subrow_pk],
                     "counts": data_counts,
                     "weight": data_counts_norm,
                     "backbone_pval": backbone_pval
@@ -167,7 +199,7 @@ class CoremMaker:
                 logging.info("%.2f percent done", round(float(counter) / len(self.row2id.keys()), 2) * 100.0)
 
             # check if already exists in DB
-            data_counts = self.__num_row_co_occurence(i)
+            data_counts = self.db_client.num_row_co_occurence(i, self.row2id, self.id2row)
 
             # set self counts to 0 and normalize other counts
             data_counts[i] = 0
@@ -178,16 +210,17 @@ class CoremMaker:
             # only keep values > 0
             backbone_data_counts = self.__extract_backbone(data_counts_norm)
 
-            to_write = [structureRowRow(i, j, data_counts[j], data_counts_norm[j], backbone_data_counts[j], row_row_collection)
+            to_write = [structureRowRow(i, j, data_counts[j], data_counts_norm[j], backbone_data_counts[j])
                         for j in data_counts.index]
             to_write = [i for i in to_write if i is not None]
 
             # write edgeList file
             with open(os.path.abspath(os.path.join(self.out_dir, "edgeList")), mode="a+") as f:
-                [writeRowRow(j) for j in to_write]
+                for j in to_write:
+                    writeRowRow(f, j)
 
-            row_row_collection.insert(to_write)
-            counter = counter + 1
+            self.db_client.insert_row_row(to_write)
+            counter += 1
 
         # clean up
         del self.rowrow_ref
@@ -440,7 +473,7 @@ class CoremMaker:
         logging.info("Adding basic corem information to MongoDB")
 
         to_write = [coremStruct(i, corems) for i in corems.Community_ID.unique()]
-        self.db.corem.insert(to_write)
+        self.db_client.insert_corem(to_write)
 
     def make_corems(self):
         """top-level corem making function"""

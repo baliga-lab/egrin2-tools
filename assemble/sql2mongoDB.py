@@ -571,7 +571,9 @@ class ResultDatabase:
             num_rows += 1
 
         # Check whether documents are already present in the collection before insertion
+        logging.info("expression data added, now checking documents for existence...")
         if self.db.gene_expression.count() > 0:
+            logging.info("do filter !!")
             d_f = filter(lambda doc: _not_exists(self.db.gene_expression, doc), exp_data)
         else:
             d_f = exp_data
