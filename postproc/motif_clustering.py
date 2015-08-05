@@ -26,6 +26,7 @@ op.add_option('--plot_motifs', default=False, action='store_true',
               help="Plot motif clusters in separate PDFs")
 op.add_option('-o', '--option', default=1, help="Filtering option, 1 or 2; see comments")
 op.add_option('-I', '--mcl_I', default=2.4, help='mcl I parameter value')
+op.add_option('-F', '--features', default='cache/Mycobacterium_tuberculosis_H37Rv_features', help='path to features file')
 opt, args = op.parse_args()
 if not opt.input_dir:
     op.error('need --input_dir option.  Use -h for help.')
@@ -54,7 +55,7 @@ if pre_filter:
     except:
         None
     import coding_fracs as cf
-    total_frac = cf.get_total_coding_rgn('cache/Mycobacterium_tuberculosis_H37Rv_features')
+    total_frac = cf.get_total_coding_rgn(opt.features)
 
     cf_files = np.sort( np.array( glob.glob(os.path.join('*/coding_fracs.tsv.bz2')) ) )
     coding_fracs = [] ##{}
