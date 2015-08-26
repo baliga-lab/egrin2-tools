@@ -18,7 +18,7 @@ except:
 
 import cmonkey.meme as meme ## use Wei-Ju's meme parser - much better than BioPython!
 
-organism = 'mtu' ## 'eco' ##
+#organism = 'mtu' ## 'eco' ##
 print organism, param_I_str
 
 try:
@@ -118,7 +118,7 @@ def get_motif_cluster_sites( cluster_ind, force=False ):
         firsts.fillna('', inplace=True)
         if len(clusters[iii]) > 100:
             firsts = firsts[ sizes > len(clusters[iii])/20. ]
-        else:
+        if len(clusters[iii]) <= 100 or len(firsts) <= 2:
             firsts = firsts[ sizes > 2 ]
         maxlen = max( [len(i) for i in firsts.seq.values] )
         minlen = min( [len(i) for i in firsts.seq.values] )
@@ -175,9 +175,12 @@ for iii in xrange( 0,len(clusters) ):
     out = get_motif_cluster_sites( iii, force=False )
     if out['record'] is None:
         continue
-    pdf_data = plot_motif_from_sites( out['sites'], 'pdf', out['smallText'] )
-    ut.writeLines( pdf_data.split( '\n' ), 'motif_clusters_%s/%04d.pdf'%(param_I_str,iii) )
-    ut.writeLines( out['memeOut'].split( '\n' ), 'motif_clusters_%s/%04d_memeOut.txt'%(param_I_str,iii) )
+    try:
+        pdf_data = plot_motif_from_sites( out['sites'], 'pdf', out['smallText'] )
+        ut.writeLines( pdf_data.split( '\n' ), 'motif_clusters_%s/%04d.pdf'%(param_I_str,iii) )
+        ut.writeLines( out['memeOut'].split( '\n' ), 'motif_clusters_%s/%04d_memeOut.txt'%(param_I_str,iii) )
+    except:
+        print 'ERROR in generating PDF for motif cluster.'
     print iii, 'DONE'
         
 #os.popen( 'pdftk motif_clusters_%s/????.pdf cat output motif_clusters_%s/ALL.pdf'%(param_I_str,param_I_str) ).read()
