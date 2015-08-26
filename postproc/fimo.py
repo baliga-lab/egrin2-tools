@@ -179,7 +179,7 @@ def main():
         lines = seqsfile_in.readlines()
         genomeseq = lines[0].upper() # to upper may not be necessary
 
-        out.write(">"+fname.find('_NC_')+1:]+'\n') ## just use chromosome NCBI code in fasta header - is this robust enough?
+        out.write(">"+fname[fname.find('_NC_')+1:]+'\n') ## just use chromosome NCBI code in fasta header - is this robust enough?
         out.write(genomeseq)
     out.close()
 
@@ -212,7 +212,7 @@ def main():
             #num = num[1:] # remove leading 0
             if os.path.isfile( os.path.join(org_dir, "fimo-outs/fimo-out-%s.bz2" % num) ):
                 print 'SKIPPING:', os.path.join(org_dir, "fimo-outs/fimo-out-%s.bz2" % num)
-                fimo_cmd += '\n' + 'echo SKIPPING "%s"' % (meme) + '\n'
+                fimo_cmd += '\n' + 'echo SKIPPING, already exists "%s"' % (meme) + '\n'
             else:
                 fimo_cmd += '\n' + 'echo "%s"' % (meme) + '\n'
                 fimo_cmd += '\n' + FIMO_TEMPLATE % (meme, seqsfile_out, 

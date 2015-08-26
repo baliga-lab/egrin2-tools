@@ -26,6 +26,7 @@ op.add_option('--plot_motifs', default=False, action='store_true',
               help="Plot motif clusters in separate PDFs")
 op.add_option('-o', '--option', default=1, help="Filtering option, 1 or 2; see comments")
 op.add_option('-I', '--mcl_I', default=2.4, help='mcl I parameter value')
+op.add_option('-F', '--features', default='cache/Mycobacterium_tuberculosis_H37Rv_features', help='path to features file')
 opt, args = op.parse_args()
 if not opt.input_dir:
     op.error('need --input_dir option.  Use -h for help.')
@@ -54,7 +55,7 @@ if pre_filter:
     except:
         None
     import coding_fracs as cf
-    total_frac = cf.get_total_coding_rgn('cache/Mycobacterium_tuberculosis_H37Rv_features')
+    total_frac = cf.get_total_coding_rgn(opt.features)
 
     cf_files = np.sort( np.array( glob.glob(os.path.join('*/coding_fracs.tsv.bz2')) ) )
     coding_fracs = [] ##{}
@@ -122,16 +123,19 @@ if len(dfs) != len(files): ## if using a shelf, once this is done once, you don'
         #if f == files[20]:
         #   break
 
-if type(dfs) == dict:
-    dfs2 = pd.concat( dfs, axis=0 )
-else:
-    dfs2 = pd.concat( dfs.values(), axis=0 )  ## works with 'shelve's but not (compressed) 'shove's
-#dfs.close()
-print dfs2.shape
+if not os.path.isfile('motifs_tomtom.tsv.bz2'):
+    if type(dfs) == dict:
+        dfs2 = pd.concat( dfs, axis=0 )
+    else:
+        dfs2 = pd.concat( dfs.values(), axis=0 )  ## works with 'shelve's but not (compressed) 'shove's
+    #dfs.close()
+    print dfs2.shape
 
-## incase we fail on steps below...
-dfs2.to_csv( bz2.BZ2File('motifs_tomtom.tsv.bz2', 'w'), sep='\t', index=False, header=True )
-#dfs2 = pd.read_table( bz2.BZ2File('motifs_tomtom.tsv.bz2', 'r') )
+    ## incase we fail on steps below...
+    dfs2.to_csv( bz2.BZ2File('motifs_tomtom.tsv.bz2', 'w'), sep='\t', index=False, header=True )
+
+else:
+    dfs2 = pd.read_table( bz2.BZ2File('motifs_tomtom.tsv.bz2', 'r') )
 
 if option == 2:
     dfs2.sort( 'p-value', inplace=True ) ## sort so lower p-values come first (these are kept by drop_duplicates)
@@ -153,7 +157,7 @@ gr = pd.DataFrame( {'query':dfs2['#Query ID'].values, 'target':dfs2['Target ID']
 gr.to_csv( 'motifs_graph.tsv', sep=' ', index=False, header=False ) ## igraph cannot read bzipped files (streams)
 del gr
 gr2 = ig.Graph.Read_Ncol( 'motifs_graph.tsv', names=True, weights=True, directed=False )
-ut.system( 'pbzip2 -fv9 motifs_graph.tsv &' )
+system( 'pbzip2 -fv9 motifs_graph.tsv &' )
 #gr2 = ig.Graph( zip(inds1, inds2), edge_attrs={'weight':np.round_(-np.log10(dfs2['p-value'].values+1e-99), 4)} )
 print gr2.ecount(), gr2.vcount()
 #gr2.write_ncol( "mot_metaclustering.txt" )
@@ -179,7 +183,7 @@ gr2b.write_ncol( "mot_metaclustering.txt", weights=None ) ## no weights used - s
 ## now run mcl, latest version from http://www.micans.org/mcl/src/mcl-latest.tar.gz
 param_I = opt.mcl_I ##3.6 ## 3.0 ## 2.4 ## 1.2 ##4.5
 cmd = './progs/mcl mot_metaclustering.txt --abc -I %.1f -v all -te 3 -S 200000'%(param_I)
-ut.system( cmd )
+system( cmd )
 
 param_I_str = str(param_I).replace('.','')
 fo = open( 'out.mot_metaclustering.txt.I%s'%(param_I_str), 'r' )
