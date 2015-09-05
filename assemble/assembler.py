@@ -21,7 +21,7 @@ import sqlite3
 import assemble_sqlite as asl
 import assemble.sql2mongoDB as rdb
 from assemble.makeCorems import CoremMaker, MongoDB
-
+import resample
 
 QSUB_TEMPLATE_HEADER_CSH = """#!/bin/csh
 
@@ -251,6 +251,18 @@ if __name__ == '__main__':
         make_corems(args, dbclient)
         corem_sizes = dbclient.corem_sizes()
         logging.debug("corem sizes: '%s'", str(corem_sizes))
-        make_resample_scripts(args, dbname, targetdir, corem_sizes)
+
+        # when we run on sqlite, we will automatically run resampling
+        # right after
+        if args.dbengine == 'sqlite':
+            rs_dbclient = resample.SqliteDB(dbclient.conn)
+            for corem_size in corem_sizes:
+                resample.col_resample_ind(rs_dbclient, n_rows=corem_size,
+                                          cols=rs_dbclient.get_col_nums(),
+                                          n_resamples=1000,
+                                          keepP=0.1)
+            dbclient.conn.commit()
+        else:
+            make_resample_scripts(args, dbname, targetdir, corem_sizes)
     else:
         logging.error("Could not locate cMonkey2 result files. Please specify --ensembledir")
