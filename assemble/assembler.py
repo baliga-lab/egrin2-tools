@@ -142,7 +142,7 @@ def merge_runs(args, dbclient, dbname):
         "date": str(datetime.datetime.utcnow()),
         "user": args.sge_user,
         "organism": args.organism,
-        #"ncbi_code": args.ncbi_code,
+        "ncbi_code": 0,  #args.ncbi_code,
         "host": args.host,
         "port": args.port,
         "db": dbname,
