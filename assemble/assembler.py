@@ -127,7 +127,7 @@ def merge_mongodb(args, dbclient):
     out_prefix = '%s-out-' % args.organism if args.prefix is None else args.prefix    
     resultdb = rdb.ResultDatabase(args.organism, dbclient.dbclient,
                                   args.ensembledir, out_prefix,
-                                  args.ratios, args.gre2motif, args.col_annot, args.ncbi_code,
+                                  args.ratios, args.gre2motif, args.col_annot,
                                   args.genome_annot, args.row_annot,
                                   args.row_annot_match_col, args.targetdir, db_run_override=False)
     if len(resultdb.db_files) > 0:
@@ -142,7 +142,7 @@ def merge_runs(args, dbclient, dbname):
         "date": str(datetime.datetime.utcnow()),
         "user": args.sge_user,
         "organism": args.organism,
-        "ncbi_code": args.ncbi_code,
+        #"ncbi_code": args.ncbi_code,
         "host": args.host,
         "port": args.port,
         "db": dbname,
@@ -204,7 +204,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('--organism', required=True, help="3 letter organism code")
     parser.add_argument('--ratios', required=True, help="Path to ratios file. Should be 'raw' (normalized) ratios, not the standardized ratios used by cMonkey")
-    parser.add_argument('--ncbi_code', required=True, help="NCBI organism code")
     parser.add_argument('--targetdir', default='.', help="Storage path for MongoDB and corem data")
     parser.add_argument('--backbone_pval', default=0.05, type=float, help="Significance pvalue for gene-gene backbone. Default = 0.05.")
     parser.add_argument('--cores', default=3, type=int, help="Number local cores to use for corem C++ scripts")

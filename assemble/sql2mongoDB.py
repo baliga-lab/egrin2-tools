@@ -50,22 +50,19 @@ def _gre2motif_path(ensembledir, gre2motif):
         return gre2motif
 
 
-def _get_ncbi_code(ncbi_code, resultdb_path):
+def _get_ncbi_code(resultdb_path):
     """Determine the NCBI code either from the ncbi_code argument or the given result database"""
-    if ncbi_code is None:
-        # try to find ncbi_code in cmonkey_run.db
-        conn = sqlite3.connect(resultdb_path)
-        c = conn.cursor()
-        try:
-            c.execute("SELECT ncbi_code FROM run_infos")
-            return c.fetchone()[0]
-        except sqlite3.Error as e:
-            logging.warn("Could not find NCBI Genome ID in cmonkey_run.db: %s", resultdb_path)
-        finally:
-            c.close()
-            conn.close()
-    else:
-        return int(ncbi_code)
+    # try to find ncbi_code in cmonkey_run.db
+    conn = sqlite3.connect(resultdb_path)
+    c = conn.cursor()
+    try:
+        c.execute("SELECT ncbi_code FROM run_infos")
+        return c.fetchone()[0]
+    except sqlite3.Error as e:
+        logging.warn("Could not find NCBI Genome ID in cmonkey_run.db: %s", resultdb_path)
+    finally:
+        c.close()
+        conn.close()
 
 
 def _available_cmonkey_resultdb_files(ensembledir, prefix):
@@ -419,7 +416,7 @@ def _insert_bicluster_info(db, conn, run_name, row2id, col2id, run2id):
 class ResultDatabase:
 
     def __init__(self, organism, db, ensembledir, prefix, ratios_raw, gre2motif, col_annot,
-                 ncbi_code, genome_file, row_annot, row_annot_match_col,
+                 genome_file, row_annot, row_annot_match_col,
                  targetdir, db_run_override=False):
         self.organism = organism
         self.db = db
@@ -428,7 +425,7 @@ class ResultDatabase:
         self.gre2motif = _gre2motif_path(ensembledir, gre2motif)
         self.db_files = _available_cmonkey_resultdb_files(ensembledir, prefix)
         self.db_run_override = db_run_override
-        self.ncbi_code = _get_ncbi_code(ncbi_code, self.db_files[0])
+        self.ncbi_code = _get_ncbi_code(self.db_files[0])
         self.ratios_raw = ratios_raw
         self.col_annot = col_annot
         self.genome_file = genome_file
