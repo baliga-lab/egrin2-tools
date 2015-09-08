@@ -138,7 +138,10 @@ def standardize_ratios(ratios):
 def read_ratios(path):
     """reads the specified gene expression and returns both
     raw matrix and standardized matrix"""
-    ratios = pd.read_csv(gzip.open(path, 'rb'), index_col=0, sep="\t")
+    if path.endswith('gz'):
+        ratios = pd.read_csv(gzip.open(path, 'rb'), index_col=0, sep="\t")
+    else:
+        ratios = pd.read_csv(path, index_col=0, sep="\t")
 
     if ratios.shape[1] == 0:  # attempt using comma as a delimiter if tab failed
         ratios = pd.read_csv(gzip.open(path, 'rb'), index_col=0, sep=",")
