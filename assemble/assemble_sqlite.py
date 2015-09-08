@@ -140,11 +140,12 @@ def read_ratios(path):
     raw matrix and standardized matrix"""
     if path.endswith('gz'):
         ratios = pd.read_csv(gzip.open(path, 'rb'), index_col=0, sep="\t")
+        if ratios.shape[1] == 0:  # attempt using comma as a delimiter if tab failed
+            ratios = pd.read_csv(gzip.open(path, 'rb'), index_col=0, sep=",")
     else:
         ratios = pd.read_csv(path, index_col=0, sep="\t")
-
-    if ratios.shape[1] == 0:  # attempt using comma as a delimiter if tab failed
-        ratios = pd.read_csv(gzip.open(path, 'rb'), index_col=0, sep=",")
+        if ratios.shape[1] == 0:  # attempt using comma as a delimiter if tab failed
+            ratios = pd.read_csv(path, index_col=0, sep=",")
 
     if ratios.shape[1] == 0:
         raise Exception("Cannot read ratios file. Check delimiter. Should be '\t' or ',' ")
