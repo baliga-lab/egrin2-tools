@@ -68,13 +68,19 @@ class SqliteDB:
 
     def insert_row_row(self, rowrow_docs):
         for doc in rowrow_docs:
-            self.conn.execute('insert into row_row (keyrow_id,subrow_id,counts,weight,backbone_pval) values (?,?,?,?,?)', [doc['row_ids'][0], doc['row_ids'][1], doc['counts'], doc['weight'], doc['backbone_pval']])
+            keyrow_id, subrow_id = map(int, doc['row_ids'])
+            counts = int(doc['counts'])
+            weight = float(doc['weight'])
+            backbone_pval = float(doc['backbone_pval'])
+            self.conn.execute('insert into row_row (keyrow_id,subrow_id,counts,weight,backbone_pval) values (?,?,?,?,?)',
+                              [keyrow_id, subrow_id, counts, weight, backbone_pval])
 
     def insert_corem(self, corem_docs):
         cursor = self.conn.cursor()
         try:
             for doc in corem_docs:
-                cursor.execute('insert into corems (density,corem_num,weighted_density) values (?,?,?)', [doc['density'], doc['corem_id'], doc['weighted_density']])
+                cursor.execute('insert into corems (density,corem_num,weighted_density) values (?,?,?)',
+                               [float(doc['density']), int(doc['corem_id']), float(doc['weighted_density'])])
                 corem_id = cursor.lastrowid
                 for row_id in doc['rows']:
                     cursor.execute('insert into corem_rows (corem_id,row_id) values (?,?)',
