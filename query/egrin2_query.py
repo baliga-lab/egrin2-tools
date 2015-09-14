@@ -30,7 +30,7 @@ def find_match(x, df, return_field):
     return df.iloc[counter][return_field]
 
 
-def __row2id(db, row, return_field="row_id"):
+def row2id(db, row, return_field="row_id"):
     """Check name format of rows. If necessary, translate."""
     query = list(db.row_info.find({"$or": [{"row_id": row}, {"egrin2_row_name": row}, {"GI": row},
                                            {"accession": row}, {"name": row}, {"sysName": row}]}))
@@ -76,12 +76,12 @@ def row2id_batch(db, rows, return_field="row_id", input_type=None):
     else:
         # try to match input_type automatically
         logging.info("Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query.")
-        to_r = [__row2id(db, x, return_field=return_field) for x in rows]
+        to_r = [row2id(db, x, return_field=return_field) for x in rows]
 
     return to_r
 
 
-def __col2id(db, col, return_field="col_id"):
+def col2id(db, col, return_field="col_id"):
     """Check name format of rows. If necessary, translate."""
     query = list(db.col_info.find({"$or": [{"col_id": col},
                                            { "egrin2_col_name": col}]}))
@@ -119,7 +119,7 @@ def col2id_batch(db, cols, return_field="col_id", input_type=None):
     else:
         # try to match input_type automatically
         logging.info("Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query.")
-        to_r = [__col2id(db, x, return_field=return_field) for x in cols]
+        to_r = [col2id(db, x, return_field=return_field) for x in cols]
 
     return to_r
 
