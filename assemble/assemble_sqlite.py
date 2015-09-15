@@ -6,6 +6,8 @@ import gzip
 import pandas as pd
 import requests
 from datetime import datetime
+import itertools
+import json
 
 """
 This assemble module is the sqlite3 based implementation
@@ -20,6 +22,9 @@ class SqliteDB:
         self.conn.execute('create table if not exists corem_rows (corem_id int, row_id int)')
         self.conn.execute('create table if not exists corem_cols (corem_id int, col_id int, pval decimal)')
         self.conn.execute('create table if not exists corem_edges (corem_id int, row1_id int, row2_id int)')
+
+    def close(self):
+        self.conn.close()
 
     def get_row_maps(self):
         row2id = {}
@@ -102,6 +107,70 @@ class SqliteDB:
             return [row[0] for row in cursor.fetchall()]
         finally:
             cursor.close()
+
+    def get_cond_ids(self):
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('select rowid from columns')
+            return [row[0] for row in cursor.fetchall()]
+        finally:
+            cursor.close()
+
+    def get_corems(self):
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('select corem_id, row_id from corem_rows')
+            corem_rows = [(corem_id, row_id) for corem_id, row_id in cursor.fetchall()]
+            result = [{'_id': corem_id, 'corem_id': corem_id, 'rows': map(lambda x: x[1], row_ids)}
+                      for corem_id, row_ids in itertools.groupby(corem_rows, lambda x: x[0])]
+            return result
+        finally:
+            cursor.close()
+
+    def no_col_resamples(self, col_id, nrows, nresamples):
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute("select count(*) from col_resamples where col_id=? and nrows=? and nresamples >= ?",
+                           [col_id, nrows, nresamples])
+            return cursor.fetchone()[0] == 0
+        finally:
+            cursor.close()
+
+    def find_gene_expressions(self, row_pks, column_pks):
+        cursor = self.conn.cursor()
+        try:
+            row_in_list = '(%s)' % ','.join(map(str, row_pks))
+            col_in_list = '(%s)' % ','.join(map(str, column_pks))
+            query = 'select col_id,value,std_value from expr_values where row_id in %s and col_id in %s' % (row_in_list, col_in_list)
+            cursor.execute(query)
+            return pd.DataFrame([{'col_id':  col_id, 'raw_expression': value, 'standardized_expression': std_value}
+                                 for col_id, value, std_value in cursor.fetchall()])
+        finally:
+            cursor.close()
+
+    def find_col_resamples(self, nrows, col_pks):
+        cursor = self.conn.cursor()
+        try:
+            in_list = '(%s)' % ','.join(map(str, col_pks))
+            query = 'select col_id,nresamples,lowest_raw_exps,lowest_std_exps from col_resamples where nrows=? and col_id in ' + in_list
+            cursor.execute(query, [nrows])
+            result = []
+            for col_id, nresamples, lowest_raw, lowest_std in cursor.fetchall():
+                result.append({'col_id': col_id, 'n_rows': nrows,
+                               'resamples': nresamples,
+                               'lowest_raw': json.loads(lowest_raw),
+                               'lowest_standardized': json.loads(lowest_std)})
+            return pd.DataFrame(result)
+        finally:
+            cursor.close()
+
+    def update_corem(self, corem, new_cols):
+        corem_pk = corem['corem_id']
+        self.conn.execute('delete from corem_cols where corem_id=?', [corem_pk])
+        for col in new_cols:
+            self.conn.execute('insert into corem_cols (corem_id,col_id,pval) values (?,?,?)',
+                              [corem_pk, int(col['col_id']), col['pval']])
+
 
 
 def is_valid_db(dbpath):

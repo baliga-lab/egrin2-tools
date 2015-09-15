@@ -5,10 +5,10 @@ import logging
 import pymongo
 import sqlite3
 from collections import namedtuple
-import itertools
 
 import query.egrin2_query as e2q
 import assemble.resample as resample
+from assemble.assemble_sqlite import SqliteDB
 import pandas as pd
 import json
 
@@ -18,76 +18,6 @@ LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
 LOG_LEVEL = logging.DEBUG
 LOG_FILE = None
 
-
-class SqliteDB:
-    def __init__(self, conn):
-        self.conn = conn
-
-    def close(self):
-        self.conn.close()
-
-    def get_cond_ids(self):
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute('select rowid from columns')
-            return [row[0] for row in cursor.fetchall()]
-        finally:
-            cursor.close()
-
-    def get_corems(self):
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute('select corem_id, row_id from corem_rows')
-            corem_rows = [(corem_id, row_id) for corem_id, row_id in cursor.fetchall()]
-            result = [{'_id': corem_id, 'corem_id': corem_id, 'rows': map(lambda x: x[1], row_ids)}
-                      for corem_id, row_ids in itertools.groupby(corem_rows, lambda x: x[0])]
-            return result
-        finally:
-            cursor.close()
-
-    def no_col_resamples(self, col_id, nrows, nresamples):
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute("select count(*) from col_resamples where col_id=? and nrows=? and nresamples >= ?",
-                           [col_id, nrows, nresamples])
-            return cursor.fetchone()[0] == 0
-        finally:
-            cursor.close()
-
-    def find_gene_expressions(self, row_pks, column_pks):
-        cursor = self.conn.cursor()
-        try:
-            row_in_list = '(%s)' % ','.join(map(str, row_pks))
-            col_in_list = '(%s)' % ','.join(map(str, column_pks))
-            query = 'select col_id,value,std_value from expr_values where row_id in %s and col_id in %s' % (row_in_list, col_in_list)
-            cursor.execute(query)
-            return pd.DataFrame([{'col_id':  col_id, 'raw_expression': value, 'standardized_expression': std_value}
-                                 for col_id, value, std_value in cursor.fetchall()])
-        finally:
-            cursor.close()
-
-    def find_col_resamples(self, nrows, col_pks):
-        cursor = self.conn.cursor()
-        try:
-            in_list = '(%s)' % ','.join(map(str, col_pks))
-            query = 'select col_id,nresamples,lowest_raw_exps,lowest_std_exps from col_resamples where nrows=? and col_id in ' + in_list
-            cursor.execute(query, [nrows])
-            result = []
-            for col_id, nresamples, lowest_raw, lowest_std in cursor.fetchall():
-                result.append({'col_id': col_id, 'n_rows': nrows,
-                               'resamples': nresamples,
-                               'lowest_raw': json.loads(lowest_raw),
-                               'lowest_standardized': json.loads(lowest_std)})
-            return pd.DataFrame(result)
-        finally:
-            cursor.close()
-
-    def update_corem(self, corem, new_cols):
-        corem_pk = corem['corem_id']
-        self.conn.execute('delete from corem_cols where corem_id=?', [corem_pk])
-        for col in new_cols:
-            self.conn.execute('insert into corem_cols (corem_id,col_id,pval) values (?,?,?)',
-                              [corem_pk, int(col['col_id']), col['pval']])
 
 class MongoDB:
     def __init__(self, dbclient):
