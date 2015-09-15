@@ -22,6 +22,7 @@ import assemble_sqlite as asl
 import assemble.sql2mongoDB as rdb
 from assemble.makeCorems import CoremMaker, MongoDB
 import resample
+import assemble_finish
 
 QSUB_TEMPLATE_HEADER_CSH = """#!/bin/csh
 
@@ -260,6 +261,7 @@ if __name__ == '__main__':
                                           cols=rs_dbclient.get_col_nums(),
                                           n_resamples=1000,
                                           keepP=0.1)
+            assemble_finish.finish_corems(dbclient)
             dbclient.conn.commit()
         else:
             make_resample_scripts(args, dbname, targetdir, corem_sizes)
