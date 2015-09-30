@@ -13,6 +13,7 @@ from bson.code import Code
 import matplotlib.pyplot as plt
 from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import pdist, squareform
+from collections import defaultdict
 
 from assemble.resample import *
 
@@ -955,4 +956,21 @@ def gre_motifs(db, gre_id, evalue=None):
     for i, pwm in enumerate(pwms):
         rows = pwm['pwm']
         result.append([[row['a'], row['g'], row['c'], row['t']] for row in rows])
+    return result
+
+def gre_motifs_batch(db, gre_ids, evalue=None):
+    """Returns a list of PSSMs for the given GRE id.
+    If evalue is specified, only the motifs with a smaller evalue are returned
+    """
+    result = defaultdict(list)
+    query = {'gre_id': {"$in": gre_ids}}
+    if evalue is not None: 
+        query['evalue'] = {'$lt': evalue}
+
+    gre_pwms = db.motif_info.find(query, {'gre_id': 1, 'pwm': 1, '_id': 0})
+
+    for gre_pwm in enumerate(gre_pwms):
+        result_rows = []
+        result[gre_pwm['gre_id']].append(result_rows)
+        result_rows.append([[row['a'], row['g'], row['c'], row['t']] for row in gre_pwm['pwm']])
     return result
