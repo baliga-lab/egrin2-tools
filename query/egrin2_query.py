@@ -970,7 +970,5 @@ def gre_motifs_batch(db, gre_ids, evalue=None):
     gre_pwms = db.motif_info.find(query, {'gre_id': 1, 'pwm': 1, '_id': 0})
 
     for gre_pwm in gre_pwms:
-        result_rows = []
-        result[gre_pwm['gre_id']].append(result_rows)
-        result_rows.append([[row['a'], row['g'], row['c'], row['t']] for row in gre_pwm['pwm']])
+        result[gre_pwm['gre_id']].append([[row['a'], row['g'], row['c'], row['t']] for row in gre_pwm['pwm']])
     return result
