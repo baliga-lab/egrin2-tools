@@ -18,9 +18,11 @@ import datetime
 import pymongo
 import sqlite3
 
+import kbase.WorkspaceClient as wsc
+
 import assemble_sqlite as asl
-import assemble.sql2mongoDB as rdb
-from assemble.makeCorems import CoremMaker, MongoDB
+import sql2mongoDB as rdb
+from makeCorems import CoremMaker, MongoDB
 import resample
 import assemble_finish
 
@@ -194,6 +196,14 @@ def make_dbclient(args, dbname):
         raise Exception('unknown dbengine: %s' % args.dbengine)
 
 
+def store_kb_workspace(conn):
+    if ('KB_AUTH_TOKEN' in os.environ and 'TARGET_WS' in os.environ and
+        'WS_URL' in os.environ):
+        auth_token = os.environ['KB_AUTH_TOKEN']
+        target_ws = os.environ['TARGET_WS']
+        ws_url = os.environ['WS_URL']
+
+
 if __name__ == '__main__':
     import argparse
     import os
@@ -224,7 +234,7 @@ if __name__ == '__main__':
     parser.add_argument('--host', default="localhost", help="MongoDB host. Default 'localhost'")
     parser.add_argument('--port', default=27017, help="MongoDB port", type=int)
     parser.add_argument('--targetdb', default=None, help="Optional ensemble MongoDB database name")
-    
+
     # reading from an ensemble directory using directory pattern
     parser.add_argument('--prefix', default=None, help="Ensemble run prefix. Default: *organism*-out-")
     parser.add_argument('--ensembledir', default='.', help="Path to ensemble runs. Default: cwd")
@@ -263,6 +273,7 @@ if __name__ == '__main__':
                                           keepP=0.1)
             assemble_finish.finish_corems(dbclient)
             dbclient.conn.commit()
+            store_kb_workspace(dbclient.conn)
         else:
             make_resample_scripts(args, dbname, targetdir, corem_sizes)
     else:
