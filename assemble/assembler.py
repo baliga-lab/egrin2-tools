@@ -18,7 +18,7 @@ import datetime
 import pymongo
 import sqlite3
 
-import kbase.WorkspaceClient as wsc
+#import kbase.WorkspaceClient as wsc
 
 import assemble_sqlite as asl
 import sql2mongoDB as rdb
@@ -196,12 +196,20 @@ def make_dbclient(args, dbname):
         raise Exception('unknown dbengine: %s' % args.dbengine)
 
 
+"""
 def store_kb_workspace(conn):
     if ('KB_AUTH_TOKEN' in os.environ and 'TARGET_WS' in os.environ and
         'WS_URL' in os.environ):
         auth_token = os.environ['KB_AUTH_TOKEN']
         target_ws = os.environ['TARGET_WS']
         ws_url = os.environ['WS_URL']
+        ws_service = wsc.Workspace(ws_url, token=auth_token)
+        ws_datatype = 'TODO-0.1'
+        data = None
+        result = ws_service.save_object({'type': ws_datatype,
+                                     'data': data,
+                                         'workspace': target_ws})
+"""
 
 
 if __name__ == '__main__':
@@ -273,7 +281,7 @@ if __name__ == '__main__':
                                           keepP=0.1)
             assemble_finish.finish_corems(dbclient)
             dbclient.conn.commit()
-            store_kb_workspace(dbclient.conn)
+            #store_kb_workspace(dbclient.conn)
         else:
             make_resample_scripts(args, dbname, targetdir, corem_sizes)
     else:
