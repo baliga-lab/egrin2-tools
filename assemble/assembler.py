@@ -11,7 +11,7 @@ python assembler.py --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir 
 python assembler.py --organism mtu --ratios ./20141130.MTB.all.ratios.csv.gz --targetdir ./ --ncbi_code 83332 --ensembledir ./  --n_resamples 1000
 """
 import argparse
-import os, sys, stat
+import os, sys, stat, glob
 import itertools
 import logging
 import datetime
@@ -123,8 +123,8 @@ This will dramatically speed up this step.""")
 
 def merge_sqlite(args):
     if len(args.result_dbs) == 0:
-        out_prefix = '%s-out-' % args.organism if args.prefix is None else args.prefix
-        result_dbs = sorted(glob.glob(os.path.join(ensembledir, "%s???/cmonkey_run.db" % prefix)))
+        prefix = '%s-out-' % args.organism if args.prefix is None else args.prefix
+        result_dbs = sorted(glob.glob(os.path.join(args.ensembledir, "%s???/cmonkey_run.db" % prefix)))
     else:
         result_dbs = args.result_dbs
     asl.merge(args, result_dbs)
