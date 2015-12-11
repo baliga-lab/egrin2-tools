@@ -438,12 +438,12 @@ def store_motifs(conn, src_conn, cluster2id):
         cursor.close()
 
 
-def merge(args):
+def merge(args, result_dbs):
     conn = sqlite3.connect(args.targetdb, 15, isolation_level='DEFERRED')
     #conn = sqlite3.connect(args.targetdb)
     try:
         create_tables(conn)
-        cmonkey_dbs = filter(is_valid_db, args.result_dbs)
+        cmonkey_dbs = filter(is_valid_db, result_dbs)
         if len(cmonkey_dbs) > 0:
             ncbi_code = extract_ncbi_code(cmonkey_dbs[0])
             print "NCBI code: ", ncbi_code

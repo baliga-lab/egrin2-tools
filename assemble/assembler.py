@@ -122,12 +122,17 @@ This will dramatically speed up this step.""")
 
 
 def merge_sqlite(args):
-    asl.merge(args)
+    if len(args.result_dbs) == 0:
+        out_prefix = '%s-out-' % args.organism if args.prefix is None else args.prefix
+        result_dbs = sorted(glob.glob(os.path.join(ensembledir, "%s???/cmonkey_run.db" % prefix)))
+    else:
+        result_dbs = args.result_dbs
+    asl.merge(args, result_dbs)
     return True
 
 
 def merge_mongodb(args, dbclient):
-    out_prefix = '%s-out-' % args.organism if args.prefix is None else args.prefix    
+    out_prefix = '%s-out-' % args.organism if args.prefix is None else args.prefix
     resultdb = rdb.ResultDatabase(args.organism, dbclient.dbclient,
                                   args.ensembledir, out_prefix,
                                   args.ratios, args.gre2motif, args.col_annot,
@@ -234,9 +239,9 @@ if __name__ == '__main__':
 
     #  options for running on Sun Grid Engine
     parser.add_argument('--cluster_arch', default='sge', help="where to run resampling on")
-    parser.add_argument('--sge_user', default=os.getlogin(), help="Cluster user name")
+    parser.add_argument('--sge_user', default=os.environ['LOGNAME'], help="Cluster user name")
 
-    parser.add_argument('--dbengine', default='mongodb')
+    parser.add_argument('--dbengine', default='mongodb', help="mongodb or sqlite")
 
     # MongoDB specific
     parser.add_argument('--host', default="localhost", help="MongoDB host. Default 'localhost'")
