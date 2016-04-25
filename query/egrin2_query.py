@@ -285,6 +285,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 # combine two data frames
                 to_r = rows.join(all_counts).sort("counts", ascending=False)
                 to_r.columns = ["counts","all_counts"]
+                to_r = to_r.drop_duplicates()
 
                 if translate:
                     to_r.index = row2id_batch(db, to_r.index.tolist(), return_field="egrin2_row_name", input_type="row_id")
