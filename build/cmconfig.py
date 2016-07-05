@@ -1,9 +1,7 @@
-#!/usr/bin/env python
-
 """
 cMonkey ini file generator for customizing ensemble runs
 """
-import os.path
+import os
 import random
 import logging
 import itertools
@@ -304,13 +302,13 @@ def make_config_files(num_cores, sets, set_files, num_runs, pipeline_file, targe
             set_choices = random.sample(set_combs, 1)[0]  # choose a set enrichment mode
 
             if not set_choices:
-                ini = ConfigFileMaker(dict(config_params.items() + [("random_seed", i)]))
+                ini = ConfigFileMaker(dict(list(config_params.items()) + [("random_seed", i)]))
             else:
                 set_choice_files = (",").join([set_file_ref[choice] for choice in set_choices])
-                ini = ConfigFileMaker(dict(config_params.items() + [("random_seed", i),
-                                                                    ("set_types", ','.join(set_choices)),
-                                                                    ("set_file", set_choice_files),
-                                                                    ("pipeline_file", pipeline_file)]))
+                ini = ConfigFileMaker(dict(list(config_params.items()) + [("random_seed", i),
+                                                                        ("set_types", ','.join(set_choices)),
+                                                                        ("set_file", set_choice_files),
+                                                                        ("pipeline_file", pipeline_file)]))
         else:
-            ini = ConfigFileMaker(dict(config_params.items() + [("random_seed", i)]))
+            ini = ConfigFileMaker(dict(list(config_params.items()) + [("random_seed", i)]))
         ini.write_config(os.path.join(targetdir, "config-%03d.ini" % i))

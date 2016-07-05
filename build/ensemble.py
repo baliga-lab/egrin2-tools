@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """Select ensemble conditions given defined blocks of conditions to include together
 (inclusion blocks) or exclude together (exclusion blocks)"""
 
@@ -9,20 +7,18 @@ import glob
 import sys
 import gzip
 import time
-from urllib2 import urlopen, URLError, HTTPError
+
+try:
+    from urllib2 import urlopen
+except:
+    from urllib.request import urlopen
+
 import random
 import itertools
 import logging
 
-import pdb
-
 import numpy as np
 import pandas as pd
-
-import pymongo
-from pymongo import MongoClient
-import gridfs
-from Bio import SeqIO
 
 
 def strip(text):
@@ -277,4 +273,3 @@ def make_ensemble_ratios(ratios, blocks, exclusion, inclusion, num_runs, targetd
     logging.info("generating sub matrices using inclusion/exclusion blocks...")
     cols = EnsemblePicker(ratios, blocks, exclusion, inclusion, num_runs, targetdir)
     cols.write_ensemble_ratios()
-

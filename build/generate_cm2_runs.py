@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """cm2sge.py
 This is a tool to prepare a directory for ensemble runs. Given an organism code
 and the ratios, matrix, split up the matrix into sub matrices and create
