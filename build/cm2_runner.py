@@ -71,7 +71,7 @@ if __name__ == '__main__':
     logging.info("config node: %s, written to: %s", config_node, configfile.name)
     logging.info("output directory: %s", outdir)
     logging.info("running cmonkey...")
-    
+
     subprocess.check_output(["cmonkey.py", "--organism", args.organism,
                            "--ratios", ratiofile.name,
                            "--config", configfile.name,
