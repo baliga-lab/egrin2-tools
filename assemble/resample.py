@@ -194,7 +194,7 @@ def col_resample_ind(dbclient, n_rows, cols, n_resamples=1000, keepP=0.1):
                     __choose_n(dbclient, int(i), df_rsd_gb.get_group(i), n2keep, True, n_rows,
                                n_resamples, old_records, keepP)
             else:
-                print "no gene expressions found"
+                print("no gene expressions found")
 
     # toUpdate
     if len(toUpdate) > 0:

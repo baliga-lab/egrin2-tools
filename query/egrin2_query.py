@@ -15,7 +15,7 @@ from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import pdist, squareform
 from collections import defaultdict
 
-from assemble.resample import *
+#from assemble.resample import *
 
 
 def rsd(vals):
@@ -124,6 +124,20 @@ def col2id_batch(db, cols, return_field="col_id", input_type=None):
 
     return to_r
 
+# as a first step to clean up the code, move argument type decisions into
+# separate functions
+def is_row_type(argtype):
+    return argtype in {"rows", "row", "gene", "genes"}
+
+def is_col_type(argtype):
+     return argtype in {"columns", "column", "col", "cols", "condition", "conditions", "conds"}
+
+def is_gre_type(argtype):
+     return argtype in {"motif", "gre", "motc", "motif.gre", "motfs", "gres", "motcs"}
+
+def is_cluster_type(argtype):
+     return argtype in {"cluster", "clusters", "bicluster", "biclusters", "bcs"}
+
 
 def agglom(db, x=[0, 1], x_type=None, y_type=None, x_input_type=None, y_output_type=None,
            logic="or", gre_lim=10, pval_cutoff=0.05, translate=True):
@@ -159,7 +173,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
         x = [x]  # single
 
     # Check input types
-    if x_type == "rows" or x_type == "row" or x_type == "gene" or x_type == "genes":
+    if is_row_type(x_type):
         x_type = "rows"
         x_o = x
         x = row2id_batch(db, x, input_type=x_input_type, return_field="row_id")
@@ -168,7 +182,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
             logging.info("Cannot translate row names: %s", x_o)
             return None
 
-    elif x_type == "columns" or x_type == "column" or x_type == "col" or x_type == "cols" or x_type == "condition" or x_type == "conditions" or x_type == "conds":
+    elif is_col_type(x_type):
         x_type = "columns"
         x_o = x
         x = col2id_batch(db, x, input_type=x_input_type, return_field="col_id")
@@ -177,10 +191,10 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
             logging.info("Cannot translate col names: %s", x_o)
             return None
 
-    elif x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motifs" or x_type == "gres" or x_type == "motcs":
+    elif is_gre_type(x_type):
         x_type = "gre_id"
 
-    elif x_type == "cluster" or x_type == "clusters" or x_type == "bicluster" or x_type == "biclusters" or x_type == "bcs":
+    elif is_cluster_type(x_type):
         logging.warn("I hope you are using cluster '_id'!!! Otherwise the results might surprise you...")
         x_type = "_id"
 
@@ -189,13 +203,13 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
         return None
 
     # Check output types
-    if y_type == "rows" or y_type == "row" or y_type == "gene" or y_type == "genes":
+    if is_row_type(y_type):
         y_type = "rows"
-    elif y_type == "columns" or y_type == "column" or y_type == "col" or y_type == "cols" or y_type == "condition" or y_type == "conditions" or y_type == "conds":
+    elif is_col_type(y_type):
         y_type = "columns"
-    elif y_type == "motif" or y_type == "gre" or y_type == "motc" or y_type == "motif.gre" or y_type == "motfs" or y_type == "gres" or y_type == "motcs":
+    elif is_gre_type(y_type):
         y_type = "gre_id"
-    elif y_type == "cluster" or y_type == "clusters" or y_type == "bicluster" or y_type == "biclusters" or x_type == "bcs":
+    elif is_cluster_type(y_type):
         logging.warn("Will return bicluster _id. The results might surprise you...")
         y_type = "_id"
     else:
@@ -469,7 +483,7 @@ LocusIds in this database include:
 
     if filter_type is not None:
         logging.warn("Many of these filters are not supported currently. Only GREs!!!")
-        if filter_type == "rows" or filter_type == "row" or filter_type == "gene" or filter_type == "genes":
+        if is_row_type(filter_type):
             filter_type = "rows"
             filterby_o = filterby
             filterby = row2id_batch(db, filterby, input_type=filter_input_type, return_field="row_id")
@@ -478,7 +492,7 @@ LocusIds in this database include:
                 logging.error("Cannot translate row names: %s", filterby_o)
                 return None
 
-        elif filter_type == "columns" or filter_type == "column" or filter_type == "col" or filter_type == "cols" or filter_type == "condition" or filter_type == "conditions" or filter_type == "conds":
+        elif is_col_type(filter_type):
             filter_type = "columns"
             filterby_o = filterby
             filterby = col2id_batch(db, filterby, input_type=filterby_input_type, return_field="col_id")
@@ -488,10 +502,10 @@ LocusIds in this database include:
                 logging.error("Cannot translate col names: %s", filterby_o)
                 return None
 
-        elif filter_type == "motif" or filter_type == "gre" or filter_type == "motc" or filter_type == "motif.gre" or filter_type == "motifs" or filter_type == "gres" or filter_type == "motcs":
+        elif is_gre_type(filter_type):
             filter_type = "gre_id"
 
-        elif filter_type == "cluster" or filter_type == "clusters" or filter_type == "bicluster" or filter_type == "biclusters" or filter_type == "bcs":
+        elif is_cluster_type(filter_type):
             logging.warn("I hope you are using cluster '_id'!!! Otherwise the results might surprise you...")
             filter_type = "_id"
 
@@ -591,7 +605,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
             return None
     elif x_type == "cols.col_id":
         x_o = x
-        x = col2id_batch(db, x, input_type = x_input_type, return_field="col_id")
+        x = col2id_batch(db, x, input_type=x_input_type, return_field="col_id")
         x = list(set(x))
         if len(x) == 0:
             logging.error("Cannot translate row names: %s", x_o)
@@ -924,7 +938,7 @@ def find_motifs(db, x, x_type, output_type=["data_frame", "array"][0]):
         # REORDER!!!
         query = query.loc[x, :]
 
-    elif x_type == "motif" or x_type == "gre" or x_type == "motc" or x_type == "motif.gre" or x_type == "motifs" or x_type == "gres" or x_type == "motcs":
+    elif is_gre_type(x_type):
         x_type = "gre_id"
         q = {x_type: {"$in": x}}
         o = {"_id": 0, "pwm": 1}
