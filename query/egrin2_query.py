@@ -21,6 +21,14 @@ from collections import defaultdict
 def rsd(vals):
     return abs(np.std(vals) / np.mean(vals))
 
+def remove_list_duplicates(l):
+    added = set()
+    result = []
+    for elem in l:
+        if elem not in added:
+            result.append(elem)
+            added.add(elem)
+    return result
 
 def find_match(x, df, return_field):
     """Find which 'df' element x matches. Return appropriate translation"""
@@ -79,7 +87,7 @@ def row2id_batch(db, rows, return_field="row_id", input_type=None):
         logging.info("Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query.")
         to_r = [row2id(db, x, return_field=return_field) for x in rows]
 
-    return to_r
+    return remove_list_duplicates(to_r)
 
 
 def col2id(db, col, return_field="col_id"):
