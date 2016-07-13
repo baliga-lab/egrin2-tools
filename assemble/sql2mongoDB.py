@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """
 Initialize  mongo database from individual cMonkey
 runs (SQLite) plus some additional tables and run_id column,
@@ -11,7 +9,11 @@ import glob
 import sys
 import gzip
 import time
-from urllib2 import urlopen, URLError, HTTPError
+try:
+    from urllib.request import urlopen, URLError, HTTPError
+except:
+    from urllib2 import urlopen, URLError, HTTPError
+
 from zipfile import ZipFile
 import itertools
 import logging
@@ -89,11 +91,11 @@ def _download_url(url, save_name='tmp', num_retries=5):
               local_file.write(f.read())
             break
         # handle errors
-        except HTTPError, e:
+        except HTTPError as e:
             logging.error("HTTP Error, code: %s URL: %s", str(e.code), url)
             logging.info("Trying to connect again. Attempt %d of 5", count)
             count += 1
-        except URLError, e:
+        except URLError as e:
             logging.error("URL Error, Reason: %s URL: %s", e.reason, url)
             logging.info("Trying to connect again. Attempt %d of 5", count)
             count += 1
@@ -439,14 +441,14 @@ class ResultDatabase:
         example queries
         ------------------------------
         for i in row_info_collection.find( { "name" : "carA" } ):
-            print i
+            print(i)
         for i in row_info_collection.find( { "sysName": { "$in" : ["b0032", "b0124", "b0089", "b0432","b2234","b0456"] } } ):
-            print "%s = %s" % ( i["sysName"], i["name"] )
-            print "It does: %s" % i["GO"]
+            print("%s = %s" % ( i["sysName"], i["name"] ))
+            print("It does: %s" % i["GO"])
 
         for i in row_info_collection.find( { "GO": { "$regex" : "GO:0006541," } } ):
-            print i["sysName"]
-            print i["GO"]
+            print(i["sysName"])
+            print(i["GO"])
 
         """
         row_annot = self.row_annot
@@ -471,7 +473,7 @@ class ResultDatabase:
                 # join with row_annot
                 row_table = pd.merge(self.row2id, row_annot, left_on=left_on, right_on=row_annot_match_col)
             else:
-                print "WARNING: could not fetch additional gene information for NCBI taxonomy ID:", self.ncbi_code
+                print("WARNING: could not fetch additional gene information for NCBI taxonomy ID:", self.ncbi_code)
                 # TODO:
                 # Check whether documents are already present in the collection before insertion
                 # In case where they are present, update them
@@ -504,7 +506,7 @@ class ResultDatabase:
             print i["egrin2_col_name"]
 
         for i in col_info_collection.find( { "$and": [ { "additional_info.name": "strain", "additional_info.value":  { "$regex": "MG1655" } }, { "additional_info.name": "growth_phase", "additional_info.value": "biofilm"  } ] } ):
-            print i
+            print(i)
         """
         col_annot = self.col_annot
 
@@ -548,11 +550,11 @@ class ResultDatabase:
         # ----- get rid of them for row2id/col2id altogether
         row_map = {row: self.row2id.loc[row].row_id for row in ratios.index.values}
         col_map = {col: self.col2id.loc[col].col_id for col in ratios.columns.values}
-        
+
         for row_name in ratios.index.values:
             if num_rows % 200 == 0:
                 logging.info("%.2f percent done (%d rows)", round((float(num_rows) / ratios.shape[0]) * 100, 1), num_rows)
-            
+
             raw_row = ratios.loc[row_name]
             std_row = ratios_std.loc[row_name]
             row_id = row_map[row_name]

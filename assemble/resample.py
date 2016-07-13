@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 Resample ratios. Add them to col_resample collection in an existing egrin2 MongoDB

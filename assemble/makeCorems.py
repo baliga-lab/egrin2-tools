@@ -1,28 +1,15 @@
-#!/usr/bin/env python
-
 """Generate corems using cMonkey ensemble MongoDB. Add them to an existing MongoDB"""
-
 import os
-import datetime
 import glob
-import sys
-import gzip
-import time
-from urllib2 import urlopen, URLError, HTTPError
-from zipfile import ZipFile
-from itertools import combinations
+
 import subprocess
 import shutil
 import decimal
 from math import ceil
-import random
 import logging
-
-import pdb
 import numpy as np
 import pandas as pd
 
-from Bio import SeqIO
 from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages

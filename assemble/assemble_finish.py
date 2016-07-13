@@ -1,10 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
 import logging
 import pymongo
 import sqlite3
-from collections import namedtuple
 
 import query.egrin2_query as e2q
 import assemble.resample as resample
@@ -150,10 +149,10 @@ def finish_corems(dbclient):
     for corem in corems:
         try:
             __compute_and_write_col(dbclient, corem, cond_ids)
-        except:            
+        except:
             logging.exception('ERROR on corem %d %s' % (corem['corem_id'], str(corem['_id'])))
             raise
-            
+
 
 if __name__ == '__main__':
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
@@ -165,7 +164,7 @@ if __name__ == '__main__':
     parser.add_argument('--dbengine', default='sqlite', help="Database engine (mongodb|sqlite)")
     args = parser.parse_args()
 
-    print "Connecting to database: ", args.db
+    print("Connecting to database: ", args.db)
     if args.dbengine == 'sqlite':
         conn = sqlite3.connect(args.db)
         dbclient = SqliteDB(conn)

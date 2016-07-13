@@ -1,4 +1,3 @@
-import argparse
 import os
 import sqlite3
 import logging
@@ -38,7 +37,7 @@ class SqliteDB:
             return row2id, id2row
         finally:
             cursor.close()
-    
+
     def get_column_maps(self):
         col2id = {}
         id2col = {}
@@ -270,8 +269,8 @@ def annotate_microbes_online(conn, row2id, ncbi_code):
     content = [line.split('\t') for line in resp.text.split('\n')]
     titles = content[0]
     sysname_col = titles.index('sysName')
-    print "sys name column at index: ", sysname_col
-    
+    print("sys name column at index: ", sysname_col)
+
     # insert the attributes
     attr2id = {}
     cursor = conn.cursor()
@@ -296,7 +295,7 @@ def annotate_microbes_online(conn, row2id, ncbi_code):
         conn.rollback()
         raise
     finally:
-        cursor.close()    
+        cursor.close()
 
 
 def db_insert_rows(conn, rows):
@@ -440,13 +439,13 @@ def store_motifs(conn, src_conn, cluster2id):
 
 def merge(args, result_dbs):
     conn = sqlite3.connect(args.targetdb, 15, isolation_level='DEFERRED')
-    #conn = sqlite3.connect(args.targetdb)
+
     try:
         create_tables(conn)
         cmonkey_dbs = filter(is_valid_db, result_dbs)
         if len(cmonkey_dbs) > 0:
             ncbi_code = extract_ncbi_code(cmonkey_dbs[0])
-            print "NCBI code: ", ncbi_code
+            print("NCBI code: ", ncbi_code)
             raw_ratios, std_ratios = read_ratios(args.ratios)
             row2id = db_insert_rows(conn, raw_ratios.index.values)
             col2id = db_insert_cols(conn, raw_ratios.columns.values)
