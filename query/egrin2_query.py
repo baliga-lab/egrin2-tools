@@ -21,6 +21,7 @@ from collections import defaultdict
 def rsd(vals):
     return abs(np.std(vals) / np.mean(vals))
 
+
 def remove_list_duplicates(l):
     added = set()
     result = []
@@ -30,13 +31,14 @@ def remove_list_duplicates(l):
             added.add(elem)
     return result
 
-def find_match(x, df, return_field):
-    """Find which 'df' element x matches. Return appropriate translation"""
-    # find matching row
-    counter = 0
-    while not (x in df.iloc[counter].tolist()):
-        counter += 1
-    return df.iloc[counter][return_field]
+
+def find_match(some_row_elem, df, column_name):
+    """finds the first row which contains some_row_elem, and returns the
+    value specified by the column name"""
+    for index, row in df.iterrows():
+        if some_row_elem in row.values:
+            return row[column_name]
+    return None
 
 
 def row2id(db, row, return_field="row_id"):
