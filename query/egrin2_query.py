@@ -305,7 +305,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 all_counts = all_counts.set_index("_id")
 
                 # combine two data frames
-                to_r = rows.join(all_counts).sort("counts", ascending=False)
+                to_r = rows.join(all_counts).sort_values("counts", ascending=False)
                 to_r.columns = ["counts","all_counts"]
                 to_r = to_r.drop_duplicates()
 
@@ -343,7 +343,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 all_counts = all_counts.set_index("_id")
 
                 # combine two data frames
-                to_r = cols.join(all_counts).sort("counts", ascending=False)
+                to_r = cols.join(all_counts).sort_values("counts", ascending=False)
                 to_r.columns = ["counts","all_counts"]
 
                 if translate:
@@ -365,7 +365,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                         db.motif_info.map_reduce(mapGREs,reduce,"gresCount_mapreduce")
 
                 gres = query.gre_id.tolist()
-                gres = filter(lambda x: x != "NaN", gres)
+                gres = list(filter(lambda x: x != "NaN", gres))
                 gres = pd.Series(gres).value_counts().to_frame("counts")
 
                 # find all bicluster counts
@@ -373,7 +373,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 all_counts = all_counts.set_index("_id")
 
                 # combine two data frames
-                to_r = gres.join(all_counts).sort("counts",ascending=False)
+                to_r = gres.join(all_counts).sort_values("counts", ascending=False)
                 to_r.columns = ["counts","all_counts"]
 
                 # filter by GREs with more than 10 instances
@@ -382,7 +382,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
             to_r["pval"] = to_r.apply(compute_p, axis=1, M=db.bicluster_info.count(), N=query.shape[0])
             to_r["qval_BH"] = multipletests(to_r.pval, method='fdr_bh')[1]
             to_r["qval_bonferroni"] = multipletests(to_r.pval, method='bonferroni')[1]
-            to_r = to_r.sort(["pval","counts"], ascending=True)
+            to_r = to_r.sort_values(["pval","counts"], ascending=True)
 
             # only return below pval cutoff
             to_r = to_r.loc[to_r.pval <= pval_cutoff, :]
@@ -433,7 +433,7 @@ def find_fimo(db, start=None, stop=None, locusId=None, strand=None, mot_pval_cut
         else:
             to_r = [count(x.iloc[i]) for i in range(x.shape[0])]
             to_r = list(itertools.chain(*to_r))
-            to_r.sort()
+            to_r.sort_values()
 
         return to_r
 
@@ -673,7 +673,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
 
                     if len(to_r):
                         to_r = row2id_batch(db, to_r, return_field=y_return_field, input_type="row_id")
-                        to_r.sort()
+                        to_r.sort_values()
                     else:
                         logging.error("No genes found")
                         return None
@@ -690,7 +690,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
                     to_r = list(set(to_r))
                     if len(to_r):
                         to_r = row2id_batch(db, to_r, return_field=y_return_field, input_type = "row_id")
-                        to_r.sort()
+                        to_r.sort_values()
                     else:
                         logging.error("No genes found")
                         return None
@@ -719,7 +719,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
 
                     if len(to_r):
                         to_r = col2id_batch(db, to_r, return_field=y_return_field, input_type="col_id")
-                        to_r.sort()
+                        to_r.sort_values()
                     else:
                         logging.error("No conditions found")
                         return None
@@ -735,7 +735,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
                     to_r = list(set(to_r))
                     if len(to_r):
                         to_r = col2id_batch(db, to_r, return_field=y_return_field, input_type="col_id")
-                        to_r.sort()
+                        to_r.sort_values()
                     else:
                         logging.error("No conditions found")
                         return None
@@ -744,7 +744,10 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
             to_r = col2id_batch(db, to_r, return_field=y_return_field, input_type="col_id")
 
     elif y_type == "corem_id":
-        to_r = query.corem_id.tolist()
+        if query.shape[0] > 0:
+            to_r = query.corem_id.tolist()
+        else:
+            to_r = None
 
     elif y_type == "edges":
         if y_return_field is None:
@@ -758,8 +761,9 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
             i_trans = [str(j) for j in i_trans]
             to_r_new.append("-".join(i_trans))
         to_r = to_r_new
-        to_r.sort()
+        to_r.sort_values()
     elif y_type == "gre_id":
+        """TODO: GRE's for a corem"""
         logging.warn("GREs detection is not currently supported for corems. Please use the `agglom` function to find GREs enriched in biclusters containing corem genes instead.")
         to_r = None
     else:
@@ -971,7 +975,7 @@ def gre_motifs(db, gre_id, evalue=None):
     """
     result = []
     query = {'gre_id': gre_id}
-    if evalue is not None: 
+    if evalue is not None:
         query['evalue'] = {'$lt': evalue}
 
     pwms = db.motif_info.find(query, {'pwm': 1, '_id': 0})
@@ -987,7 +991,7 @@ def gre_motifs_batch(db, gre_ids, evalue=None):
     """
     result = defaultdict(list)
     query = {'gre_id': {"$in": gre_ids}}
-    if evalue is not None: 
+    if evalue is not None:
         query['evalue'] = {'$lt': evalue}
 
     gre_pwms = db.motif_info.find(query, {'gre_id': 1, 'pwm': 1, '_id': 0})
