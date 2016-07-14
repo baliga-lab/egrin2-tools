@@ -71,7 +71,7 @@ def __col_resample_pval(dbclient, rows, cols, n_resamples,
         return None
 
     # Determine what/how many resamples need to be added to db
-    to_add = filter(lambda col: dbclient.no_col_resamples(col, len(rows), n_resamples), cols)
+    to_add = list(filter(lambda col: dbclient.no_col_resamples(col, len(rows), n_resamples), cols))
 
     count = 1
     if len(to_add) > 0:
@@ -120,7 +120,7 @@ or change 'add_override' flag of this function to 'True' to build the resample n
         pvals = pvals[pvals <= sig_cutoff]
 
     if sort:
-        pvals.sort()
+        pvals.sort_values()
 
     pvals = pvals.to_frame()
     pvals.columns = ["pval"]

@@ -120,7 +120,8 @@ class SqliteDB:
         try:
             cursor.execute('select corem_id, row_id from corem_rows')
             corem_rows = [(corem_id, row_id) for corem_id, row_id in cursor.fetchall()]
-            result = [{'_id': corem_id, 'corem_id': corem_id, 'rows': map(lambda x: x[1], row_ids)}
+            result = [{'_id': corem_id, 'corem_id': corem_id,
+                       'rows': list(map(lambda x: x[1], row_ids))}
                       for corem_id, row_ids in itertools.groupby(corem_rows, lambda x: x[0])]
             return result
         finally:

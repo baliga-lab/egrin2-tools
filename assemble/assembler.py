@@ -283,6 +283,9 @@ if __name__ == '__main__':
                                           cols=rs_dbclient.get_col_nums(),
                                           n_resamples=1000,
                                           keepP=0.1)
+            dbclient.conn.commit()  # commit everything so we can recover here
+
+            # do the finish step
             assemble_finish.finish_corems(dbclient)
             dbclient.conn.commit()
             #store_kb_workspace(dbclient.conn)
