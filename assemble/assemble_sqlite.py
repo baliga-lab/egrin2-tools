@@ -442,7 +442,7 @@ def merge(args, result_dbs):
 
     try:
         create_tables(conn)
-        cmonkey_dbs = filter(is_valid_db, result_dbs)
+        cmonkey_dbs = list(filter(is_valid_db, result_dbs))
         if len(cmonkey_dbs) > 0:
             ncbi_code = extract_ncbi_code(cmonkey_dbs[0])
             print("NCBI code: ", ncbi_code)

@@ -136,7 +136,7 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
         for block in blocks:
             block_ind = block.split(":::")
             co_freq = pd.DataFrame(0, index = block_ind, columns = self.run_composition.keys())
-            for i in self.run_composition.iterkeys():
+            for i in self.run_composition.keys():
                 for j in block_ind:
                     if j in self.run_composition[i]["blocks"]:
                         co_freq.loc[j, i] = co_freq.loc[j, i] + 1
@@ -150,12 +150,12 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
         self.blocks2col["block"] = self.blocks2col.index
         self.blocks2col = self.blocks2col.set_index("sample")
         self.blocks2col = self.blocks2col.loc[self.blocks2col.block != "block", ]
-        for i in self.run_composition.iterkeys():
+        for i in self.run_composition.keys():
             self.blocks2col.loc[self.run_composition[i]["cols"], "r_in"] = self.blocks2col.loc[self.run_composition[i]["cols"], "r_in"] + 1.0 / self.nruns
 
     def __find_block_freq(self):
         self.blocks["r_in"] = 0
-        for i in self.run_composition.iterkeys():
+        for i in self.run_composition.keys():
             self.blocks.loc[self.run_composition[i]["blocks"], "r_in"] = self.blocks.loc[self.run_composition[i]["blocks"], "r_in"] + 1.0 / self.nruns
 
     def __pick_cols_single(self, n):
@@ -208,7 +208,7 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
 
     def __write_ratios(self):
         logging.info("Writing ratio files")
-        for i in self.run_composition.iterkeys():
+        for i in self.run_composition.keys():
             if int(i) % 100 == 0:
                 logging.info("%.2f percent done", float(i) / float(self.nruns) * 100)
 
@@ -227,7 +227,7 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
         run_df = pd.DataFrame(0, index = range(1, self.nruns + 1),
                               columns=["ncols", "excluded", "blocks", "cols"])
 
-        for i in self.run_composition.iterkeys():
+        for i in self.run_composition.keys():
             run_df.loc[i, "ncols"] = len(self.run_composition[i]["cols"])
             run_df.loc[i, "excluded"] = self.run_composition[i]["excluded"]
             run_df.loc[i, "blocks"] = (":::").join(self.run_composition[i]["blocks"])

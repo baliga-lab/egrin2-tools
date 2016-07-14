@@ -7,7 +7,12 @@ import pandas as pd
 
 import bz2
 import sqlite3
-import cPickle as pickle   ## make shelve much faster!
+
+try:
+    import cPickle as pickle   ## make shelve much faster!
+except:
+    import pickle
+
 import shelve
 
 from cmonkeyobj import cMonkey2 as cm2

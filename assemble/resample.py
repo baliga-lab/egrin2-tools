@@ -31,7 +31,7 @@ def rsd(vals):
 
 def resample(row_vals, n_rows):
     """filter out nan values!!!!"""
-    return rsd(random.sample(row_vals.dropna(), n_rows))
+    return rsd(random.sample(row_vals.dropna().tolist(), n_rows))
 
 class MongoDB:
     def __init__(self, dbclient):
@@ -117,9 +117,9 @@ class SqliteDB:
 
 def __choose_n(dbclient, col, vals, n, add, n_rows, n_resamples, old_records, keepP):
     raw = vals.loc[:, "raw_expression"].copy()
-    raw.sort()
+    raw.sort_values()
     standardized = vals.loc[:, "standardized_expression"].copy()
-    standardized.sort()
+    standardized.sort_values()
 
     if add:
         d = {
@@ -181,12 +181,12 @@ def col_resample_ind(dbclient, n_rows, cols, n_resamples=1000, keepP=0.1):
         bins = __split_list(toAdd, nbins)
         logging.info("%d bins created", len(bins))
         for index, b in enumerate(bins):
-            logging.info("processing bin %d", index)
+            logging.info("processing bin %d (of %d)", index, nbins)
             df = dbclient.find_gene_expressions(b)
             if df.shape != (0,0):
                 df_gb = df.groupby("col_id")
                 logging.info('making rsd on col ids (n_rows = %d)...', n_rows)
-                df_rsd = pd.concat([df_gb.aggregate(resample, n_rows) for i in xrange(0, n_resamples)])
+                df_rsd = pd.concat([df_gb.aggregate(resample, n_rows) for i in range(0, n_resamples)])
                 df_rsd_gb = df_rsd.groupby(df_rsd.index)
 
                 logging.info("Adding new entries...")
@@ -211,7 +211,7 @@ def col_resample_ind(dbclient, n_rows, cols, n_resamples=1000, keepP=0.1):
                 resamples = n_resamples - np.min([i["resamples"] for i in old_records.values()])
 
                 if resamples > 0:
-                    df_rsd = pd.concat([df_gb.aggregate(resample, n_rows) for i in xrange(0, resamples)])
+                    df_rsd = pd.concat([df_gb.aggregate(resample, n_rows) for i in range(0, resamples)])
                     df_rsd_gb = df_rsd.groupby(df_rsd.index)
 
                     logging.info("Updating entries")

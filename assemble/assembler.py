@@ -8,6 +8,11 @@ python3 assembler.py --organism eco --ratios /Users/abrooks/Desktop/Active/Eco_e
 python3 assembler.py --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0
 
 python3 assembler.py --organism mtu --ratios ./20141130.MTB.all.ratios.csv.gz --targetdir ./ --ncbi_code 83332 --ensembledir ./  --n_resamples 1000
+
+
+Using the SQLIte engine
+
+PYTHONPATH=. assemble/assembler.py --organism mtu --ratios mtb_files/20141130.MTB.all.ratios.csv --targetdir assemble-py3-test --dbengine sqlite --targetdb mtu-assemble-test.db ass1_input/mtu-out-001/cmonkey_run.db ass1_input/mtu-out-002/cmonkey_run.db ass1_input/mtu-out-004/cmonkey_run.db
 """
 import argparse
 import os, glob

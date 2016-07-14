@@ -12,10 +12,8 @@ Documentation is available on the [wiki](http://nbviewer.ipython.org/github/bali
 
 ## System requirements
 
-* Developed and tested with Python 2.7.6
+* Developed and tested with Python 2.7.6 and Python 3.4.3
 * biopython >= 1.65
-* colorbrewer >= 9172
-* joblib >= 0.7.1
 * matplotlib >= 1.3.1
 * numpy >= 1.8.2
 * pandas >= 0.15.2

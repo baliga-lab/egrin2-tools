@@ -3,13 +3,10 @@
 import os
 import bz2
 import glob
-# import itertools
-# import cPickle as pickle   ## make shelve much faster!
-import shelve  # shove  # see http://www.evilchuck.com/2008/02/tell-python-to-shove-it.html about shove
+import shelve
 import optparse
 import numpy as np
 import numpy.core.defchararray as npstr
-# import scipy.sparse as sparse
 import pandas as pd
 import igraph as ig
 
@@ -80,8 +77,6 @@ files = np.sort(np.array(glob.glob(input_dir + "/*tomtom.tsv.bz2")))  # folder w
 dfs = {}
 #  can pd.concat work on shelved dataframes? YES. Note protocol=2 is faster and smaller.
 dfs = shelve.open('tomtom_shelf.db', protocol=2, writeback=False)
-# dfs = shove.Shove('sqlite:///'+input_dir+'/shove.db', compress=True)  # note this requires SQLAlchemy installed
-# dfs = shove.Shove('file://./'+input_dir+'/shove.db', compress=True)
 
 if len(dfs) != len(files):  # if using a shelf, once this is done once, you don't have to do it again.
     for f in files:
@@ -127,7 +122,7 @@ if not os.path.isfile('motifs_tomtom.tsv.bz2'):
     if type(dfs) == dict:
         dfs2 = pd.concat(dfs, axis=0)
     else:
-        dfs2 = pd.concat(dfs.values(), axis=0)  # works with 'shelve's but not (compressed) 'shove's
+        dfs2 = pd.concat(dfs.values(), axis=0)
     # dfs.close()
     print dfs2.shape
 

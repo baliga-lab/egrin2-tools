@@ -137,11 +137,11 @@ class CoremMaker:
             logging.info("Found edgeList file at '%s'. Removing it.",
                          os.path.abspath(os.path.join(self.out_dir, "edgeList")))
             os.remove(os.path.abspath(os.path.join(self.out_dir, "edgeList")))
-            logging.info("Dropping row_row MongoDB collection as a precaution.")
+            logging.info("Dropping row_row collection as a precaution.")
             self.db_client.drop_row_rows()
 
         def addToD(d, ind1, ind2, val):
-            if ind1 not in d.iterkeys():
+            if ind1 not in d.keys():
                 d[ind1] = {}
             d[ind1][ind2] = val
             return d
@@ -238,7 +238,7 @@ class CoremMaker:
                 step = decimal.Decimal(step)
 
                 # create a generator expression for the index values
-                indices = (i for i in _xrange(0, ((stop-start) / step).to_integral_value()))
+                indices = (i for i in _xrange(0, int(((stop-start) / step).to_integral_value())))
 
                 # yield results
                 for i in indices:
@@ -252,7 +252,7 @@ class CoremMaker:
             p = subprocess.Popen(["adjmat2wpairs", "edgeList", "0", "0"], cwd=os.path.abspath(self.out_dir))
             p.wait()
 
-            ranges = range(0, len(self.row2id) + 1, (len(self.row2id) + 1) / self.n_subs)
+            ranges = list(range(0, len(self.row2id) + 1, int((len(self.row2id) + 1) / self.n_subs)))
 
             # make sure last is # genes
             ranges[len(ranges) - 1] = len(self.row2id) + 1
@@ -411,7 +411,7 @@ class CoremMaker:
         sigClusters = sigClusters[sigClusters["Community_Density"] > 0]
 
         # sort by density
-        sigClusters = sigClusters.sort(['Community_Density','Community_Weighted_Density','Community_ID'],ascending=False)
+        sigClusters = sigClusters.sort_values(['Community_Density','Community_Weighted_Density','Community_ID'],ascending=False)
 
         # rename corems
         clusterNameD = dict(zip(sigClusters.Community_ID.unique(), range(1, len(sigClusters.Community_ID.unique()) + 1)))
@@ -456,8 +456,8 @@ class CoremMaker:
 
         corems = pd.read_csv(os.path.join(os.path.abspath(self.out_dir),
                                           "edgeList.communities_" + str(self.cutoff) + "_FINAL.txt"),
-                             sep="\t", header=False)
-        logging.info("Adding basic corem information to MongoDB")
+                             sep="\t")
+        logging.info("Adding basic corem information to database")
 
         to_write = [coremStruct(i, corems) for i in corems.Community_ID.unique()]
         self.db_client.insert_corem(to_write)
