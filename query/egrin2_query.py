@@ -10,12 +10,7 @@ from scipy.stats import hypergeom
 from statsmodels.sandbox.stats.multicomp import multipletests
 import itertools
 from bson.code import Code
-import matplotlib.pyplot as plt
-from scipy.cluster.hierarchy import linkage, dendrogram
-from scipy.spatial.distance import pdist, squareform
 from collections import defaultdict
-
-#from assemble.resample import *
 
 
 def rsd(vals):
@@ -41,55 +36,34 @@ def find_match(some_row_elem, df, column_name):
     return None
 
 
-def row2id(db, row, return_field="row_id"):
+def row2id_any(db, values, return_field="row_id"):
     """Check name format of rows. If necessary, translate."""
-    query = list(db.row_info.find({"$or": [{"row_id": row}, {"egrin2_row_name": row}, {"GI": row},
-                                           {"accession": row}, {"name": row}, {"sysName": row}]}))
-    if len(query) == 1:
-        if return_field == "all":
-            row = query[0]
-        else:
-            try:
-                row = query[0][return_field]
-            except Exception:
-                row = query[0]["row_id"]
-        return row
-
-    elif len(query) > 0:
-        logging.error("Multiple rows match the row name: %s", row)
-        logging.info(query)
-        return None
+    query = list(db.row_info.find({"$or": [{"row_id": {"$in": values}},
+                                           {"egrin2_row_name": {"$in": values}},
+                                           {"GI": {"$in": values}},
+                                           {"accession": {"$in": values}},
+                                           {"name": {"$in": values}},
+                                           {"sysName": {"$in": values}}]}))
+    if return_field == "all":
+        return query
     else:
-        logging.error("Cannot identify row name: %s", row)
-        return None
+        return remove_list_duplicates(list([q[return_field] for q in query]))
 
 
-def row2id_batch(db, rows, return_field="row_id", input_type=None):
-    """Check name format of rows. If necessary, translate."""
-    if return_field == input_type:
-        # returned its input previously, but just don't call this function !!
-        raise Exception('come on, that does not make any sense !')
+def row2id_with(db, values, input_field, return_field="row_id"):
+    """row2id function searching on a specific input field, which is potentially faster
+    than row2id_any()"""
+    entry_fields  = {"row_id", "egrin2_row_name", "GI", "accession", "name", "sysName"}
+    output_spec = {field: 1 for field in entry_fields}
 
-    query = pd.DataFrame(list(db.row_info.find({"$or": [{"row_id": {"$in": rows}},
-                                                        {"egrin2_row_name": {"$in": rows}},
-                                                        {"GI": {"$in": rows}},
-                                                        {"accession": {"$in": rows}},
-                                                        {"name": {"$in": rows}},
-                                                        {"sysName": {"$in": rows}}]},
-                                               {"row_id": 1,
-                                                "egrin2_row_name": 1,
-                                                "GI": 1, "accession": 1,
-                                                "name": 1})))
-
-    if input_type in ["row_id", "egrin2_row_name", "GI", "accession", "name", "sysName"]:
-        query = query.set_index(input_type)
-        to_r = query.loc[rows][return_field].tolist()
+    if input_field in entry_fields:
+        q = {input_field: {"$in": values}}
+        query = pd.DataFrame(list(db.row_info.find(q, output_spec)))
+        query = query.set_index(input_field)
+        to_r = query.loc[values][return_field].tolist()
+        return remove_list_duplicates(to_r)
     else:
-        # try to match input_type automatically
-        logging.info("Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query.")
-        to_r = [row2id(db, x, return_field=return_field) for x in rows]
-
-    return remove_list_duplicates(to_r)
+        raise Exception('row2id_with() called without input_type !!')
 
 
 def col2id(db, col, return_field="col_id"):
@@ -186,8 +160,11 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
     if is_row_type(x_type):
         x_type = "rows"
         x_o = x
-        x = row2id_batch(db, x, input_type=x_input_type, return_field="row_id")
-        x = list(set(x))
+        if x_input_type is not None:
+            x = row2id_with(db, x, x_input_type, return_field="row_id")
+        else:
+            x = row2id_any(db, x, return_field="row_id")
+
         if len(x) == 0:
             logging.info("Cannot translate row names: %s", x_o)
             return None
@@ -312,7 +289,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 to_r = to_r.drop_duplicates()
 
                 if translate:
-                    to_r.index = row2id_batch(db, to_r.index.tolist(), return_field="egrin2_row_name", input_type="row_id")
+                    to_r.index = row2id_with(db, to_r.index.tolist(), "row_id", return_field="egrin2_row_name")
 
             if y_type == "columns":
 
@@ -393,6 +370,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
     else:
         logging.info("Could not find any biclusters matching your criteria")
         return None
+
 
 def find_fimo(db, start=None, stop=None, locusId=None, strand=None, mot_pval_cutoff=None, filterby=None, filter_type=None,
               filterby_input_type=None, use_fimo_small=True,
@@ -496,7 +474,7 @@ LocusIds in this database include:
         if is_row_type(filter_type):
             filter_type = "rows"
             filterby_o = filterby
-            filterby = row2id_batch(db, filterby, input_type=filter_input_type, return_field="row_id")
+            filterby = row2id_with(db, filterby, filter_input_type, return_field="row_id")
             filterby = list(set(filterby))
             if len(filterby) == 0:
                 logging.error("Cannot translate row names: %s", filterby_o)
@@ -574,6 +552,7 @@ LocusIds in this database include:
 
     return gre_scans
 
+
 def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes", y_return_field=None,
                     count=False, logic="or"):
 
@@ -608,7 +587,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
     x_type = TYPE_MAP[x_type]
     if x_type == "rows":
         x_o = x
-        x = row2id_batch(db, x, input_type = x_input_type, return_field="row_id")
+        x = row2id_with(db, x, x_input_type, return_field="row_id")
         x = list(set(x))
         if len(x) == 0:
             logging.error("Cannot translate row names: %s", x_o)
@@ -623,7 +602,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
     elif x_type == "edges":
         x_new = []
         for i in x:
-            i_trans = row2id_batch(db, i.split("-"), input_type=x_input_type, return_field="row_id")
+            i_trans = row2id_with(db, i.split("-"), x_input_type, return_field="row_id")
             i_trans = [str(j) for j in i_trans]
             x_new.append("-".join(i_trans))
             i_trans.reverse()
@@ -666,7 +645,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
                     to_r = to_r[to_r >= query.shape[0]]
 
                     if to_r.shape[0] > 0:
-                        to_r.index = row2id_batch(db, to_r.index.tolist(), return_field=y_return_field, input_type="row_id")
+                        to_r.index = row2id_with(db, to_r.index.tolist(), "row_id", return_field=y_return_field)
                     else:
                         logging.error("No genes found")
                         return None
@@ -674,7 +653,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
                     to_r = to_r[to_r >= query.shape[0]].index.tolist()
 
                     if len(to_r):
-                        to_r = row2id_batch(db, to_r, return_field=y_return_field, input_type="row_id")
+                        to_r = row2id_with(db, to_r, "row_id", return_field=y_return_field)
                         to_r.sort_values()
                     else:
                         logging.error("No genes found")
@@ -684,20 +663,20 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
                     to_r = pd.Series(to_r).value_counts()
 
                     if to_r.shape[0] > 0:
-                        to_r.index = row2id_batch(db, to_r.index.tolist(), return_field=y_return_field, input_type="row_id")
+                        to_r.index = row2id_with(db, to_r.index.tolist(), "row_id", return_field=y_return_field)
                     else:
                         logging.error("No genes found")
                         return None
                 else:
                     to_r = list(set(to_r))
                     if len(to_r):
-                        to_r = row2id_batch(db, to_r, return_field=y_return_field, input_type = "row_id")
+                        to_r = row2id_with(db, to_r, "row_id", return_field=y_return_field)
                         to_r.sort_values()
                     else:
                         logging.error("No genes found")
                         return None
         else:
-            to_r = row2id_batch(db, query.rows[0], return_field=y_return_field, input_type="row_id")
+            to_r = row2id_with(db, query.rows[0], "row_id", return_field=y_return_field)
 
     elif y_type == "cols.col_id":
         if y_return_field is None:
@@ -758,7 +737,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
         to_r_new = []
 
         for i in to_r:
-            i_trans = row2id_batch(db, [int(j) for j in i.split("-")], input_type="row_id", return_field=y_return_field)
+            i_trans = row2id_with(db, [int(j) for j in i.split("-")], "row_id", return_field=y_return_field)
 
             i_trans = [str(j) for j in i_trans]
             to_r_new.append("-".join(i_trans))
@@ -785,7 +764,7 @@ def find_gene_expression(db, rows=None, cols=None, standardized=True):
 
     Parameters:
     -- db: mongo database object
-    -- rows: list of rows/genes in format recognized by row2id_batch (i.e. some name present in MicrobesOnline)
+    -- rows: list of rows/genes in format recognized by row2id_with() (i.e. some name present in MicrobesOnline)
     -- cols: list of columns/conditions in format recognized by col2id_batch (i.e. name in ratios matrix)
     -- standardized: fetch standardized data if True, otherwise raw (normalized) data
 
@@ -810,8 +789,7 @@ def find_gene_expression(db, rows=None, cols=None, standardized=True):
         cols = [cols]  # single
 
     # translate rows/cols
-
-    rows = row2id_batch(db, rows, return_field="row_id", input_type=input_type_rows)
+    rows = row2id_with(db, rows, input_type_rows, return_field="row_id")
     cols = col2id_batch(db, cols, return_field="col_id", input_type=input_type_cols)
 
     if len(rows) > 1000 or len(cols) > 1000:
@@ -827,12 +805,13 @@ def find_gene_expression(db, rows=None, cols=None, standardized=True):
         else:
             data = query.pivot(index="row_id", columns="col_id", values="raw_expression")
 
-    data.index = row2id_batch(db, data.index.tolist(), return_field="egrin2_row_name", input_type="row_id")
+    data.index = row2id_with(db, data.index.tolist(), "row_id", return_field="egrin2_row_name")
     data.columns = col2id_batch(db, data.columns.tolist(), return_field="egrin2_col_name", input_type="col_id")
     data = data.sort_index()
     data = data.reindex_axis(sorted(data.columns), axis=1)
 
     return data
+
 
 def export_ggbweb(db, genes=None, outfile=None):
     """
@@ -840,7 +819,7 @@ def export_ggbweb(db, genes=None, outfile=None):
 
     Parameters:
     -- db: mongo database object
-    -- genes: list of genes in format recognized by row2id_batch (some name present in MicrobesOnline)
+    -- genes: list of genes in format recognized by row2id_with() (some name present in MicrobesOnline)
     -- outfile: path/name of module file to write
     """
     if genes is None:
@@ -853,7 +832,7 @@ def export_ggbweb(db, genes=None, outfile=None):
     def locFormat(x, gene):
         return pd.DataFrame([gene, "E.colik-12", str(x.start), str(x.stop)])
 
-    gene_info = pd.DataFrame(row2id_batch(db, genes, return_field="all"))
+    gene_info = pd.DataFrame(row2id_any(db, genes, return_field="all"))
 
     to_r = pd.concat([locFormat(gene_info.iloc[i], gene_info.loc[i, "egrin2_row_name"]) for i in range(gene_info.shape[0])], 2).T
 
@@ -986,6 +965,7 @@ def gre_motifs(db, gre_id, evalue=None):
         rows = pwm['pwm']
         result.append([[row['a'], row['g'], row['c'], row['t']] for row in rows])
     return result
+
 
 def gre_motifs_batch(db, gre_ids, evalue=None):
     """Returns a list of PSSMs for the given GRE id.

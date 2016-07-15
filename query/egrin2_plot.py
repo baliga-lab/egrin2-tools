@@ -5,9 +5,8 @@ import numpy as np
 import pandas as pd
 import itertools
 
-import plotly.plotly as py
+import plotly.plotly as plotly
 from plotly.graph_objs import *
-
 from query.egrin2_query import *
 
 
@@ -108,7 +107,7 @@ def plotExpression(data, plot_type="boxplot", ipynb=False, zlim=None, sort=False
         return None
 
     if not ipynb:
-        unique_url = py.plot(fig)
+        unique_url = plotly.plot(fig)
         return unique_url
 
     return fig
