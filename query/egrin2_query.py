@@ -73,13 +73,13 @@ def col2id_any(db, values, return_field="col_id"):
     return [q[return_field] for q in query]
 
 
-def col2id_with(db, cols, input_type, return_field="col_id"):
+def col2id_with(db, cols, input_field, return_field="col_id"):
     """Check name format of rows. If necessary, translate."""
-    if input_type in ["col_id", "egrin2_col_name"]:
+    if input_field in ["col_id", "egrin2_col_name"]:
         query = pd.DataFrame(list(db.col_info.find({ "$or": [{"col_id": {"$in": cols}},
                                                              {"egrin2_col_name": {"$in": cols}}]},
                                                    {"col_id": 1, "egrin2_col_name": 1})))
-        query = query.set_index(input_type)
+        query = query.set_index(input_field)
         return remove_list_duplicates(query.loc[cols][return_field].tolist())
     else:
         raise Exception('col2id_with() called without input type !!!')

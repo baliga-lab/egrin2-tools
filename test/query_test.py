@@ -131,6 +131,15 @@ class QueryTest(unittest.TestCase):  # pylint: disable-msg=R0904
     #### col2id_with()
     ##################################################################
 
+    def test_col2id_with_egrin2_col_name(self):
+        self.assertEquals([COL_INFOS[0]['col_id'], COL_INFOS[1]['col_id']],
+                          e2q.col2id_with(self.db, ['name1', 'name2'], input_field='egrin2_col_name'))
+        # return field and input field can not be the same
+        with self.assertRaises(KeyError):
+            self.assertEquals([COL_INFOS[0]['col_id'], COL_INFOS[1]['col_id']],
+                              e2q.col2id_with(self.db, ['name1', 'name2'], input_field='egrin2_col_name', return_field='egrin2_col_name'))
+
+
 if __name__ == '__main__':
     suite = [unittest.TestLoader().loadTestsFromTestCase(QueryTest)]
 
