@@ -66,47 +66,24 @@ def row2id_with(db, values, input_field, return_field="row_id"):
         raise Exception('row2id_with() called without input_type !!')
 
 
-def col2id(db, col, return_field="col_id"):
+def col2id_any(db, values, return_field="col_id"):
     """Check name format of rows. If necessary, translate."""
-    query = list(db.col_info.find({"$or": [{"col_id": col},
-                                           { "egrin2_col_name": col}]}))
-    if len(query) == 1:
-        try:
-            col = query[0][return_field]
-        except Exception:
-            col = query[0]["col_id"]
-        return col
-
-    elif len(query) > 0:
-        logging.error("Multiple cols match the col name: %s", col)
-        logging.info(query)
-        return None
-    else:
-        logging.error("Cannot identify col name: %s", col)
-        return None
+    query = list(db.col_info.find({"$or": [{"col_id": {"$in": values}},
+                                           { "egrin2_col_name": {"$in": values}}]}))
+    return [q[return_field] for q in query]
 
 
-def col2id_batch(db, cols, return_field="col_id", input_type=None):
+def col2id_with(db, cols, input_type, return_field="col_id"):
     """Check name format of rows. If necessary, translate."""
-    if return_field == input_type:
-        # just here to remove previous calls, this only returned the
-        # cols argument, simply don't call that function !!!
-        raise Exception('come on, that does not make any sense !!!')
-
-    query = pd.DataFrame(list(db.col_info.find({ "$or": [{"col_id": {"$in": cols}},
-                                                         {"egrin2_col_name": {"$in": cols}}]},
-                                               {"col_id": 1, "egrin2_col_name": 1})))
-
     if input_type in ["col_id", "egrin2_col_name"]:
+        query = pd.DataFrame(list(db.col_info.find({ "$or": [{"col_id": {"$in": cols}},
+                                                             {"egrin2_col_name": {"$in": cols}}]},
+                                                   {"col_id": 1, "egrin2_col_name": 1})))
         query = query.set_index(input_type)
-        to_r = query.loc[cols][return_field].tolist()
-
+        return remove_list_duplicates(query.loc[cols][return_field].tolist())
     else:
-        # try to match input_type automatically
-        logging.info("Reverting to translation by single matches. Defining 'input_type' will dramatically speed up query.")
-        to_r = [col2id(db, x, return_field=return_field) for x in cols]
+        raise Exception('col2id_with() called without input type !!!')
 
-    return to_r
 
 # as a first step to clean up the code, move argument type decisions into
 # separate functions
@@ -172,8 +149,11 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
     elif is_col_type(x_type):
         x_type = "columns"
         x_o = x
-        x = col2id_batch(db, x, input_type=x_input_type, return_field="col_id")
-        x = list(set(x))
+        if x_input_type is not None:
+            x = col2id_with(db, x, x_input_type, return_field="col_id")
+        else:
+            x = col2id_any(db, x, return_field="col_id")
+
         if len(x) == 0:
             logging.info("Cannot translate col names: %s", x_o)
             return None
@@ -326,7 +306,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 to_r.columns = ["counts","all_counts"]
 
                 if translate:
-                    to_r.index = col2id_batch(db, to_r.index.tolist(), return_field="egrin2_col_name", input_type="col_id")
+                    to_r.index = col2id_with(db, to_r.index.tolist(), "col_id", return_field="egrin2_col_name")
 
             if y_type == "gre_id":
 
@@ -483,7 +463,7 @@ LocusIds in this database include:
         elif is_col_type(filter_type):
             filter_type = "columns"
             filterby_o = filterby
-            filterby = col2id_batch(db, filterby, input_type=filterby_input_type, return_field="col_id")
+            filterby = col2id_with(db, filterby, filterby_input_type, return_field="col_id")
             filterby = list(set(filterby))
 
             if len(filterby) == 0:
@@ -594,7 +574,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
             return None
     elif x_type == "cols.col_id":
         x_o = x
-        x = col2id_batch(db, x, input_type=x_input_type, return_field="col_id")
+        x = col2id_with(db, x, x_input_type, return_field="col_id")
         x = list(set(x))
         if len(x) == 0:
             logging.error("Cannot translate row names: %s", x_o)
@@ -691,7 +671,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
                 if count:
                     to_r = to_r[to_r >= query.shape[0]]
                     if to_r.shape[0] > 0:
-                        to_r.index = col2id_batch(db, to_r.index.tolist(), return_field=y_return_field, input_type="col_id")
+                        to_r.index = col2id_with(db, to_r.index.tolist(), "col_id", return_field=y_return_field)
                     else:
                         logging.error("No conditions found")
                         return None
@@ -699,7 +679,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
                     to_r = to_r[to_r >= query.shape[0]].index.tolist()
 
                     if len(to_r):
-                        to_r = col2id_batch(db, to_r, return_field=y_return_field, input_type="col_id")
+                        to_r = col2id_with(db, to_r, 'col_id', return_field=y_return_field)
                         to_r.sort_values()
                     else:
                         logging.error("No conditions found")
@@ -708,21 +688,21 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
                 if count:
                     to_r = pd.Series(to_r).value_counts()
                     if to_r.shape[0] > 0:
-                        to_r.index = col2id_batch(db, to_r.index.tolist(), return_field=y_return_field, input_type="col_id")
+                        to_r.index = col2id_with(db, to_r.index.tolist(), 'col_id', return_field=y_return_field)
                     else:
                         logging.error("No conditions found")
                         return None
                 else:
                     to_r = list(set(to_r))
                     if len(to_r):
-                        to_r = col2id_batch(db, to_r, return_field=y_return_field, input_type="col_id")
+                        to_r = col2id_with(db, to_r, 'col_id', return_field=y_return_field)
                         to_r.sort_values()
                     else:
                         logging.error("No conditions found")
                         return None
         else:
             to_r = [int(i["col_id"]) for i in list(itertools.chain( *query.cols.values.tolist())) if i["col_id"] if type(i["col_id"]) is float]
-            to_r = col2id_batch(db, to_r, return_field=y_return_field, input_type="col_id")
+            to_r = col2id_with(db, to_r, 'col_id', return_field=y_return_field)
 
     elif y_type == "corem_id":
         if query.shape[0] > 0:
@@ -765,7 +745,7 @@ def find_gene_expression(db, rows=None, cols=None, standardized=True):
     Parameters:
     -- db: mongo database object
     -- rows: list of rows/genes in format recognized by row2id_with() (i.e. some name present in MicrobesOnline)
-    -- cols: list of columns/conditions in format recognized by col2id_batch (i.e. name in ratios matrix)
+    -- cols: list of columns/conditions in format recognized by col2id_with (i.e. name in ratios matrix)
     -- standardized: fetch standardized data if True, otherwise raw (normalized) data
 
     """
@@ -790,7 +770,7 @@ def find_gene_expression(db, rows=None, cols=None, standardized=True):
 
     # translate rows/cols
     rows = row2id_with(db, rows, input_type_rows, return_field="row_id")
-    cols = col2id_batch(db, cols, return_field="col_id", input_type=input_type_cols)
+    cols = col2id_with(db, cols, input_type_cols, return_field="col_id")
 
     if len(rows) > 1000 or len(cols) > 1000:
         logging.warn("This is a large query. Please be patient. If you need faster access, I would suggest saving this matrix and loading directly from file.")
@@ -806,7 +786,7 @@ def find_gene_expression(db, rows=None, cols=None, standardized=True):
             data = query.pivot(index="row_id", columns="col_id", values="raw_expression")
 
     data.index = row2id_with(db, data.index.tolist(), "row_id", return_field="egrin2_row_name")
-    data.columns = col2id_batch(db, data.columns.tolist(), return_field="egrin2_col_name", input_type="col_id")
+    data.columns = col2id_with(db, data.columns.tolist(), 'col_id', return_field="egrin2_col_name")
     data = data.sort_index()
     data = data.reindex_axis(sorted(data.columns), axis=1)
 
