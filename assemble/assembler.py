@@ -125,13 +125,14 @@ def make_resample_scripts(args, dbname, targetdir, corem_sizes):
 This will dramatically speed up this step.""")
 
 
-def merge_sqlite(args):
+def merge_sqlite(args, dbclient):
     if len(args.result_dbs) == 0:
         prefix = '%s-out-' % args.organism if args.prefix is None else args.prefix
         result_dbs = sorted(glob.glob(os.path.join(args.ensembledir, "%s???/cmonkey_run.db" % prefix)))
     else:
+        print('args.result_dbs: ', args.result_dbs)
         result_dbs = args.result_dbs
-    asl.merge(args, result_dbs)
+    asl.merge(dbclient, args, result_dbs)
     return True
 
 
@@ -172,7 +173,7 @@ def merge_runs(args, dbclient, dbname):
     if args.dbengine == 'mongodb':
         return merge_mongodb(args, dbclient)
     elif args.dbengine == 'sqlite':
-        return merge_sqlite(args)
+        return merge_sqlite(args, dbclient)
     else:
         raise Exception('Unsupported database engine: %s' % args.dbengine)
 
@@ -199,7 +200,7 @@ def make_dbclient(args, dbname):
         db = client[dbname]
         return MongoDB(db)
     elif args.dbengine == 'sqlite':
-        conn = sqlite3.connect(dbname)
+        conn = sqlite3.connect(args.targetdb, 15, isolation_level='DEFERRED')
         return asl.SqliteDB(conn)
     else:
         raise Exception('unknown dbengine: %s' % args.dbengine)

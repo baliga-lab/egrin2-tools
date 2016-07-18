@@ -100,7 +100,8 @@ def is_cluster_type(argtype):
      return argtype in {"cluster", "clusters", "bicluster", "biclusters", "bcs"}
 
 
-def agglom(db, x=[0, 1], x_type=None, y_type=None, x_input_type=None, y_output_type=None,
+def agglom(db, x, x_type, y_type,
+           x_input_type=None, y_output_type=None,
            logic="or", gre_lim=10, pval_cutoff=0.05, translate=True):
     """
     Determine enrichment of y given x through bicluster co-membership.
