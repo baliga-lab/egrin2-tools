@@ -7,6 +7,7 @@ import requests
 from datetime import datetime
 import itertools
 import json
+import util
 
 """
 This assemble module is the sqlite3 based implementation
@@ -448,7 +449,7 @@ def store_motifs(conn, src_conn, cluster2id):
 
 
 def merge(dbclient, args, result_dbs):
-    conn = sqlite3.connect(args.targetdb, 15, isolation_level='DEFERRED')
+    conn = dbclient.conn
     create_tables(conn)
     cmonkey_dbs = list(filter(is_valid_db, result_dbs))
     if len(cmonkey_dbs) > 0:
@@ -468,7 +469,10 @@ def merge(dbclient, args, result_dbs):
             try:
                 run_id = store_run_info(conn, src_conn, row2id, col2id)
                 cluster2id = store_biclusters(conn, src_conn, run_id, row2id, col2id)
+                start = util.current_millis()
                 store_motifs(conn, src_conn, cluster2id)
+                elapsed = util.current_millis() - start
+                logging.info('copied motifs in %d ms.', elapsed)
             finally:
                 src_conn.close()
     else:
