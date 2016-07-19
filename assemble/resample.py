@@ -167,14 +167,10 @@ def update_db_col_resample(dbclient, columns, n_rows, n_resamples, keepP,
             elapsed = util.current_millis() - start_time
             logging.info("make_rsd_groups in %d s.", (elapsed / 1000))
 
-            logging.info("Adding/updating new entries...")
-            start_time = util.current_millis()
             for i in df_rsd_gb.groups.keys():
                 __choose_n(dbclient, int(i), df_rsd_gb.get_group(i), n2keep,
                            add=add, n_rows=n_rows,
                            n_resamples=n_resamples, old_records=old_records, keepP=keepP)
-            elapsed = util.current_millis() - start_time
-            logging.info("added/updated entries in %d s.", (elapsed / 1000))
         else:
             logging.info("no gene expressions found")
 
@@ -189,24 +185,23 @@ def col_resample_ind(dbclient, n_rows, cols, n_resamples=1000, keepP=0.1):
 
     if old_records is not None:
         logging.info("finding records that need to be updated...")
-        toUpdate = [int(i["col_id"])
-                    for i in old_records.values() if int(i["resamples"]) < n_resamples]
+        cols_to_update = [int(i["col_id"]) for i in old_records.values() if int(i["resamples"]) < n_resamples]
 
-    toAdd = [i for i in cols if i not in old_records.keys()]
+    cols_to_add = [i for i in cols if i not in old_records.keys()]
 
-    if len(toAdd) == 0 and len(toUpdate) == 0:
+    if len(cols_to_add) == 0 and len(cols_to_pdate) == 0:
         logging.info("Nothing to add")
     else:
-        logging.info("%d records to add and %d records to update...", len(toAdd), len(toUpdate))
+        logging.info("%d records to add and %d records to update...", len(cols_to_add), len(cols_to_update))
 
-    if len(toAdd) > 0:
-        update_db_col_resample(dbclient, toAdd, n_rows, n_resamples, keepP,
+    if len(cols_to_add) > 0:
+        update_db_col_resample(dbclient, cols_to_add, n_rows, n_resamples, keepP,
                                old_records, add=True)
 
-    if len(toUpdate) > 0:
+    if len(cols_to_update) > 0:
         n_resamples -= np.min([i["resamples"] for i in old_records.values()])
         if n_resamples > 0:
-            update_db_col_resample(dbclient, toUpdate, n_rows, n_resamples, keepP,
+            update_db_col_resample(dbclient, cols_to_update, n_rows, n_resamples, keepP,
                                    old_records, add=False)
 
 
