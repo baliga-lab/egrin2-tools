@@ -190,7 +190,13 @@ def col_resample_ind(dbclient, n_rows, cols, n_resamples=1000, keepP=0.1):
                 df_gb = df.dropna().groupby("col_id")
                 logging.info('making rsd on col ids (n_rows = %d)...', n_rows)
                 start_time = util.current_millis()
-                df_rsd = pd.concat([df_gb.aggregate(resample, n_rows) for i in range(0, n_resamples)])
+
+                # for speed, setup a large data frame to select from
+                sel_df = df_gb.aggregate(lambda g: g.tolist())
+                df_rsd = pd.concat([sel_df.apply(lambda x: (rsd(random.sample(x[0], n_rows)),
+                                                            rsd(random.sample(x[1], n_rows))),
+                                                 axis=1, broadcast=True) for i in range(0, n_resamples)])
+
                 elapsed = util.current_millis() - start_time
                 logging.info("concat aggregates in %d s.", (elapsed / 1000))
                 start_time = util.current_millis()
@@ -221,17 +227,21 @@ def col_resample_ind(dbclient, n_rows, cols, n_resamples=1000, keepP=0.1):
 
             if df.shape != (0, 0):
                 df_gb = df.dropna().groupby("col_id")
-                resamples = n_resamples - np.min([i["resamples"] for i in old_records.values()])
+                n_resamples -= np.min([i["resamples"] for i in old_records.values()])
 
-                if resamples > 0:
-                    df_rsd = pd.concat([df_gb.aggregate(resample, n_rows) for i in range(0, resamples)])
+                if n_resamples > 0:
+                    sel_df = df_gb.aggregate(lambda g: g.tolist())
+                    df_rsd = pd.concat([sel_df.apply(lambda x: (rsd(random.sample(x[0], n_rows)),
+                                                                rsd(random.sample(x[1], n_rows))),
+                                                     axis=1, broadcast=True) for i in range(0, n_resamples)])
+
                     df_rsd_gb = df_rsd.groupby(df_rsd.index)
 
                     logging.info("Updating entries")
                     for i in df_rsd_gb.groups.keys():
                         __choose_n(dbclient, int(i), df_rsd_gb.get_group(i), n2keep,
                                    add=False, n_rows=n_rows,
-                                   n_resamples=resamples, old_records=old_records, keepP=keepP)
+                                   n_resamples=n_resamples, old_records=old_records, keepP=keepP)
     return None
 
 
