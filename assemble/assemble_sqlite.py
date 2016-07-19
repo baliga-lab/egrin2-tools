@@ -7,7 +7,8 @@ import requests
 from datetime import datetime
 import itertools
 import json
-import util
+
+import assemble.util as util
 
 """
 This assemble module is the sqlite3 based implementation

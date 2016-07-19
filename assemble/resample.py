@@ -21,7 +21,7 @@ import pandas as pd
 import sqlite3
 import json
 
-import util
+import assemble.util as util
 
 
 DESCRIPTION = """resample.py - prepare brute force random resamples"""
@@ -30,11 +30,14 @@ DESCRIPTION = """resample.py - prepare brute force random resamples"""
 def rsd(vals):
     return abs(np.std(vals) / np.mean(vals))
 
-
-def resample(row_vals, n_rows):
-    """sample from non-NaN groups entries"""
-    return rsd(random.sample(row_vals.tolist(), n_rows))
-
+def make_col_id_rsd_groups(df, n_rows, n_resamples):
+    # for speed, setup a large data frame to select from
+    df_gb = df.dropna().groupby("col_id")
+    sel_df = df_gb.aggregate(lambda g: g.tolist())
+    df_rsd = pd.concat([sel_df.apply(lambda x: (rsd(random.sample(x[0], n_rows)),
+                                                rsd(random.sample(x[1], n_rows))),
+                                     axis=1, broadcast=True) for i in range(0, n_resamples)])
+    return df_rsd.groupby(df_rsd.index)
 
 class MongoDB:
     def __init__(self, dbclient):
@@ -146,10 +149,35 @@ def __choose_n(dbclient, col, vals, n, add, n_rows, n_resamples, old_records, ke
         dbclient.update_col_resample(n_rows, col, resamples, ran, ras)
 
 
-def __split_list(alist, wanted_parts=1):
-    length = len(alist)
-    return [alist[i * length // wanted_parts: (i + 1) * length // wanted_parts]
-            for i in range(wanted_parts)]
+def update_db_col_resample(dbclient, columns, n_rows, n_resamples, keepP,
+                           old_records, add=True):
+    n2keep = int(round(n_resamples * keepP))
+    # do in batches of 100 so memory usage doesn't get too high
+    nbins = int(math.ceil(len(columns) / 100.0))
+    bins = util.split_list(columns, nbins)
+
+    logging.info("%d bins created", len(bins))
+    for index, b in enumerate(bins):
+        logging.info("processing bin %d (of %d)", index, nbins)
+        df = dbclient.find_gene_expressions(b)
+        if df.shape != (0,0):
+            logging.info('making rsd on col ids (n_rows = %d)...', n_rows)
+            start_time = util.current_millis()
+            df_rsd_gb = make_col_id_rsd_groups(df, n_rows, n_resamples)
+            elapsed = util.current_millis() - start_time
+            logging.info("make_rsd_groups in %d s.", (elapsed / 1000))
+
+            logging.info("Adding/updating new entries...")
+            start_time = util.current_millis()
+            for i in df_rsd_gb.groups.keys():
+                __choose_n(dbclient, int(i), df_rsd_gb.get_group(i), n2keep,
+                           add=add, n_rows=n_rows,
+                           n_resamples=n_resamples, old_records=old_records, keepP=keepP)
+            elapsed = util.current_millis() - start_time
+            logging.info("added/updated entries in %d s.", (elapsed / 1000))
+        else:
+            logging.info("no gene expressions found")
+
 
 def col_resample_ind(dbclient, n_rows, cols, n_resamples=1000, keepP=0.1):
     """Resample gene expression for a given number of genes in a particular condition using RSD, brute force."""
@@ -168,81 +196,18 @@ def col_resample_ind(dbclient, n_rows, cols, n_resamples=1000, keepP=0.1):
 
     if len(toAdd) == 0 and len(toUpdate) == 0:
         logging.info("Nothing to add")
-        return None
     else:
         logging.info("%d records to add and %d records to update...", len(toAdd), len(toUpdate))
 
-
-    n2keep = int(round(n_resamples * keepP))
-
-    # toAdd
     if len(toAdd) > 0:
-        logging.info("Computing resamples for new entries")
+        update_db_col_resample(dbclient, toAdd, n_rows, n_resamples, keepP,
+                               old_records, add=True)
 
-        # do in batches of 100 so memory usage doesn't get too high
-        nbins = int(math.ceil(len(toAdd) / 100.0))
-        bins = __split_list(toAdd, nbins)
-        logging.info("%d bins created", len(bins))
-        for index, b in enumerate(bins):
-            logging.info("processing bin %d (of %d)", index, nbins)
-            df = dbclient.find_gene_expressions(b)
-            if df.shape != (0,0):
-                df_gb = df.dropna().groupby("col_id")
-                logging.info('making rsd on col ids (n_rows = %d)...', n_rows)
-                start_time = util.current_millis()
-
-                # for speed, setup a large data frame to select from
-                sel_df = df_gb.aggregate(lambda g: g.tolist())
-                df_rsd = pd.concat([sel_df.apply(lambda x: (rsd(random.sample(x[0], n_rows)),
-                                                            rsd(random.sample(x[1], n_rows))),
-                                                 axis=1, broadcast=True) for i in range(0, n_resamples)])
-
-                elapsed = util.current_millis() - start_time
-                logging.info("concat aggregates in %d s.", (elapsed / 1000))
-                start_time = util.current_millis()
-                df_rsd_gb = df_rsd.groupby(df_rsd.index)
-                elapsed = util.current_millis() - start_time
-                logging.info("group by in %d s.", (elapsed / 1000))
-
-                logging.info("Adding new entries...")
-                start_time = util.current_millis()
-                for i in df_rsd_gb.groups.keys():
-                    __choose_n(dbclient, int(i), df_rsd_gb.get_group(i), n2keep,
-                               add=True, n_rows=n_rows,
-                               n_resamples=n_resamples, old_records=old_records, keepP=keepP)
-                elapsed = util.current_millis() - start_time
-                logging.info("added entries in %d s.", (elapsed / 1000))
-            else:
-                print("no gene expressions found")
-
-    # toUpdate
     if len(toUpdate) > 0:
-        logging.info("Computing resamples for updated entries")
-
-        # do in batches of 500 so memory usage doesn't get too high
-        nbins = int(math.ceil(len(toUpdate) / 100.0))
-        bins = split_list(toUpdate, nbins)
-        for b in bins:
-            df = dbclient.find_gene_expressions(self, column_nums)
-
-            if df.shape != (0, 0):
-                df_gb = df.dropna().groupby("col_id")
-                n_resamples -= np.min([i["resamples"] for i in old_records.values()])
-
-                if n_resamples > 0:
-                    sel_df = df_gb.aggregate(lambda g: g.tolist())
-                    df_rsd = pd.concat([sel_df.apply(lambda x: (rsd(random.sample(x[0], n_rows)),
-                                                                rsd(random.sample(x[1], n_rows))),
-                                                     axis=1, broadcast=True) for i in range(0, n_resamples)])
-
-                    df_rsd_gb = df_rsd.groupby(df_rsd.index)
-
-                    logging.info("Updating entries")
-                    for i in df_rsd_gb.groups.keys():
-                        __choose_n(dbclient, int(i), df_rsd_gb.get_group(i), n2keep,
-                                   add=False, n_rows=n_rows,
-                                   n_resamples=n_resamples, old_records=old_records, keepP=keepP)
-    return None
+        n_resamples -= np.min([i["resamples"] for i in old_records.values()])
+        if n_resamples > 0:
+            update_db_col_resample(dbclient, toUpdate, n_rows, n_resamples, keepP,
+                                   old_records, add=False)
 
 
 LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
