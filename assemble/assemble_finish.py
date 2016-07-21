@@ -8,7 +8,7 @@ import sqlite3
 import query.egrin2_query as e2q
 import assemble.resample as resample
 from assemble.assemble_sqlite import SqliteDB
-import pandas as pd
+from assemble.assemble_mongodb import MongoDB
 import json
 
 
@@ -16,34 +16,6 @@ DESCRIPTION = """assemble_finish.py - finish and dump mongodb"""
 LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
 LOG_LEVEL = logging.DEBUG
 LOG_FILE = None
-
-
-class MongoDB:
-    def __init__(self, dbclient):
-        self.dbclient = dbclient
-
-    def close(self):
-        pass
-
-    def get_cond_ids(self):
-        return [entry['col_id'] for entry in self.dbclient["col_info"].find({}, {"_id": 0, "col_id": 1})]
-
-    def get_corems(self):
-        return [corem for corem in self.dbclient["corem"].find({}, {'_id': 1, "rows": 1, "corem_id": 1})]
-
-    def no_col_resamples(self, col, nrows, nresamples):
-        return self.dbclient.col_resample.find_one({"n_rows": nrows, "col_id": col, "resamples": {"$gte": nresamples}}) is None
-
-    def find_gene_expressions(self, rows, cols):
-        return pd.DataFrame(list(self.dbclient.gene_expression.find({"col_id": {"$in": cols}, "row_id": {"$in": rows}},
-                                                                    { "_id": 0, "col_id": 1, "raw_expression": 1,
-                                                                      "standardized_expression": 1})))
-
-    def find_col_resamples(self, nrows, cols):
-        return pd.DataFrame(list(self.dbclient.col_resample.find({"n_rows": nrows, "col_id": {"$in": cols}}, {"_id": 0})))
-
-    def update_corem(self, corem, new_cols):
-        self.dbclient['corem'].update({"_id": corem['_id']}, {"$set": {"cols": new_cols}})
 
 
 def __col_resample_pval(dbclient, rows, cols, n_resamples,

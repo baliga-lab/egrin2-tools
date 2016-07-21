@@ -17,6 +17,10 @@ class SqliteDBTest(unittest.TestCase):
         self.conn = sqlite3.connect(TEST_DATABASE)
         self.db = asl.SqliteDB(self.conn)
 
+    def tearDown(self):
+        if os.path.exists(TEST_DATABASE):
+            os.remove(TEST_DATABASE)
+
     def test(self):
         pass
 

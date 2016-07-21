@@ -25,8 +25,9 @@ import sqlite3
 #import kbase.WorkspaceClient as wsc
 
 import assemble_sqlite as asl
+import assemble_mongodb as assmongo
 import sql2mongoDB as rdb
-from makeCorems import CoremMaker, MongoDB
+from makeCorems import CoremMaker
 import resample
 import assemble_finish
 
@@ -198,7 +199,7 @@ def make_dbclient(args, dbname):
         else:
             logging.info("Initializing MongoDB database: %s", dbname)
         db = client[dbname]
-        return MongoDB(db)
+        return assmongo.MongoDB(db)
     elif args.dbengine == 'sqlite':
         conn = sqlite3.connect(args.targetdb, 15, isolation_level='DEFERRED')
         return asl.SqliteDB(conn)
