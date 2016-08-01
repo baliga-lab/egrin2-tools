@@ -21,6 +21,8 @@ import pandas as pd
 import sqlite3
 import json
 
+import multiprocessing
+
 import assemble.util as util
 
 
@@ -30,6 +32,7 @@ DESCRIPTION = """resample.py - prepare brute force random resamples"""
 def rsd(vals):
     return abs(np.std(vals) / np.mean(vals))
 
+
 def make_col_id_rsd_groups(df, n_rows, n_resamples):
     # for speed, setup a large data frame to select from
     df_gb = df.dropna().groupby("col_id")
@@ -38,6 +41,7 @@ def make_col_id_rsd_groups(df, n_rows, n_resamples):
                                                 rsd(random.sample(x[1], n_rows))),
                                      axis=1, broadcast=True) for i in range(0, n_resamples)])
     return df_rsd.groupby(df_rsd.index)
+
 
 class MongoDB:
     def __init__(self, dbclient):
@@ -149,30 +153,61 @@ def __choose_n(dbclient, col, vals, n, add, n_rows, n_resamples, old_records, ke
         dbclient.update_col_resample(n_rows, col, resamples, ran, ras)
 
 
+class get_mp_pool:
+    def __init__(self):
+        self.pool = multiprocessing.Pool()
+
+    def __enter__(self):
+        return self.pool
+
+    def __exit__(self, type, value, tb):
+        self.pool.close()
+        self.pool.join()
+
+
+def process_bin(param):
+    """processing of a bin (typically in mutliprocessing)"""
+    index, b, df, nbins, n_rows, n_resamples = param
+    logging.info("processing bin %d (of %d)", index, nbins)
+    if df.shape != (0,0):
+        logging.info('making rsd on col ids (n_rows = %d)...', n_rows)
+        start_time = util.current_millis()
+        df_rsd_gb = make_col_id_rsd_groups(df, n_rows, n_resamples)
+        elapsed = util.current_millis() - start_time
+        logging.info("make_rsd_groups in %d s.", (elapsed / 1000))
+
+        for i in df_rsd_gb.groups.keys():
+            return (int(i), df_rsd_gb.get_group(i))
+    else:
+        logging.info("no gene expressions found")
+        return None
+
+
 def update_db_col_resample(dbclient, columns, n_rows, n_resamples, keepP,
-                           old_records, add=True):
+                           old_records, add=True, multiprocessing=True):
     n2keep = int(round(n_resamples * keepP))
     # do in batches of 100 so memory usage doesn't get too high
     nbins = int(math.ceil(len(columns) / 100.0))
     bins = util.split_list(columns, nbins)
 
     logging.info("%d bins created", len(bins))
-    for index, b in enumerate(bins):
-        logging.info("processing bin %d (of %d)", index, nbins)
-        df = dbclient.find_gene_expressions(b)
-        if df.shape != (0,0):
-            logging.info('making rsd on col ids (n_rows = %d)...', n_rows)
-            start_time = util.current_millis()
-            df_rsd_gb = make_col_id_rsd_groups(df, n_rows, n_resamples)
-            elapsed = util.current_millis() - start_time
-            logging.info("make_rsd_groups in %d s.", (elapsed / 1000))
+    # all parameter preparation that accesses the database needs to be
+    # in the main process, sqlite does not support concurrent access
+    params = [(index, b, dbclient.find_gene_expressions(b), nbins, n_rows, n_resamples) for index, b in enumerate(bins)]
 
-            for i in df_rsd_gb.groups.keys():
-                __choose_n(dbclient, int(i), df_rsd_gb.get_group(i), n2keep,
-                           add=add, n_rows=n_rows,
-                           n_resamples=n_resamples, old_records=old_records, keepP=keepP)
-        else:
-            logging.info("no gene expressions found")
+    if multiprocessing:
+        with get_mp_pool() as pool:
+            result = pool.map(process_bin, params)
+    else:
+        result = [process_bin(param) for param in params]
+
+    # write the results sequentially, since sqlite can't write reliably in concurrent mode
+    for entry in result:
+        if entry is not None:
+            col_id, exprs = entry
+            __choose_n(dbclient, col_id, exprs, n2keep, add=add, n_rows=n_rows,
+                        n_resamples=n_resamples, old_records=old_records, keepP=keepP)
+
 
 
 def col_resample_ind(dbclient, n_rows, cols, n_resamples=1000, keepP=0.1):
