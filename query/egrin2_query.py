@@ -478,7 +478,7 @@ LocusIds in this database include:
             logging.warn("I hope you are using cluster '_id'!!! Otherwise the results might surprise you...")
             filter_type = "_id"
 
-        logging.info("Filtering motifs by %s", ilter_type)
+        logging.info("Filtering motifs by %s", filter_type)
         bcs_df= pd.concat([getBCs(i, filter_type) for i in filterby], ignore_index=True)
         mots = pd.DataFrame(list(db[fimo_collection].find({"start": {"$gte": start},
                                                            "stop": {"$lte": stop },

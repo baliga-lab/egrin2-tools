@@ -15,14 +15,27 @@ class SqliteDBTest(unittest.TestCase):
         if os.path.exists(TEST_DATABASE):
             os.remove(TEST_DATABASE)
         self.conn = sqlite3.connect(TEST_DATABASE)
+        asl.create_tables(self.conn)
         self.db = asl.SqliteDB(self.conn)
 
     def tearDown(self):
         if os.path.exists(TEST_DATABASE):
             os.remove(TEST_DATABASE)
 
-    def test(self):
-        pass
+    def test_insert_cols(self):
+        ids = asl.db_insert_cols(self.conn, ['col1', 'col2', 'col3'])
+        self.assertEquals(len(ids), 3)
+        cur = self.conn.cursor()
+        cur.execute('select count(*) from columns')
+        self.assertEquals(3, cur.fetchone()[0])
+
+    def test_insert_rows(self):
+        ids = asl.db_insert_rows(self.conn, ['row1', 'row2', 'row3'])
+        self.assertEquals(len(ids), 3)
+        cur = self.conn.cursor()
+        cur.execute('select count(*) from rows')
+        self.assertEquals(3, cur.fetchone()[0])
+
 
 if __name__ == '__main__':
     suite = [unittest.TestLoader().loadTestsFromTestCase(SqliteDBTest)]
