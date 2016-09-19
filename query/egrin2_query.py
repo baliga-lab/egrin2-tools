@@ -358,24 +358,21 @@ def find_gre_positions(db, gre_ids):
     return a dataframe of (gre_id, start, stop) rows
     """
     positions = []
-    res = db.genome.find({}, {'_id': 0, 'scaffoldId': 1, 'sequence': 1})
-    chromosome_lengths = {int(entry['scaffoldId']): len(entry['sequence']) for entry in res}
+    cluster_mot_pos = {}
 
-    res =  db.motif_info.find({'gre_id': { '$in': gre_ids}}, {'_id': 0, 'gre_id': 1, 'meme_motif_site': 1, 'pwm': 1})
-    for entry in res:
+    gres =  db.motif_info.find({'gre_id': { '$in': gre_ids}}, {'_id': 0, 'gre_id': 1, 'cluster_id': 1, 'motif_num': 1})
+    for entry in gres:
         gre_id = entry['gre_id']
-        motif_len = len(entry['pwm'])
-        for site in entry['meme_motif_site']:
-            reverse = site['reverse'] == 1
-            start = site['start']
-            if reverse:
-                stop = start - motif_len
-                if stop < 0:
-                    stop = chromosome_lengths[site['scaffoldId']] + stop
-                # reverse start/stop, because stop < start in this case
-                start, stop = stop, start
-            else:
-                stop = start + motif_len
+        cluster_id = entry['cluster_id']
+        motif_num = entry['motif_num']
+        key = '%s:%d' % (str(cluster_id), motif_num)
+        if key in cluster_mot_pos:
+            mot_pos = cluster_mot_pos[key]
+        else:
+            mot_pos = []
+            for entry in db.fimo.find({'cluster_id': cluster_id, 'motif_num': motif_num}, {'start': 1, 'stop': 1}):
+                mot_pos.append((entry['start'], entry['stop']))
+        for start, stop in mot_pos:
             positions.append((gre_id, start, stop))
     return pd.DataFrame(positions, columns=['gre_id', 'start', 'stop'])
 
