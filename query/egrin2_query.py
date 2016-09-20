@@ -418,7 +418,7 @@ def find_fimo(db, start=None, stop=None, locusId=None, strand=None, mot_pval_cut
         else:
             to_r = [count(x.iloc[i]) for i in range(x.shape[0])]
             to_r = list(itertools.chain(*to_r))
-            to_r.sort_values()
+            to_r.sort()
 
         return to_r
 
