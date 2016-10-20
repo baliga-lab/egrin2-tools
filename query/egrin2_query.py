@@ -364,7 +364,7 @@ def find_gre_positions(db, gre_ids, max_evalue=10):
                                 [ { 'gre_id': { '$in': gre_ids}},
                                   {'evalue': {'$lt': max_evalue } }
                                 ]},
-                               {'_id': 0, 'gre_id': 1, 'cluster_id': 1, 'motif_num': 1, 'evalue': 1)
+                                {'_id': 0, 'gre_id': 1, 'cluster_id': 1, 'motif_num': 1, 'evalue': 1})
     for entry in gres:
         gre_id = entry['gre_id']
         cluster_id = entry['cluster_id']
@@ -378,8 +378,8 @@ def find_gre_positions(db, gre_ids, max_evalue=10):
             mot_pos = []
             for entry in db.fimo.find({'cluster_id': cluster_id, 'motif_num': motif_num}, {'start': 1, 'stop': 1}):
                 mot_pos.append((entry['start'], entry['stop'], evalue))
-        for start, stop in mot_pos:
-            positions.append((gre_id, start, stop))
+        for start, stop, evalue in mot_pos:
+            positions.append((gre_id, start, stop, evalue))
     return pd.DataFrame(positions, columns=['gre_id', 'start', 'stop', 'evalue'])
 
 
