@@ -353,28 +353,34 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
         return None
 
 
-def find_gre_positions(db, gre_ids):
+def find_gre_positions(db, gre_ids, max_evalue=10):
     """return a list of all positions of motifs associated with a list of GREs
     return a dataframe of (gre_id, start, stop) rows
     """
     positions = []
     cluster_mot_pos = {}
 
-    gres =  db.motif_info.find({'gre_id': { '$in': gre_ids}}, {'_id': 0, 'gre_id': 1, 'cluster_id': 1, 'motif_num': 1})
+    gres =  db.motif_info.find({'$and':
+                                [ { 'gre_id': { '$in': gre_ids}},
+                                  {'evalue': {'$lt': max_evalue } }
+                                ]},
+                               {'_id': 0, 'gre_id': 1, 'cluster_id': 1, 'motif_num': 1, 'evalue': 1)
     for entry in gres:
         gre_id = entry['gre_id']
         cluster_id = entry['cluster_id']
         motif_num = entry['motif_num']
+        evalue = entry['evalue']
+
         key = '%s:%d' % (str(cluster_id), motif_num)
         if key in cluster_mot_pos:
             mot_pos = cluster_mot_pos[key]
         else:
             mot_pos = []
             for entry in db.fimo.find({'cluster_id': cluster_id, 'motif_num': motif_num}, {'start': 1, 'stop': 1}):
-                mot_pos.append((entry['start'], entry['stop']))
+                mot_pos.append((entry['start'], entry['stop'], evalue))
         for start, stop in mot_pos:
             positions.append((gre_id, start, stop))
-    return pd.DataFrame(positions, columns=['gre_id', 'start', 'stop'])
+    return pd.DataFrame(positions, columns=['gre_id', 'start', 'stop', 'evalue'])
 
 
 def find_fimo(db, start=None, stop=None, locusId=None, strand=None, mot_pval_cutoff=None, filterby=None, filter_type=None,
