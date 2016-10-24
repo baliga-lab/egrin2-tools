@@ -565,6 +565,21 @@ LocusIds in this database include:
     return gre_scans
 
 
+def corems_with_genes(db, gene_names):
+    """search corems for a list of gene names using a simple interface"""
+    genes = {e['row_id']: e['sysName']
+             for e in db.row_info.find({'sysName': {'$in': gene_names}}, {'_id': 0, 'row_id': 1, 'sysName': 1})}
+    gene_ids = genes.keys()
+    corems = db.corem.find({'rows': {'$in': list(gene_ids)}}, {'_id': 0, 'corem_id': 1, 'rows': 1})
+    result = []
+    for corem in corems:
+        corem_id = corem['corem_id']
+        for row_id in corem['rows']:
+            if row_id in gene_ids:
+                result.append([corem_id, genes[row_id]])
+    return pd.DataFrame(result, columns=['corem_id', 'gene'])
+
+
 def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes", y_return_field=None,
                     count=False, logic="or"):
 
