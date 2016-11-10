@@ -597,6 +597,17 @@ def corem_genes(db, corem_num):
     return [gene["sysName"] for gene in genes]
 
 
+def cluster_genes(db, cluster_id):
+    res = db.bicluster_info.find({'_id': cluster_id}, {'_id': 0, 'rows': 1});
+    rows = [r['rows'] for r in res]
+    if len(rows) == 0:
+        return []
+    else:
+        row_ids = rows[0]
+        genes = [r['sysName'] for r in db.row_info.find({'row_id': { '$in': row_ids }}, {'_id': 0, 'sysName': 1})]
+        return list(genes)
+
+
 def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes", y_return_field=None,
                     count=False, logic="or"):
 
