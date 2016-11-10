@@ -115,13 +115,19 @@ def agglom(db, x, x_type, y_type,
     logging.info('Using "%s" logic', logic)
 
     def compute_p(i, M, N):
-        z = i.counts # n black balls in draw
-        n = i.all_counts # num black balls tot
-        M = M
-        # M = M - n  # n white balls
-        N = N # num drawn
-        prb =  hypergeom.sf(z, M, n, N)
-        return prb
+        """
+        computes the p-value for a given row in a data frame containing
+        the columns "counts" and "all_counts"
+
+        parameters:
+        i: data entry
+        M: total number of entries of this data type
+        N: size of the sub set to compute the p value on (number drawn)
+        """
+        z = i.counts  # n black balls in draw
+        n = i.all_counts  # num black balls tot
+        # M = M - n  # n white balls (was by Aaron, unused)
+        return  hypergeom.sf(z, M, n, N)
 
     if x_type is None:
         logging.info("""Please supply an x_type for your query.
@@ -204,7 +210,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                         row2id_with(db, list(r['rows']), "row_id", return_field="egrin2_row_name"))
                        for r in res]
 
-            query = pd.DataFrame(list(results))
+            query = pd.DataFrame(list(results), columns=["_id", 'num_genes', "genes"])
     else:
         logging.error("I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'.")
         return None
@@ -358,6 +364,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
 
             # only return below pval cutoff
             to_r = to_r.loc[to_r.pval <= pval_cutoff, :]
+            to_r.index = map(int, to_r.index)  # make sure GRE ids are integers
             return to_r
 
     else:
@@ -736,7 +743,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
                     to_r = list(set(to_r))
                     if len(to_r):
                         to_r = row2id_with(db, to_r, "row_id", return_field=y_return_field)
-                        to_r.sort_values()
+                        to_r = sorted(to_r)
                     else:
                         logging.error("No genes found")
                         return None
