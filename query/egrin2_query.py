@@ -196,9 +196,15 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
         elif y_type == "gre_id":
             queryPre = pd.DataFrame(list(db.bicluster_info.find(q, {"_id" : 1})))["_id"].tolist()
             query = pd.DataFrame(list(db.motif_info.find({"cluster_id": {"$in": queryPre}}, {y_type: 1})))
-
         else:
-            query = pd.DataFrame(list(db.bicluster_info.find(q, o)))
+            o = {y_type: 1, 'rows': 1}
+            res = db.bicluster_info.find(q, o)
+            results = [(r['_id'],
+                        len(r['rows']),
+                        row2id_with(db, list(r['rows']), "row_id", return_field="egrin2_row_name"))
+                       for r in res]
+
+            query = pd.DataFrame(list(results))
     else:
         logging.error("I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'.")
         return None
@@ -236,6 +242,10 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                  """)
 
         if y_type == "_id":
+            # agglom bicluster result type
+            #res = [(r['_id'], len(r['rows']))
+            #row2id_with(db, list(r['rows']), "row_id", return_field="egrin2_row_name"))
+            #        for r in query]
             return query
         else:
             if y_type == "rows":
