@@ -137,26 +137,26 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
     # Check input types
     if is_row_type(x_type):
         x_type = "rows"
-        x_o = x
+        x_orig = x
         if x_input_type is not None:
             x = row2id_with(db, x, x_input_type, return_field="row_id")
         else:
             x = row2id_any(db, x, return_field="row_id")
 
         if len(x) == 0:
-            logging.info("Cannot translate row names: %s", x_o)
+            logging.info("Cannot translate row names: %s", x_orig)
             return None
 
     elif is_col_type(x_type):
         x_type = "columns"
-        x_o = x
+        x_orig = x
         if x_input_type is not None:
             x = col2id_with(db, x, x_input_type, return_field="col_id")
         else:
             x = col2id_any(db, x, return_field="col_id")
 
         if len(x) == 0:
-            logging.info("Cannot translate col names: %s", x_o)
+            logging.info("Cannot translate col names: %s", x_orig)
             return None
 
     elif is_gre_type(x_type):
@@ -267,7 +267,9 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                 # combine two data frames
                 to_r = rows.join(all_counts).sort_values("counts", ascending=False)
                 to_r.columns = ["counts","all_counts"]
+                to_r['gene_id'] = to_r.index
                 to_r = to_r.drop_duplicates()
+                del to_r['gene_id']
 
                 if translate:
                     to_r.index = row2id_with(db, to_r.index.tolist(), "row_id", return_field="egrin2_row_name")
@@ -580,6 +582,21 @@ def corems_with_genes(db, gene_names):
     return pd.DataFrame(result, columns=['corem_id', 'gene'])
 
 
+def corem_genes(db, corem_num):
+    """genes associated with a corem
+    This replaces the heavily overloaded find_corem_info() function
+    for the (db, corem_id, x_type='corem_id', y_type='genes') call
+    """
+    corem_num = int(corem_num)
+    corems = [corem for corem in db.corem.find({'corem_id': corem_num},{"_id": 0, "rows": 1})]
+    rows = []
+    if len(corems) > 0:
+        rows = corems[0]["rows"]
+    genes = db.row_info.find({"row_id": {"$in": rows}},
+                             {"_id": 0, "row_id": 1, "sysName": 1, "start": 1, "stop": 1, "strand": 1, "accession": 1})
+    return [gene["sysName"] for gene in genes]
+
+
 def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes", y_return_field=None,
                     count=False, logic="or"):
 
@@ -613,18 +630,18 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
     # Check input types
     x_type = TYPE_MAP[x_type]
     if x_type == "rows":
-        x_o = x
+        x_orig = x
         x = row2id_with(db, x, x_input_type, return_field="row_id")
         x = list(set(x))
         if len(x) == 0:
-            logging.error("Cannot translate row names: %s", x_o)
+            logging.error("Cannot translate row names: %s", x_orig)
             return None
     elif x_type == "cols.col_id":
-        x_o = x
+        x_orig = x
         x = col2id_with(db, x, x_input_type, return_field="col_id")
         x = list(set(x))
         if len(x) == 0:
-            logging.error("Cannot translate row names: %s", x_o)
+            logging.error("Cannot translate row names: %s", x_orig)
             return None
     elif x_type == "edges":
         x_new = []
@@ -638,7 +655,7 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
         x = x_new
 
         if len(x) == 0:
-            logging.error("Cannot translate row names: %s", x_o)
+            logging.error("Cannot translate row names: %s", x_orig)
             return None
 
     y_type_original = y_type
