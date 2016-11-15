@@ -9,7 +9,9 @@ import pandas as pd
 from scipy.stats import hypergeom
 from statsmodels.sandbox.stats.multicomp import multipletests
 import itertools
+import numbers
 from bson.code import Code
+from bson.int64 import Int64
 from collections import defaultdict
 
 
@@ -625,6 +627,13 @@ def cluster_genes(db, cluster_id):
         return list(genes)
 
 
+def __to_bson_value(value):
+    if isinstance(value, numbers.Integral):
+        return Int64(value)
+    else:
+        return value
+
+
 def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes", y_return_field=None,
                     count=False, logic="or"):
 
@@ -691,10 +700,10 @@ def find_corem_info(db, x, x_type="corem_id", x_input_type=None, y_type="genes",
 
     if logic in {"and","or","nor"}:
         if logic == "and" and x_type == "corem_id":
-            q = {"$or": [{x_type: i} for i in x]}
+            q = {"$or": [{x_type: __to_bson_value(i)} for i in x]}
 
         else:
-            q = {"$" + logic: [{x_type: i} for i in x]}
+            q = {"$" + logic: [{x_type: __to_bson_value(i)} for i in x]}
 
         o = {y_type: 1}
         query = pd.DataFrame(list(db.corem.find(q, o)))
