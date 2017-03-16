@@ -14,19 +14,48 @@ from bson.code import Code
 from bson.int64 import Int64
 from collections import defaultdict
 
+######################################################################
+# MongoDB Map Reduce Functions
+######################################################################
+
+MAP_COLUMNS = Code("""
+function () {
+  this.columns.forEach(function(z) {
+    emit(z, 1);
+  });
+}""")
+
+MAP_ROWS = Code("""
+function () {
+  this.rows.forEach(function(z) {
+    emit(z, 1);
+  });
+}""")
+
+MAP_GRES = Code("""
+function () {
+  print(this);
+  emit(this.gre_id, 1);
+}""")
+
+REDUCE = Code("""
+function (key, values) {
+  var total = 0;
+  for (var i = 0; i < values.length; i++) {
+    total += values[i];
+  }
+  return total;
+}""")
+
 
 def rsd(vals):
     return abs(np.std(vals) / np.mean(vals))
 
 
 def remove_list_duplicates(l):
-    added = set()
-    result = []
-    for elem in l:
-        if elem not in added:
-            result.append(elem)
-            added.add(elem)
-    return result
+    """returns a list removing the duplicates preserving the order"""
+    seen = set()
+    return [i for i in l if not (i in seen or seen.add(i))]
 
 
 def find_match(some_row_elem, df, column_name):
@@ -102,6 +131,64 @@ def is_cluster_type(argtype):
      return argtype in {"cluster", "clusters", "bicluster", "biclusters", "bcs"}
 
 
+def compute_p(i, M, N):
+    """
+    computes the p-value for a given row in a data frame containing
+    the columns "counts" and "all_counts"
+
+    parameters:
+    i: data entry
+    M: total number of entries of this data type
+    N: size of the sub set to compute the p value on (number drawn)
+    """
+    z = i.counts  # n black balls in draw
+    n = i.all_counts  # num black balls tot
+    # M = M - n  # n white balls (was by Aaron, unused)
+    return  hypergeom.sf(z, M, n, N)
+
+
+def __enrich_counts(db, to_r, query, pval_cutoff):
+    to_r["pval"] = to_r.apply(compute_p, axis=1, M=db.bicluster_info.count(), N=query.shape[0])
+    to_r["qval_BH"] = multipletests(to_r.pval, method='fdr_bh')[1]
+    to_r["qval_bonferroni"] = multipletests(to_r.pval, method='bonferroni')[1]
+    to_r = to_r.sort_values(["pval","counts"], ascending=True)
+
+    # only return below pval cutoff
+    to_r = to_r.loc[to_r.pval <= pval_cutoff, :]
+    to_r.index = map(int, to_r.index)  # make sure GRE ids are integers
+    return to_r
+
+
+def __map_reduce_to_gres(db, query, gre_lim):
+    if db.gresCount_mapreduce.count() == 0:
+        logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
+        db.motif_info.map_reduce(MAP_GRES, REDUCE, "gresCount_mapreduce")
+
+    else:
+        # do spot check to make sure mapreduce is up to date
+        random_id = random.randint(0, db.gresCount_mapreduce.count())
+        ref = db.gresCount_mapreduce.find_one({"_id": random_id})["value"]
+        test = db.motif_info.find({"gre_id": random_id}).count()
+        if ref != test:
+            logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
+            db.motif_info.map_reduce(MAP_GRES, REDUCE, "gresCount_mapreduce")
+
+    gres = query.gre_id.tolist()
+    gres = list(filter(lambda x: x != "NaN", gres))
+    gres = pd.Series(gres).value_counts().to_frame("counts")
+
+    # find all bicluster counts
+    all_counts = pd.DataFrame(list(db.gresCount_mapreduce.find()))
+    all_counts = all_counts.set_index("_id")
+
+    # combine two data frames
+    to_r = gres.join(all_counts).sort_values("counts", ascending=False)
+    to_r.columns = ["counts","all_counts"]
+
+    # filter by GREs with more than 10 instances
+    return to_r.loc[to_r.all_counts>=gre_lim, :]
+
+
 def agglom(db, x, x_type, y_type,
            x_input_type=None, y_output_type=None,
            logic="or", gre_lim=10, pval_cutoff=0.05, translate=True):
@@ -115,21 +202,6 @@ def agglom(db, x, x_type, y_type,
     'bicluster': takes or outputs bicluster '_id'
     """
     logging.info('Using "%s" logic', logic)
-
-    def compute_p(i, M, N):
-        """
-        computes the p-value for a given row in a data frame containing
-        the columns "counts" and "all_counts"
-
-        parameters:
-        i: data entry
-        M: total number of entries of this data type
-        N: size of the sub set to compute the p value on (number drawn)
-        """
-        z = i.counts  # n black balls in draw
-        n = i.all_counts  # num black balls tot
-        # M = M - n  # n white balls (was by Aaron, unused)
-        return  hypergeom.sf(z, M, n, N)
 
     if x_type is None:
         logging.info("""Please supply an x_type for your query.
@@ -219,48 +291,14 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
 
     if query.shape[0] > 0:
 
-        mapColumns = Code("""
-            function () {
-            this.columns.forEach(function(z) {
-                emit(z, 1);
-                });
-            }
-            """)
-        mapRows = Code("""
-            function () {
-            this.rows.forEach(function(z) {
-                emit(z, 1);
-                });
-            }
-            """)
-        mapGREs = Code("""
-            function () {
-            print(this);
-            emit(this.gre_id, 1);
-            }
-            """)
-        reduce = Code("""
-            function (key, values) {
-                     var total = 0;
-                     for (var i = 0; i < values.length; i++) {
-                    total += values[i];
-                    }
-                return total;
-                 }
-                 """)
-
         if y_type == "_id":
-            # agglom bicluster result type
-            #res = [(r['_id'], len(r['rows']))
-            #row2id_with(db, list(r['rows']), "row_id", return_field="egrin2_row_name"))
-            #        for r in query]
             return query
         else:
             if y_type == "rows":
 
                 if db.rowsCount_mapreduce.count() == 0:
                     logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                    db.bicluster_info.map_reduce(mapRows, reduce, "rowsCount_mapreduce")
+                    db.bicluster_info.map_reduce(MAP_ROWS, REDUCE, "rowsCount_mapreduce")
                 else:
                     # do spot check to make sure mapreduce is up to date
                     random_id = random.randint(0, db.rowsCount_mapreduce.count())
@@ -269,7 +307,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
 
                     if ref != test:
                         logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                        db.bicluster_info.map_reduce(mapRows, reduce, "rowsCount_mapreduce")
+                        db.bicluster_info.map_reduce(MAP_ROWS, REDUCE, "rowsCount_mapreduce")
 
                 rows = pd.Series(list(itertools.chain(*query.rows.tolist()))).value_counts().to_frame("counts")
 
@@ -296,7 +334,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
 
                 if db.columnsCount_mapreduce.count() == 0:
                     logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                    db.bicluster_info.map_reduce(mapColumns, reduce, "columnsCount_mapreduce")
+                    db.bicluster_info.map_reduce(MAP_COLUMNS, REDUCE, "columnsCount_mapreduce")
 
                 else:
                     # do spot check to make sure mapreduce is up to date
@@ -306,10 +344,10 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
 
                     if ref != test:
                         logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                        db.bicluster_info.map_reduce(mapColumns, reduce, "columnsCount_mapreduce")
+                        db.bicluster_info.map_reduce(MAP_COLUMNS, REDUCE, "columnsCount_mapreduce")
 
                 if db.columnsCount_mapreduce.count() == 0:
-                    db.bicluster_info.map_reduce(mapColumns, reduce, "columnsCount_mapreduce")
+                    db.bicluster_info.map_reduce(MAP_COLUMNS, REDUCE, "columnsCount_mapreduce")
 
                 cols = pd.Series(list(itertools.chain(*query["columns"].tolist()))).value_counts().to_frame("counts")
 
@@ -330,44 +368,9 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                     to_r.index = col2id_with(db, to_r.index.tolist(), "col_id", return_field="egrin2_col_name")
 
             if y_type == "gre_id":
+                to_r = __map_reduce_to_gres(db, query, gre_lim)
 
-                if db.gresCount_mapreduce.count() == 0:
-                    logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                    db.motif_info.map_reduce(mapGREs, reduce, "gresCount_mapreduce")
-
-                else:
-                    # do spot check to make sure mapreduce is up to date
-                    random_id = random.randint(0, db.gresCount_mapreduce.count())
-                    ref = db.gresCount_mapreduce.find_one({"_id": random_id})["value"]
-                    test = db.motif_info.find({"gre_id": random_id}).count()
-                    if ref != test:
-                        logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
-                        db.motif_info.map_reduce(mapGREs,reduce,"gresCount_mapreduce")
-
-                gres = query.gre_id.tolist()
-                gres = list(filter(lambda x: x != "NaN", gres))
-                gres = pd.Series(gres).value_counts().to_frame("counts")
-
-                # find all bicluster counts
-                all_counts = pd.DataFrame(list(db.gresCount_mapreduce.find()))
-                all_counts = all_counts.set_index("_id")
-
-                # combine two data frames
-                to_r = gres.join(all_counts).sort_values("counts", ascending=False)
-                to_r.columns = ["counts","all_counts"]
-
-                # filter by GREs with more than 10 instances
-                to_r = to_r.loc[to_r.all_counts>=gre_lim, :]
-
-            to_r["pval"] = to_r.apply(compute_p, axis=1, M=db.bicluster_info.count(), N=query.shape[0])
-            to_r["qval_BH"] = multipletests(to_r.pval, method='fdr_bh')[1]
-            to_r["qval_bonferroni"] = multipletests(to_r.pval, method='bonferroni')[1]
-            to_r = to_r.sort_values(["pval","counts"], ascending=True)
-
-            # only return below pval cutoff
-            to_r = to_r.loc[to_r.pval <= pval_cutoff, :]
-            to_r.index = map(int, to_r.index)  # make sure GRE ids are integers
-            return to_r
+            return __enrich_counts(db, to_r, query, pval_cutoff)
 
     else:
         logging.info("Could not find any biclusters matching your criteria")
