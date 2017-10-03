@@ -44,9 +44,10 @@ class EnsemblePicker:
         self.random_blocks = random_blocks
         self.ratios = pd.read_csv(ratios, index_col=0, sep=",")
         self.blocks2col = pd.read_csv(blocks, sep=",", names=["sample", "block"],
-                                      converters={'sample': strip, 'block': strip}).icol([0, 1])
-        self.blocks =  pd.DataFrame(zip(self.blocks2col.block.value_counts().keys(),
-                                        self.blocks2col.block.value_counts()), columns=["block", "block.sample.num"])
+                                      converters={'sample': strip, 'block': strip}).iloc[:,:2]
+        self.blocks =  pd.DataFrame(list(zip(self.blocks2col.block.value_counts().keys(),
+                                             self.blocks2col.block.value_counts())),
+                                    columns=["block", "block.sample.num"])
         self.blocks["p"] = 1
         self.blocks["r_in"] = 0
         self.blocks = self.blocks.set_index(keys="block")
