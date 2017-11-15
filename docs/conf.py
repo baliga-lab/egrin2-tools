@@ -89,7 +89,14 @@ html_theme = 'alabaster'
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-# html_theme_options = {}
+html_theme_options = {
+  'logo': 'egrin2_logo_80px.png',
+  'github_user': 'baliga-lab',
+  'github_repo': 'egrin2-tools',
+  'github_banner': True,
+  'logo_name': True,
+  'description': 'EGRIN2 tool chain'
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
