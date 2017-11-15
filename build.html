@@ -1,0 +1,170 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Build &#8212; egrin2-tools 1.0.0 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Build Tutorial" href="build_tutorial.html" />
+    <link rel="prev" title="Introduction" href="introduction.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="build">
+<h1>Build<a class="headerlink" href="#build" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="do-you-need-an-egrin-2-0-ensemble">
+<h2>Do you need an <strong>EGRIN 2.0</strong> ensemble ?<a class="headerlink" href="#do-you-need-an-egrin-2-0-ensemble" title="Permalink to this headline">¶</a></h2>
+<p>Good! You’ve come to the right place.</p>
+<p>We’ve already developed ensembles for several commonly studied microbes, including E. coli and Mycobacterium tuberculosis. Consult our list of available ensembles to see if we’ve already developed a model for your organism.</p>
+<p>If you don’t see your organism listed, it’s time to think about building an ensemble of your own. The tools described here will help you do that provided you have or can assemble a compendium of transcriptome profiles (e.g hundreds of microarrays). Larger datasets are generally better. If you need help, you can <a class="reference external" href="https://www.systemsbiology.org/people/labs/baliga-lab/">contact us</a> for guidance.</p>
+<p>If you need to build an ensemble you should first familiarize yourself with the python-based <a class="reference external" href="http://baliga-lab.github.io/cmonkey2/">cMonkey2</a> algorithm.</p>
+</div>
+<div class="section" id="what-is-an-egrin-2-0-ensemble">
+<h2>What is an <strong>EGRIN 2.0</strong> ensemble ?<a class="headerlink" href="#what-is-an-egrin-2-0-ensemble" title="Permalink to this headline">¶</a></h2>
+<p>An EGRIN 2.0 ensemble is the result of running cMonkey2 (a non-deterministic, integrated biclustering algorithm) many times to infer highly-accurate, condition-specfic gene regulatory networks.</p>
+<p>Why? Read our <a class="reference external" href="http://msb.embopress.org/content/10/7/740.long">paper</a>.</p>
+</div>
+<div class="section" id="what-do-the-build-tools-do">
+<h2>What do the <strong>BUILD</strong> tools do ?<a class="headerlink" href="#what-do-the-build-tools-do" title="Permalink to this headline">¶</a></h2>
+<p>These tools help build custom ensembles. In short, they automatically configure cMonkey2 runs and generate QSub scripts for submitting many <code class="docutils literal"><span class="pre">cMonkey2</span></code> jobs to a Sun Grid Engine (SGE) scheduler.</p>
+<p>The tools generate cMonkey2 runs with slightly different parameterizations for training on subsets of the available experimental data. If you supply <code class="docutils literal"><span class="pre">BLOCK</span></code> definitions for the experimental conditions, including <code class="docutils literal"><span class="pre">INCLUSION</span> <span class="pre">BLOCKS</span></code> and <code class="docutils literal"><span class="pre">EXCLUSION</span> <span class="pre">BLOCKS</span></code>, the subsets of experimental data can be chosen intelligently. More about this in the <a class="reference internal" href="build_tutorial.html"><span class="doc">Build Tutorial</span></a>.</p>
+</div>
+<div class="section" id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
+<p>Obviously for these to work, you will need:</p>
+<blockquote>
+<div><ul class="simple">
+<li>Access to a cluster running the SGE scheduler</li>
+<li><a class="reference external" href="https://github.com/baliga-lab/cmonkey2">cMonkey2</a> installed on that cluster.</li>
+<li>in addition, see system requirements listed in this documentation</li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="tutorial">
+<h2>Tutorial<a class="headerlink" href="#tutorial" title="Permalink to this headline">¶</a></h2>
+<p>If you meet all of the requirements and are ready to build an ensemble from scratch, continue to our <a class="reference internal" href="build_tutorial.html"><span class="doc">Build Tutorial</span></a>.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="index.html">
+    <img class="logo" src="_static/egrin2_logo_80px.png" alt="Logo"/>
+    
+    <h1 class="logo logo-name">egrin2-tools</h1>
+    
+  </a>
+</p>
+
+
+
+<p class="blurb">EGRIN2 tool chain</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=baliga-lab&repo=egrin2-tools&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Build</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#do-you-need-an-egrin-2-0-ensemble">Do you need an <strong>EGRIN 2.0</strong> ensemble ?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-is-an-egrin-2-0-ensemble">What is an <strong>EGRIN 2.0</strong> ensemble ?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-do-the-build-tools-do">What do the <strong>BUILD</strong> tools do ?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tutorial">Tutorial</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="build_tutorial.html">Build Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="assemble.html">Assemble</a></li>
+<li class="toctree-l1"><a class="reference internal" href="query.html">Query</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="introduction.html" title="previous chapter">Introduction</a></li>
+      <li>Next: <a href="build_tutorial.html" title="next chapter">Build Tutorial</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Aaron Brooks, David Reiss, Wei-ju Wu, Micheleen Harris.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.4</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/build.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+    <a href="https://github.com/baliga-lab/egrin2-tools" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>

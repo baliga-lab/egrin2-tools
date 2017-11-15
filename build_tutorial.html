@@ -1,0 +1,399 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Build Tutorial &#8212; egrin2-tools 1.0.0 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Assemble" href="assemble.html" />
+    <link rel="prev" title="Build" href="build.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="build-tutorial">
+<h1>Build Tutorial<a class="headerlink" href="#build-tutorial" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="in-a-nutshell">
+<h2>In a nutshell<a class="headerlink" href="#in-a-nutshell" title="Permalink to this headline">¶</a></h2>
+<p>The BUILD scripts configure cMonkey2 to run on an SGE managed cluster. In the process, they change several cMonkey2 parameters to generate variability in each run. They also choose experiments to include in each run according to user-provided annotations.</p>
+</div>
+<div class="section" id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
+<p>User must supply several files, including:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">ratios</span></code>: a Tab-delimited or Comma-separated file containing a matrix of gene expression values across all conditions.</li>
+<li><code class="docutils literal"><span class="pre">blocks</span></code>: a Comma-separated file containing annotations for each condition.</li>
+<li><code class="docutils literal"><span class="pre">inclusion_blocks</span></code>: a Comma-separated file containing groups of blocks to be co-included in runs.</li>
+<li><code class="docutils literal"><span class="pre">exclusion_blocks</span></code>: a Comma-separated file containing groups of blocks to be co-excluded in runs.</li>
+</ul>
+</div></blockquote>
+<p>Optionally:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">pipeline</span></code>: a JSON file containing custom scoring pipeline. Currently only set-enrichment pipeline is supported</li>
+<li><code class="docutils literal"><span class="pre">setenrich_files</span></code>: Comma-separated files containing set-enrichment sets. Multiple files should be separated by a comma.</li>
+</ul>
+</div></blockquote>
+<p>The format for each of these files will be described in detail below.</p>
+<p>We have provided example files for building an Mycobacterium Tuberculosis ensemble. The data come from the following publications:</p>
+<p><a class="reference external" href="https://academic.oup.com/nar/article/42/18/11291/2434825/A-high-resolution-network-model-for-global-gene">EJR Peterson, DJ Reiss, S Turkarslan, KJ Minch, T Rustad, CL Plaisier, WJR Longabaugh, DR Sherman, NS Baliga. (2014). A high-resolution network model for global gene regulation in Mycobacterium tuberculosis. Nucleic Acids Research</a>.</p>
+<p><a class="reference external" href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0502-3">TR Rustad, KJ Minch, S Ma, JK Winkler, S Hobbes, MJ Hickey, W Brabant, S Turkarslan, ND Price, NS Baliga and DR Sherman. (2014). Mapping and manipulating the Mycobacterium tuberculosis transcriptome using a transcription factor overexpression-derived regulatory network. Genome Biology</a></p>
+<p><a class="reference external" href="https://www.nature.com/articles/ncomms6829">KJ Minch, TR Rustad, EJR Peterson, J Winkler, DJ Reiss, S Ma, M Hickey, W Brabant, B Morrison, S Turkaslan, C Mawhinney, JE Galagan, ND Price, NS Baliga, DR. Sherman. (2014). The DNA-binding network of Mycobacterium tuberculosis. Nature Communications</a></p>
+<p>Additionally, the Python modules described in this documentation’s dependencies are required.</p>
+</div>
+<div class="section" id="scripts">
+<h2>Scripts<a class="headerlink" href="#scripts" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">cMonkeyQSub.py</span></code>: The control function for BUILD scripts. Writes QSub script.</li>
+<li><code class="docutils literal"><span class="pre">cMonkeyIniGen.py</span></code>: Templating function to generate cMonkey2 initialization (.ini) files.</li>
+<li><code class="docutils literal"><span class="pre">ensemblePicker.py</span></code>: Picks experiments to include in a run given user-supplied experimental blocks</li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="build-an-egrin-2-0-ensemble">
+<h2><strong>BUILD</strong> an EGRIN 2.0 ensemble<a class="headerlink" href="#build-an-egrin-2-0-ensemble" title="Permalink to this headline">¶</a></h2>
+<p>In this tutorial we will <strong>BUILD</strong> an ensemble for Mycobacterium tuberculosis using several example files, which we provide here</p>
+</div>
+<div class="section" id="step-1-generate-required-input-files">
+<h2>STEP 1: Generate required input files<a class="headerlink" href="#step-1-generate-required-input-files" title="Permalink to this headline">¶</a></h2>
+<p>First, let’s explore the required files.</p>
+<div class="section" id="ratios-csv">
+<h3><code class="docutils literal"><span class="pre">ratios.csv</span></code><a class="headerlink" href="#ratios-csv" title="Permalink to this headline">¶</a></h3>
+<p>A Tab-delimited or Comma-separated file containing a matrix of gene expression values across all conditions. Rows should correspond to genes and columns to individual conditions, as in the example file below.</p>
+<div class="figure">
+<img alt="Example ratios" src="_images/ratios.png" />
+</div>
+</div>
+<div class="section" id="blocks-csv">
+<h3><code class="docutils literal"><span class="pre">blocks.csv</span></code><a class="headerlink" href="#blocks-csv" title="Permalink to this headline">¶</a></h3>
+<p>A Tab-delimited or Comma-separated file containing the block membership for each experiment in the dataset as below.</p>
+<div class="figure">
+<img alt="Example blocks" src="_images/blocks.png" />
+</div>
+</div>
+<div class="section" id="inclusion-blocks-csv">
+<h3><code class="docutils literal"><span class="pre">inclusion_blocks.csv</span></code><a class="headerlink" href="#inclusion-blocks-csv" title="Permalink to this headline">¶</a></h3>
+<p>A Tab-delimited or Comma-separated file containing definitions for groups of blocks to be co-included in a cMonkey2 run, as defined above. These blocks are not <strong>strictly</strong> co-included in every cMonkey2 run, rather placement of a block into an inclusion block increases the likelihood that a particular block will be selected given that another block from its inclusion block has already been included in a particular cMonkey run.</p>
+<p>Each group of blocks should be separated by <code class="docutils literal"><span class="pre">:::</span></code>, as indicated in the template below. The names of each block should be the same as those defined in <code class="docutils literal"><span class="pre">blocks.csv.gz</span></code> above.</p>
+<p>The <code class="docutils literal"><span class="pre">block.sample.num</span></code> column is not required, but can be useful for evaluating the blocks.</p>
+<div class="figure">
+<img alt="Example inclusion_blocks" src="_images/inclusion_blocks.png" />
+</div>
+</div>
+<div class="section" id="exclusion-blocks-csv">
+<h3><code class="docutils literal"><span class="pre">exclusion_blocks.csv</span></code><a class="headerlink" href="#exclusion-blocks-csv" title="Permalink to this headline">¶</a></h3>
+<p>A Tab-delimited or Comma-separated file containing definitions for groups of <code class="docutils literal"><span class="pre">blocks</span></code> to be co-excluded from a cMonkey2 run. Typically these blocks are defined for testing purposes. If they are not defined, several random <code class="docutils literal"><span class="pre">exclusion</span> <span class="pre">blocks</span></code> will be defined in order to evaluate model over-fitting (to be implemented)</p>
+<p>The format for the <code class="docutils literal"><span class="pre">exclusion</span> <span class="pre">blocks</span></code> is the same as the <code class="docutils literal"><span class="pre">inclusion</span> <span class="pre">blocks</span></code> before. Each group of blocks should be separated by <code class="docutils literal"><span class="pre">:::</span></code>, as indicated in the template below. The names of each block refer to those defined in <code class="docutils literal"><span class="pre">blocks.csv.gz</span></code> above.</p>
+<p>Again, the <code class="docutils literal"><span class="pre">block.sample.num</span></code> column is not required.</p>
+<div class="figure">
+<img alt="Example exclusion_blocks" src="_images/exclusion_blocks.png" />
+</div>
+<p>Each of these files need to be supplied by the user.</p>
+</div>
+</div>
+<div class="section" id="optional-generate-custom-scoring-pipeline-and-files">
+<h2>(Optional) Generate custom scoring pipeline and files<a class="headerlink" href="#optional-generate-custom-scoring-pipeline-and-files" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="https://github.com/baliga-lab/cmonkey2">cMonkey2</a> can use a custom scoring pipeline. Currently, this is limited to set-enrichment.</p>
+<p>In this example, we will generate an ensemble. We do so by providing several additional options to the <code class="docutils literal"><span class="pre">cMonkeyQSub.py</span></code> function, namely:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">pipeline</span></code>: a JSON file containing custom scoring pipeline. Currently only set-enrichment pipeline is supported</li>
+<li><code class="docutils literal"><span class="pre">setenrich</span></code>: Name(s) of set enrichment ‘sets’ to include. Names should be comma separated.</li>
+<li><code class="docutils literal"><span class="pre">setenrich_files</span></code>: Comma-separated files containing set-enrichment sets. Multiple files should be separated by a comma.</li>
+</ul>
+</div></blockquote>
+<p>Users interested in building custom scoring pipelines or configuring set-enrichment should consult the cMonkey2 documentation.</p>
+</div>
+<div class="section" id="step-2-call-cmonkeyqsub-py">
+<h2>STEP 2: Call cMonkeyQSub.py<a class="headerlink" href="#step-2-call-cmonkeyqsub-py" title="Permalink to this headline">¶</a></h2>
+<p>Generating an ensemble configuration entails calling a single Python script. There are a number of required and optional parameters that can be passed to this command line function, which are described below:</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>%run ..//cMonkeyQSub.py -h
+
+usage: cMonkeyQSub.py [-h] --organism ORGANISM --ratios RATIOS --targetdir
+                      TARGETDIR [--numruns NUMRUNS] [--ncbi_code NCBI_CODE]
+                      [--mincols MINCOLS] [--num_cores NUM_CORES]
+                      [--max_tasks MAX_TASKS] [--user USER] [--csh]
+                      [--blocks BLOCKS] [--inclusion INCLUSION]
+                      [--exclusion EXCLUSION] [--pipeline PIPELINE]
+                      [--setenrich SETENRICH]
+                      [--setenrich_files SETENRICH_FILES]
+
+cMonkeyQSub.py - prepare cluster runs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --organism ORGANISM   3 letter organism code
+  --ratios RATIOS       Path to ratios file
+  --targetdir TARGETDIR
+                        Path to output directory
+  --numruns NUMRUNS     Number of cMonkey2 runs to configure
+  --ncbi_code NCBI_CODE
+                        NCBI organism code
+  --mincols MINCOLS     Minimum number of experiments to include in a cMonkey2
+                        run
+  --num_cores NUM_CORES
+                        Number of cores on cluster to request
+  --max_tasks MAX_TASKS
+                        Maximum number of jobs to be sent to the cluster at a
+                        time
+  --user USER           Cluster user name
+  --csh                 Flag to indicate C Shell
+  --blocks BLOCKS       Path to block definitions
+  --inclusion INCLUSION
+                        Path to inclusion block definitions
+  --exclusion EXCLUSION
+                        Path to exclusion block definitions
+  --pipeline PIPELINE   Path to scoring pipeline config file
+  --setenrich SETENRICH
+                        Name(s) of set enrichment &#39;sets&#39; to include. Names
+                        should be comma separated.
+  --setenrich_files SETENRICH_FILES
+                        Set enrichment files. File paths should be comma
+                        separated.
+</pre></div>
+</div>
+<p>Here we will concentrate on the required arguments.</p>
+<div class="section" id="required-arguments">
+<h3>Required Arguments<a class="headerlink" href="#required-arguments" title="Permalink to this headline">¶</a></h3>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">organism</span></code>: 3-letter organism code</li>
+<li><code class="docutils literal"><span class="pre">ratios</span></code>: ratios file described above</li>
+<li><code class="docutils literal"><span class="pre">targetdir</span></code>: location of a directory in which to configure the cMonkey2 runs</li>
+</ul>
+</div></blockquote>
+<p>If you do not supply block files as described above, the experiments to include in each run will be choosen randomly. Several random exclusion_blocks will be defined for testing (currently not supported - block files must be supplied / ANB 03042015)</p>
+<p>Here we will assume that the required files are in the local working directory. Furthermore, we will assume that the <code class="docutils literal"><span class="pre">cMonkeyQSub.py</span></code> is in the working directory and that all of the required modules are in your <code class="docutils literal"><span class="pre">$PYTHONPATH</span></code>.</p>
+<p>For the following example, we will generate 5 cMonkey2 runs.</p>
+<p>On the command line this would be called as follows:</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>python cMonkeyQSub.py --organism mtu --ratios ratios.csv --targetdir mtu-ens-2014 --numruns 10 --blocks blocks.csv --inclusion inclusion_blocks.csv --exclusion exclusion_blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ChIPSeq.csv,DE.csv --csh
+</pre></div>
+</div>
+<p>Optionally you can run this within the iPython, assuming this iPython notebook is running within the egrin2-tools Git repository.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>%run ..//cMonkeyQSub.py --organism mtu --ratios ./static/example_files/ratios.csv --targetdir mtu-ens-2014 --numruns 5 --blocks ./static/example_files/blocks.csv --inclusion ./static/example_files/inclusion_blocks.csv --exclusion ./static/example_files/exclusion_blocks.csv --pipeline ./static/example_files/setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ./static/example_files/ChIPSeq.csv,./static/example_files/DE.csv --csh
+
+Choosing ensemble conditions
+Writing reports
+Writing ratio files
+Done
+Writing ensemble config files
+Done
+</pre></div>
+</div>
+<p>If the scripts run successfully, they should print the messages above, populate the <code class="docutils literal"><span class="pre">mtu-ens-2014</span></code> directory with <code class="docutils literal"><span class="pre">ratios-xxx.tsv</span></code> files and <code class="docutils literal"><span class="pre">config-xxx.ini</span></code> files, as well as generate several report files in the parent directory. The ensemble report files contain information about the run composition, detailed for each report file below:</p>
+</div>
+</div>
+<div class="section" id="step-3-evaluate-ensemblereport-files">
+<h2>STEP 3: Evaluate ensembleReport files<a class="headerlink" href="#step-3-evaluate-ensemblereport-files" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal"><span class="pre">ensembleReport_runs.csv</span></code></p>
+<p>Global report of the ensemble run compositions.</p>
+<div class="figure">
+<img alt="Example ensemble report runs" src="_images/ensembleReport_runs.png" />
+</div>
+<p>The columns of this report file signify:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">run_num</span></code>: cMonkey run number</li>
+<li><code class="docutils literal"><span class="pre">ncols</span></code>: number of experiments included in the run</li>
+<li><code class="docutils literal"><span class="pre">excluded</span></code>: <code class="docutils literal"><span class="pre">exclusion</span> <span class="pre">block</span></code> that was excluded from the run (i.e., none of the conditions in this block will be in the run)</li>
+<li><code class="docutils literal"><span class="pre">blocks</span></code>: blocks that were included in the run</li>
+<li><code class="docutils literal"><span class="pre">cols</span></code>: names of experiments (from column names of <code class="docutils literal"><span class="pre">ratios.csv</span></code>) that were included in the run</li>
+</ul>
+</div></blockquote>
+<div class="section" id="ensemblereport-cols-csv">
+<h3><code class="docutils literal"><span class="pre">ensembleReport_cols.csv</span></code><a class="headerlink" href="#ensemblereport-cols-csv" title="Permalink to this headline">¶</a></h3>
+<p>Extends <code class="docutils literal"><span class="pre">blocks.csv</span></code>. Reports how often each condition was included in the ensemble.</p>
+<div class="figure">
+<img alt="Example ensemble report cols" src="_images/ensembleReport_cols.png" />
+</div>
+<p>The columns of this report file signify:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">sample</span></code>: experiment name, from <code class="docutils literal"><span class="pre">blocks.csv</span></code></li>
+<li><code class="docutils literal"><span class="pre">block</span></code>: <code class="docutils literal"><span class="pre">block</span></code> to which experiment belongs, from <code class="docutils literal"><span class="pre">blocks.csv</span></code></li>
+<li><code class="docutils literal"><span class="pre">ensemble_freq</span></code>: rate of inclusion in the ensemble</li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="ensemblereport-blocks-csv">
+<h3><code class="docutils literal"><span class="pre">ensembleReport_blocks.csv</span></code><a class="headerlink" href="#ensemblereport-blocks-csv" title="Permalink to this headline">¶</a></h3>
+<p>Reports how often each block was included in the ensemble.</p>
+<div class="figure">
+<img alt="Example ensemble report blocks" src="_images/ensembleReport_blocks.png" />
+</div>
+<p>The columns of this report file signify:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">block</span></code>: block name</li>
+<li><code class="docutils literal"><span class="pre">block_sample_num</span></code>: number of experiments annotated by this block</li>
+<li><code class="docutils literal"><span class="pre">ensemble_freq</span></code>: rate of inclusion in the ensemble</li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="ensemblereport-inclusionblocks-csv">
+<h3><code class="docutils literal"><span class="pre">ensembleReport_inclusionBlocks.csv</span></code><a class="headerlink" href="#ensemblereport-inclusionblocks-csv" title="Permalink to this headline">¶</a></h3>
+<p>Reports how often each inclusion block was included in the ensemble.</p>
+<div class="figure">
+<img alt="Example ensemble report inclusion blocks" src="_images/ensembleReport_inclusion.png" />
+</div>
+<p>The columns of this report file signify:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">inclusion_blocks</span></code>: inclusion_block name. blocks separated by <code class="docutils literal"><span class="pre">:::</span></code></li>
+<li><code class="docutils literal"><span class="pre">block_sample_num</span></code>: number of experiments included in this inclusion block</li>
+<li><code class="docutils literal"><span class="pre">freq_single</span></code>: rate at which a single block from this inclusion_block is included in the ensemble</li>
+<li><code class="docutils literal"><span class="pre">freq_coinclusion</span></code>: rate at which at least 2 of blocks from this inclusion_block are co-included in a single run</li>
+<li><code class="docutils literal"><span class="pre">max_coinclusion_all</span></code>: rate at which <strong>ALL</strong> of blocks from this inclusion_block are co-included in a single run across all ensemble runs</li>
+<li><code class="docutils literal"><span class="pre">max_coinclusion_sub</span></code>: rate at which <strong>ALL</strong> of blocks from this inclusion_block are co-included in a single run across all ensemble runs in which at least one of the blocks occurs</li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="ensemblereport-exclusionblocks-csv">
+<h3><code class="docutils literal"><span class="pre">ensembleReport_exclusionBlocks.csv</span></code><a class="headerlink" href="#ensemblereport-exclusionblocks-csv" title="Permalink to this headline">¶</a></h3>
+<p>Reports how often each exclusion block was excluded in the ensemble.</p>
+<div class="figure">
+<img alt="Example ensemble report exclusion blocks" src="_images/ensembleReport_exclusion.png" />
+</div>
+<p>The columns of this report file signify:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">exclusion_blocks</span></code>: exclusion block name</li>
+<li><code class="docutils literal"><span class="pre">block_sample_num</span></code>: number of experiments annotated by this exclusion block</li>
+<li><code class="docutils literal"><span class="pre">excluded_freq</span></code>: rate of exclusion in the ensemble</li>
+</ul>
+</div></blockquote>
+</div>
+</div>
+<div class="section" id="step-4-transfer-to-cluster-and-run-cmonkey2">
+<h2>STEP 4: Transfer to cluster and run cMonkey2<a class="headerlink" href="#step-4-transfer-to-cluster-and-run-cmonkey2" title="Permalink to this headline">¶</a></h2>
+<p>The entire targetdir (e.g. <code class="docutils literal"><span class="pre">mtu-ens-2014</span></code> in our example) is now ready to be transfered to the cluster, where you can generate the ensemble by running <code class="docutils literal"><span class="pre">org.sh</span></code>, where <code class="docutils literal"><span class="pre">org</span></code> is the 3-letter organism code you provided.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="index.html">
+    <img class="logo" src="_static/egrin2_logo_80px.png" alt="Logo"/>
+    
+    <h1 class="logo logo-name">egrin2-tools</h1>
+    
+  </a>
+</p>
+
+
+
+<p class="blurb">EGRIN2 tool chain</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=baliga-lab&repo=egrin2-tools&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html">Build</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Build Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#in-a-nutshell">In a nutshell</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#scripts">Scripts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#build-an-egrin-2-0-ensemble"><strong>BUILD</strong> an EGRIN 2.0 ensemble</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-1-generate-required-input-files">STEP 1: Generate required input files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#optional-generate-custom-scoring-pipeline-and-files">(Optional) Generate custom scoring pipeline and files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-2-call-cmonkeyqsub-py">STEP 2: Call cMonkeyQSub.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-3-evaluate-ensemblereport-files">STEP 3: Evaluate ensembleReport files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-4-transfer-to-cluster-and-run-cmonkey2">STEP 4: Transfer to cluster and run cMonkey2</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="assemble.html">Assemble</a></li>
+<li class="toctree-l1"><a class="reference internal" href="query.html">Query</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="build.html" title="previous chapter">Build</a></li>
+      <li>Next: <a href="assemble.html" title="next chapter">Assemble</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Aaron Brooks, David Reiss, Wei-ju Wu, Micheleen Harris.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.4</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/build_tutorial.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+    <a href="https://github.com/baliga-lab/egrin2-tools" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>
