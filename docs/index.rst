@@ -30,6 +30,10 @@ including running multiple cMonkey2 runs and postprocessing the cMonkey2 results
    Assemble <assemble>
    Assemble Tutorial <assemble_tutorial>
    Query <query>
+   Basic Mining Using agglom <basic_mining_agglom>
+   Basic Mining Using coremFinder <basic_mining_coremfinder>
+   Advanced Mining <advanced_mining>
+   Plot Expression Tutorial <plot_expression_tutorial>
 
 
 Indices and tables
