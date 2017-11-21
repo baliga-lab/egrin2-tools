@@ -8,7 +8,9 @@ Utilities and scripts for generating, assembling, and querying EGRIN**2.0** ense
 
 ## Documentation
 
-Documentation is available on the [wiki](http://nbviewer.ipython.org/github/baliga-lab/egrin2-tools/blob/master/doc/index.ipynb). [Developers](https://groups.google.com/d/forum/cmonkey-dev) and [users](https://groups.google.com/d/forum/cmonkey-users) may also refer to the cMonkey2 discussion groups for additional information. 
+See this project's [Github Pages](http://baliga-lab.github.io/egrin2-tools/) for documentation.
+
+[Developers](https://groups.google.com/d/forum/cmonkey-dev) and [users](https://groups.google.com/d/forum/cmonkey-users) may also refer to the cMonkey2 discussion groups for additional information. 
 
 ## System requirements
 
