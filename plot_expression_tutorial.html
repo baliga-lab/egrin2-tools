@@ -5,7 +5,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>Plot Expression Tutorial &#8212; egrin2-tools 1.0.0 documentation</title>
+    <title>TUTORIAL: Visualizing Basic EGRIN 2.0 queries &#8212; egrin2-tools 1.0.0 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
@@ -39,8 +39,137 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="section" id="plot-expression-tutorial">
-<h1>Plot Expression Tutorial<a class="headerlink" href="#plot-expression-tutorial" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="tutorial-visualizing-basic-egrin-2-0-queries">
+<h1>TUTORIAL: Visualizing Basic <cite>EGRIN 2.0</cite> queries<a class="headerlink" href="#tutorial-visualizing-basic-egrin-2-0-queries" title="Permalink to this headline">¶</a></h1>
+<p><em>In this tutorial, we will visualize gene expression resulting from basic EGRIN 2.0 queries</em></p>
+<div class="section" id="preliminaries">
+<h2>Preliminaries<a class="headerlink" href="#preliminaries" title="Permalink to this headline">¶</a></h2>
+<p>As described in the System Requirements, there are several dependencies that need to be satisfied to complete this tutorial, including:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">pymongo</span></code></li>
+<li><code class="docutils literal"><span class="pre">numpy</span></code></li>
+<li><code class="docutils literal"><span class="pre">pandas</span></code></li>
+<li><code class="docutils literal"><span class="pre">joblib</span></code></li>
+<li><code class="docutils literal"><span class="pre">scipy</span></code></li>
+<li><code class="docutils literal"><span class="pre">statsmodels</span></code></li>
+<li><code class="docutils literal"><span class="pre">itertools</span></code></li>
+</ul>
+</div></blockquote>
+<p>To query the ensemble, we must first load all of the query functions.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>import query.egrin2_query as e2q
+import query.egrin2_plot as e2p
+import pymongo
+</pre></div>
+</div>
+<p>We will also define the host and the database that we’d like to use. Host is the name of the machine hosting the EGRIN 2.0 MongoDB while db is the organism-specific EGRIN 2.0 database name to query.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>client = pymongo.MongoClient(host=&#39;baligadev&#39;)
+db = client[&#39;eco_db&#39;]
+</pre></div>
+</div>
+</div>
+<div class="section" id="basic-queries">
+<h2>Basic queries<a class="headerlink" href="#basic-queries" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="step-1-find-genes-in-a-corem">
+<h3>STEP 1: Find genes in a corem<a class="headerlink" href="#step-1-find-genes-in-a-corem" title="Permalink to this headline">¶</a></h3>
+<p>Here we will retrieve genes and experiments in which these genes are co-regulated from a specific corem.</p>
+<p>This type of information can be retrieved using the coremFinder function. To call this function we need to specify:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">x</span></code>: our query</li>
+<li><code class="docutils literal"><span class="pre">x_type</span></code>: our query type. This could be corems, genes, conditions, GREs, or specific-coregulatory edges. In this case we will use corem.</li>
+<li><code class="docutils literal"><span class="pre">y_type</span></code>: our target type. This is the type of information we would like to retrieve. The type can be any type described by x_type</li>
+</ul>
+</div></blockquote>
+<p>In addition we include the host and db variables defined above.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>corem = 1
+corem_genes = e2q.find_corem_info(db, corem, x_type=&quot;corem_id&quot;, y_type=&quot;genes&quot;)
+corem_genes.sort()
+print &quot;\nThere are %d genes in corem %d, including:\n&quot; % (len(corem_genes), corem)
+for i in corem_genes:
+    print i, &quot; is also called &quot;, e2q.row2id_batch(db, [i], return_field=&quot;name&quot; )[0]
+</pre></div>
+</div>
+<p>(TODO)</p>
+</div>
+<div class="section" id="step-2-find-experiments-where-these-genes-are-co-expressed">
+<h3>STEP 2: Find experiments where these genes are co-expressed<a class="headerlink" href="#step-2-find-experiments-where-these-genes-are-co-expressed" title="Permalink to this headline">¶</a></h3>
+<p>This query will also use the coremFinder function. To find conditions associated with our corem rather than genes, we simply change the y_type argument.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>corem_conditions = e2q.find_corem_info(db, corem, x_type=&quot;corem&quot;, y_type=&quot;conditions&quot;)
+corem_conditions.sort()
+print &quot;\nThere are %d conditions in which these genes are co-regulated, including:\n&quot; % len(corem_conditions)
+for i in corem_conditions[0:10]:
+    print i
+
+There are 418 conditions in which these genes are co-regulated, including:
+
+conditions
+</pre></div>
+</div>
+</div>
+<div class="section" id="step-3-retrieve-gene-expression-from-the-database">
+<h3>STEP 3: Retrieve gene expression from the database<a class="headerlink" href="#step-3-retrieve-gene-expression-from-the-database" title="Permalink to this headline">¶</a></h3>
+<p>To retrieve gene expression values for these genes and experiments we use the expressionFinder function. To call this function we specific the rows (genes) and columns (conditions), as well as the host and db as before.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>gene_expression = e2q.find_gene_expression(db, rows=corem_genes, cols=corem_conditions)
+</pre></div>
+</div>
+<p>(TODO)</p>
+</div>
+<div class="section" id="step-4-plot-expression-values">
+<h3>STEP 4. Plot expression values<a class="headerlink" href="#step-4-plot-expression-values" title="Permalink to this headline">¶</a></h3>
+<p>We have several options for plotting these gene expression values. We could plot the expression values as lines, or in a heatmap, or even as a boxplot for all genes in each condition.</p>
+<p>Each of these visualizations is available by calling a single function, plotExpression. To call this function we must provide:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">data</span></code>: this is the gene expression values, a Pandas data frame</li>
+<li><code class="docutils literal"><span class="pre">plot_type</span></code>: this is the type of plot to draw. Can be <code class="docutils literal"><span class="pre">boxplot</span></code> (default),line, or <code class="docutils literal"><span class="pre">heatmap</span></code></li>
+<li><code class="docutils literal"><span class="pre">ipynb</span></code>: logical indicating whether the plot will be drawn in an iPython notebook</li>
+<li><code class="docutils literal"><span class="pre">sort</span></code>: optionally sort the data (default: <code class="docutils literal"><span class="pre">FALSE</span></code>)</li>
+</ul>
+</div></blockquote>
+<p>It’s important to note that this function only requires a Pandas data frame, meaning you can use it to plot any kind of data (e.g. loaded from a text file).</p>
+<p>Additionally, if we are producing the plot in an iPython notebook, we need to set the argument ipynb = TRUE and call an additional function py.iplot on the value returned from plotExpression.</p>
+<p>Below are three examples, calling the plotExpression function with three different values for the plot_type argument: line, heatmap, and boxplot.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>line_plot = e2p.plotExpression(data=gene_expression, plot_type = &quot;line&quot;, ipynb=True, sort=False)
+py.iplot(line_plot)
+</pre></div>
+</div>
+<p>(TODO)</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>heatmap = plotExpression( data = gene_expression, plot_type = &quot;heatmap&quot;, ipynb = True )
+py.iplot( heatmap )
+</pre></div>
+</div>
+<p>(TODO)</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>boxplot = plotExpression( gene_expression, plot_type = &quot;boxplot&quot;, ipynb = True, sort = True )
+py.iplot( boxplot )
+</pre></div>
+</div>
+<p>(TODO)</p>
+</div>
+<div class="section" id="putting-it-all-together">
+<h3>Putting it all together<a class="headerlink" href="#putting-it-all-together" title="Permalink to this headline">¶</a></h3>
+<p>Here is the code. You can copy this to your own notebook or download a blank slate notebook here.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span># PLOT GENE EXPRESSION
+
+# prelims
+from query.egrin2_query import *
+host = &quot;&quot;
+db = &quot;&quot;
+
+corem = 1
+# find corem genes
+corem_genes =  coremFinder(x = corem,x_type = &quot;corem&quot;, y_type=&quot;genes&quot;,host=host,db=db)
+# find corem conditions
+corem_conditions =  coremFinder(x = corem,x_type = &quot;corem&quot;, y_type=&quot;conditions&quot;, host=host, db=db)
+# get gene expression
+gene_expression = expressionFinder(rows=corem_genes,cols=corem_conditions,host=host,db=db)
+# plot
+plot = plotExpression( data = gene_expression, plot_type = &quot;line&quot;, ipynb = True, sort = False )
+py.iplot( plot )
+</pre></div>
+</div>
+</div>
+</div>
 </div>
 
 
@@ -83,10 +212,14 @@
 <li class="toctree-l1"><a class="reference internal" href="assemble.html">Assemble</a></li>
 <li class="toctree-l1"><a class="reference internal" href="assemble_tutorial.html">Assemble Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="query.html">Query</a></li>
-<li class="toctree-l1"><a class="reference internal" href="basic_mining_agglom.html">Basic Mining Using ``agglom``</a></li>
-<li class="toctree-l1"><a class="reference internal" href="basic_mining_coremfinder.html">Basic Mining Using ``coremFinder``</a></li>
+<li class="toctree-l1"><a class="reference internal" href="basic_mining_agglom.html">Basic Mining Using agglom</a></li>
+<li class="toctree-l1"><a class="reference internal" href="basic_mining_coremfinder.html">Basic Mining Using coremFinder</a></li>
 <li class="toctree-l1"><a class="reference internal" href="advanced_mining.html">Advanced Mining</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Plot Expression Tutorial</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Plot Expression Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#preliminaries">Preliminaries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#basic-queries">Basic queries</a></li>
+</ul>
+</li>
 </ul>
 
 <div class="relations">

@@ -23,6 +23,7 @@
     <script type="text/javascript" src="_static/doctools.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Basic Mining Using coremFinder" href="basic_mining_coremfinder.html" />
     <link rel="prev" title="Query" href="query.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -41,6 +42,471 @@
             
   <div class="section" id="basic-mining-using-agglom">
 <h1>Basic Mining Using <code class="docutils literal"><span class="pre">agglom</span></code><a class="headerlink" href="#basic-mining-using-agglom" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="egrin2-0-mongodb-query-using-agglom">
+<h2>EGRIN2.0 MongoDB query using agglom<a class="headerlink" href="#egrin2-0-mongodb-query-using-agglom" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="set-up">
+<h3>Set-up<a class="headerlink" href="#set-up" title="Permalink to this headline">¶</a></h3>
+<p>Make sure <code class="docutils literal"><span class="pre">./egrin-tools/</span></code> folder is in your <code class="docutils literal"><span class="pre">$PYTHONPATH</span></code></p>
+<p>You can do this on Mac/Linux by adding the path to you Bash Shell Startup Files, e.g. <code class="docutils literal"><span class="pre">~/.bashrc</span></code> or <code class="docutils literal"><span class="pre">~/.bash_profile</span></code></p>
+<p>for example in <code class="docutils literal"><span class="pre">~/.bash_profile</span></code> add the following line:</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>export PYTHONPATH=$PYTHONPATH:path/to/egrin2-tools/
+</pre></div>
+</div>
+</div>
+<div class="section" id="load-required-modules">
+<h3>Load required modules<a class="headerlink" href="#load-required-modules" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-none"><div class="highlight"><pre><span></span>import query.egrin2_query as e2q
+import pymongo
+client = pymongo.MongoClient(host=&#39;baligadev&#39;)
+db = client[&#39;eco_db&#39;]
+</pre></div>
+</div>
+<p>There are several dependencies that need to be satisfied, including:</p>
+<blockquote>
+<div><ul class="simple">
+<li>pymongo</li>
+<li>numpy</li>
+<li>pandas</li>
+<li>joblib</li>
+<li>scipy</li>
+<li>statsmodels</li>
+<li>itertools</li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="agglom-function">
+<h3><code class="docutils literal"><span class="pre">agglom</span></code> function<a class="headerlink" href="#agglom-function" title="Permalink to this headline">¶</a></h3>
+<p>The agglom function is the centerpiece for querying information in the ensemble.</p>
+<p>Using this function you can co-associate any two bicluster features across the entire ensemble: so - biclusters, genes, conditions, and GREs with biclusters, genes, conditions, or GREs.</p>
+<p>If you stack multiple agglom calls you can quickly build very complex queries.</p>
+<p>The agglom function has a simple, universal format. Basically it needs an input (x), the type of that input (x_type), the desired output type (y_type), and some infomration about the location of the EGRIN 2.0 MongoDB.</p>
+<p>The function will output a table of pvalues that reports the signifigance for each element in your output query type.</p>
+<p>Let’s take a look at the function itself, then we will explore serveral examples:</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>?e2q.agglom
+</pre></div>
+</div>
+<p><strong>Example 1: find co-regulated genes</strong></p>
+<p>In this example, we will mine the ensemble for genes discovered in biclusters with the gene E. coli carbamoyl phosphate synthetase, carA (b0032)</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>carA_genes = e2q.agglom(db, x=&quot;b0032&quot;, x_type=&quot;genes&quot;, y_type=&quot;genes&quot;)
+carA_genes
+</pre></div>
+</div>
+<table border="1" class="docutils">
+<colgroup>
+<col width="8%" />
+<col width="10%" />
+<col width="16%" />
+<col width="21%" />
+<col width="21%" />
+<col width="24%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">gene</th>
+<th class="head">counts</th>
+<th class="head">all_counts</th>
+<th class="head">pval</th>
+<th class="head">qval_BH</th>
+<th class="head">qval_bonferroni</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>b1062</td>
+<td>152</td>
+<td>198</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="row-odd"><td>b0336</td>
+<td>153</td>
+<td>198</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="row-even"><td>b0337</td>
+<td>154</td>
+<td>198</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="row-odd"><td>b4244</td>
+<td>167</td>
+<td>198</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="row-even"><td>b4245</td>
+<td>169</td>
+<td>198</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="row-odd"><td>b0033</td>
+<td>173</td>
+<td>198</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="row-even"><td>b0032</td>
+<td>198</td>
+<td>198</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="row-odd"><td>b2499</td>
+<td>142</td>
+<td>198</td>
+<td>3.783051e-300</td>
+<td>4.073085e-298</td>
+<td>3.665776e-297</td>
+</tr>
+<tr class="row-even"><td>b2476</td>
+<td>142</td>
+<td>198</td>
+<td>3.783051e-300</td>
+<td>4.073085e-298</td>
+<td>3.665776e-297</td>
+</tr>
+<tr class="row-odd"><td>b2313</td>
+<td>141</td>
+<td>198</td>
+<td>5.664712e-297</td>
+<td>4.574255e-295</td>
+<td>5.489106e-294</td>
+</tr>
+<tr class="row-even"><td>b2312</td>
+<td>141</td>
+<td>198</td>
+<td>5.664712e-297</td>
+<td>4.574255e-295</td>
+<td>5.489106e-294</td>
+</tr>
+<tr class="row-odd"><td>…</td>
+<td>…</td>
+<td>…</td>
+<td>…</td>
+<td>…</td>
+<td>…</td>
+</tr>
+</tbody>
+</table>
+<p>259 rows × 5 columns</p>
+<p>There are several things to note in this query.</p>
+<p>First the arguments:</p>
+<blockquote>
+<div><ul class="simple">
+<li>x specfies the query. This can be gene(s), condition(s), GRE(s), or bicluster(s). x can be a single entity or a list of entitites of the same type.</li>
+<li>x_type indicates the type of x. This can include gene, condition, gres, and biclusters. Basically: “what is x?” The parameter typing is pretty flexible, so - for example - rows can be used instead of genes.</li>
+<li>y_type is the type of. Again, genes, conditions, gres, or biclusters.</li>
+<li>host specifies where the MongoDB database is running. In this case it is running on a machine called baligadev. If you are hosting the database locally this would be localhost</li>
+<li>db is the name of the database you want to perform the query in. Typically databases are specified by the three letter organism code (e.g., eco) followed by _db. A list of maintained databases is available here.</li>
+</ul>
+</div></blockquote>
+<p>Also note the output:</p>
+<p>This is a table of all genes that are frequently co-discovered in biclusters with b0032 (carA). They are sorted by their relative “enrichment” in the sample x (where lower pval = greater enrichment). This is quantified by the hypergeometric distribution. To account for multiple testing, two corrections are included: Benjamini-Hochberg correction (qval_BH; less stringent) and Bonferrnoni correction (qval_bonferroni; more stringent).</p>
+<p><strong>Example 2: what if gene names have different formats ?</strong></p>
+<p>We can easily change the format of x, which makes it easy to specify genes in any format, e.g. NCBI annotation or common name. Let’s try to include a list of genes with two different naming formats. This time we will only return the first few elements using .head()</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>e2q.agglom(db, x=[&quot;b0032&quot;,&quot;pyrL&quot;,&quot;b0031&quot;], x_type=&quot;genes&quot;, y_type= &quot;genes&quot;).head()
+</pre></div>
+</div>
+<table border="1" class="docutils">
+<colgroup>
+<col width="11%" />
+<col width="13%" />
+<col width="21%" />
+<col width="9%" />
+<col width="15%" />
+<col width="32%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">gene</th>
+<th class="head">counts</th>
+<th class="head">all_counts</th>
+<th class="head">pval</th>
+<th class="head">qval_BH</th>
+<th class="head">qval_bonferroni</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>b4244</td>
+<td>179</td>
+<td>198</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="row-odd"><td>b0033</td>
+<td>180</td>
+<td>198</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="row-even"><td>b4245</td>
+<td>185</td>
+<td>198</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="row-odd"><td>b0031</td>
+<td>198</td>
+<td>198</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="row-even"><td>b4246</td>
+<td>198</td>
+<td>198</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>5 rows × 5 columns</p>
+<p>Here, two of the genes are Blattner Ids (b****), while the other is a common name. This is no problem for the query.</p>
+<p>The lookup table is pretty extensive for genes (it comes from MicrobesOnline) so anything from common name to GI number can be matched. Cool, huh?</p>
+<p><strong>Example 3: alternative logic</strong></p>
+<p>You can specify the type of logic to use in grouping your query.</p>
+<p>For example, do you want do find biclusters where all genes x in your query are present (and logic) or biclusters where at least one of the genes is present (or logic). You can change the logical grouping of your query by specifying the logic parameter.</p>
+<p>This parameter can take one of three values: and, or, or nor. By default the command uses or logic.</p>
+<p>Here we change the logic employed in the previous query to “and”, meaning that a bicluster must contain all of the query genes. Notice how the values change.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>e2q.agglom(db, x=[&quot;b0032&quot;,&quot;pyrL&quot;,&quot;b0031&quot;], x_type=&quot;genes&quot;, y_type=&quot;genes&quot;, logic=&quot;and&quot;).head()
+</pre></div>
+</div>
+<table border="1" class="docutils">
+<colgroup>
+<col width="8%" />
+<col width="10%" />
+<col width="17%" />
+<col width="20%" />
+<col width="20%" />
+<col width="25%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">gene</th>
+<th class="head">counts</th>
+<th class="head">all_counts</th>
+<th class="head">pval</th>
+<th class="head">qval_BH</th>
+<th class="head">qval_bonferroni</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>b4246</td>
+<td>25</td>
+<td>198</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="row-odd"><td>b0032</td>
+<td>25</td>
+<td>198</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="row-even"><td>b0031</td>
+<td>25</td>
+<td>198</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="row-odd"><td>b4006</td>
+<td>24</td>
+<td>198</td>
+<td>5.510260e-57</td>
+<td>3.981163e-55</td>
+<td>1.592465e-54</td>
+</tr>
+<tr class="row-even"><td>b1062</td>
+<td>23</td>
+<td>198</td>
+<td>2.604624e-53</td>
+<td>1.075338e-51</td>
+<td>7.527363e-51</td>
+</tr>
+</tbody>
+</table>
+<p>5 rows × 5 columns</p>
+<p>Logical operations can provide a substantial amount of power to your queries. For example, imagine that you not only want to know when b0032, pyrL, and b0031 are co-regulated but also when they are not. This can be done using the logical operator nor.</p>
+<p><strong>Example 4: other associations</strong></p>
+<p>So far we have mined gene-gene co-associations, but there are other associations in the ensemble that are also available, including conditions, and GREs, and biclusters.</p>
+<p>Each of these can be accessed by changing the x_type and y_type parameter.</p>
+<p><strong>Conditions</strong></p>
+<p>For example to find conditions where these genes are co-regulated, we change y_type to conditions:</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>e2q.agglom(db, x=[&quot;b0032&quot;,&quot;pyrL&quot;,&quot;b0031&quot;], x_type=&quot;genes&quot;, y_type=&quot;conditions&quot;, logic=&quot;or&quot;).head()
+</pre></div>
+</div>
+<table border="1" class="docutils">
+<colgroup>
+<col width="29%" />
+<col width="8%" />
+<col width="13%" />
+<col width="15%" />
+<col width="15%" />
+<col width="19%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">conditions</th>
+<th class="head">counts</th>
+<th class="head">all_counts</th>
+<th class="head">pval</th>
+<th class="head">qval_BH</th>
+<th class="head">qval_bonferroni</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>rb_del_rpoS_biofilm</td>
+<td>240</td>
+<td>12921</td>
+<td>2.849586e-13</td>
+<td>7.228851e-11</td>
+<td>1.327907e-10</td>
+</tr>
+<tr class="row-odd"><td>biofilm_24hr_del_yceP</td>
+<td>239</td>
+<td>12879</td>
+<td>3.889790e-13</td>
+<td>7.228851e-11</td>
+<td>1.812642e-10</td>
+</tr>
+<tr class="row-even"><td>ik_H2_T4</td>
+<td>232</td>
+<td>12380</td>
+<td>4.653767e-13</td>
+<td>7.228851e-11</td>
+<td>2.168655e-10</td>
+</tr>
+<tr class="row-odd"><td>MG1063_uninduced_t180</td>
+<td>232</td>
+<td>12543</td>
+<td>2.190004e-12</td>
+<td>2.551355e-10</td>
+<td>1.020542e-09</td>
+</tr>
+<tr class="row-even"><td>rb_del_rpoS_exponential</td>
+<td>226</td>
+<td>12198</td>
+<td>5.366065e-12</td>
+<td>5.001173e-10</td>
+<td>2.500586e-09</td>
+</tr>
+</tbody>
+</table>
+<p>5 rows × 5 columns</p>
+<p><strong>GREs</strong></p>
+<p>To discover GREs located upstream of these genes we change y_type to gre:</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>e2q.agglom(db, x=[&quot;b0032&quot;,&quot;pyrL&quot;,&quot;b0031&quot;], x_type=&quot;genes&quot;, y_type=&quot;gre&quot;, logic=&quot;or&quot;).head()
+</pre></div>
+</div>
+<table border="1" class="docutils">
+<colgroup>
+<col width="7%" />
+<col width="10%" />
+<col width="16%" />
+<col width="21%" />
+<col width="21%" />
+<col width="25%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">GREs</th>
+<th class="head">counts</th>
+<th class="head">all_counts</th>
+<th class="head">pval</th>
+<th class="head">qval_BH</th>
+<th class="head">qval_bonferroni</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>11</td>
+<td>187</td>
+<td>231</td>
+<td>9.726498e-267</td>
+<td>5.252309e-265</td>
+<td>5.252309e-265</td>
+</tr>
+<tr class="row-odd"><td>81</td>
+<td>42</td>
+<td>48</td>
+<td>2.936386e-64</td>
+<td>7.928242e-63</td>
+<td>1.585648e-62</td>
+</tr>
+<tr class="row-even"><td>12</td>
+<td>41</td>
+<td>211</td>
+<td>6.248311e-26</td>
+<td>1.124696e-24</td>
+<td>3.374088e-24</td>
+</tr>
+<tr class="row-odd"><td>309</td>
+<td>14</td>
+<td>19</td>
+<td>2.195152e-21</td>
+<td>2.606271e-20</td>
+<td>1.185382e-19</td>
+</tr>
+<tr class="row-even"><td>197</td>
+<td>16</td>
+<td>27</td>
+<td>2.413214e-21</td>
+<td>2.606271e-20</td>
+<td>1.303136e-19</td>
+</tr>
+</tbody>
+</table>
+<p>5 rows × 5 columns</p>
+<p>Note that GRE names in ensemble are integer values, thus GRE #1 is simply called 1</p>
+<p><strong>Biclusters</strong></p>
+<p>Finally: to return biclusters we change y_type to bicluster.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>e2q.agglom(db, x=[&quot;b0032&quot;,&quot;pyrL&quot;,&quot;b0031&quot;], x_type=&quot;genes&quot;, y_type=&quot;bicluster&quot;, logic=&quot;or&quot;).head()
+
+WARNING:root:Will return bicluster _id. The results might surprise you...
+</pre></div>
+</div>
+<table border="1" class="docutils">
+<colgroup>
+<col width="27%" />
+<col width="73%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Bicluster</th>
+<th class="head">_id</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>0</td>
+<td>54ee42396a208812a205295a</td>
+</tr>
+<tr class="row-odd"><td>1</td>
+<td>54ee42396a208812a2052982</td>
+</tr>
+<tr class="row-even"><td>2</td>
+<td>54ee42826a208812a2052b61</td>
+</tr>
+<tr class="row-odd"><td>3</td>
+<td>54ee42836a208812a2052ce0</td>
+</tr>
+<tr class="row-even"><td>4</td>
+<td>54ee430d6a208812a2053120</td>
+</tr>
+</tbody>
+</table>
+<p>5 rows × 1 columns</p>
+<p>Please note that this returns MongoDB _ids for the biclusters, which are not by themselves useful or informative. Rather, these _ids can be used in other queries (e.g. fimoFinder) or to query MongoDB directly.</p>
+</div>
+</div>
 </div>
 
 
@@ -83,7 +549,13 @@
 <li class="toctree-l1"><a class="reference internal" href="assemble.html">Assemble</a></li>
 <li class="toctree-l1"><a class="reference internal" href="assemble_tutorial.html">Assemble Tutorial</a></li>
 <li class="toctree-l1"><a class="reference internal" href="query.html">Query</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Basic Mining Using ``agglom``</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Basic Mining Using agglom</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#egrin2-0-mongodb-query-using-agglom">EGRIN2.0 MongoDB query using agglom</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="basic_mining_coremfinder.html">Basic Mining Using coremFinder</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced_mining.html">Advanced Mining</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plot_expression_tutorial.html">Plot Expression Tutorial</a></li>
 </ul>
 
 <div class="relations">
@@ -91,6 +563,7 @@
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
       <li>Previous: <a href="query.html" title="previous chapter">Query</a></li>
+      <li>Next: <a href="basic_mining_coremfinder.html" title="next chapter">Basic Mining Using <code class="docutils literal"><span class="pre">coremFinder</span></code></a></li>
   </ul></li>
 </ul>
 </div>
