@@ -37,7 +37,7 @@ Additionally, the Python modules described in this documentation's dependencies 
 Scripts
 -------
 
-  * ``cMonkeyQSub.py``: The control function for BUILD scripts. Writes QSub script.
+  * ``generate_cm2_runs.py``: The control function for BUILD scripts. Writes QSub script.
   * ``cMonkeyIniGen.py``: Templating function to generate cMonkey2 initialization (.ini) files.
   * ``ensemblePicker.py``: Picks experiments to include in a run given user-supplied experimental blocks
 
@@ -109,8 +109,8 @@ In this example, we will generate an ensemble. We do so by providing several add
 
 Users interested in building custom scoring pipelines or configuring set-enrichment should consult the cMonkey2 documentation.
 
-STEP 2: Call cMonkeyQSub.py
----------------------------
+STEP 2: Call generate_cm2_runs.py
+---------------------------------
 
 Generating an ensemble configuration entails calling a single Python script. There are a number of required and optional parameters that can be passed to this command line function, which are described below:
 
@@ -118,18 +118,18 @@ Generating an ensemble configuration entails calling a single Python script. The
 
 ::
 
-   %run ..//cMonkeyQSub.py -h
+   $ python generate_cm2_runs.py -h
 
-   usage: cMonkeyQSub.py [-h] --organism ORGANISM --ratios RATIOS --targetdir
-                         TARGETDIR [--numruns NUMRUNS] [--ncbi_code NCBI_CODE]
-                         [--mincols MINCOLS] [--num_cores NUM_CORES]
-                         [--max_tasks MAX_TASKS] [--user USER] [--csh]
-                         [--blocks BLOCKS] [--inclusion INCLUSION]
-                         [--exclusion EXCLUSION] [--pipeline PIPELINE]
-                         [--setenrich SETENRICH]
-                         [--setenrich_files SETENRICH_FILES]
+   usage: generate_cm2_runs.py [-h] --organism ORGANISM --ratios RATIOS
+                               --targetdir TARGETDIR [--numruns NUMRUNS]
+                               [--ncbi_code NCBI_CODE] [--mincols MINCOLS]
+                               [--num_cores NUM_CORES] [--max_tasks MAX_TASKS]
+                               [--user USER] [--csh] [--blocks BLOCKS]
+                               [--inclusion INCLUSION] [--exclusion EXCLUSION]
+                               [--pipeline PIPELINE] [--setenrich SETENRICH]
+                               [--setenrich_files SETENRICH_FILES]
 
-   cMonkeyQSub.py - prepare cluster runs
+   generate_cm2_params.py - prepare cluster runs for Sun Grid Engine
 
    optional arguments:
      -h, --help            show this help message and exit
@@ -173,7 +173,7 @@ Required Arguments
 
 If you do not supply block files as described above, the experiments to include in each run will be choosen randomly. Several random exclusion_blocks will be defined for testing (currently not supported - block files must be supplied / ANB 03042015)
 
-Here we will assume that the required files are in the local working directory. Furthermore, we will assume that the ``cMonkeyQSub.py`` is in the working directory and that all of the required modules are in your ``$PYTHONPATH``.
+Here we will assume that the required files are in the local working directory. Furthermore, we will assume that the ``generate_cm2_runs.py`` is in the working directory and that all of the required modules are in your ``$PYTHONPATH``.
 
 For the following example, we will generate 5 cMonkey2 runs.
 
@@ -183,7 +183,7 @@ On the command line this would be called as follows:
 
 ::
 
-   python cMonkeyQSub.py --organism mtu --ratios ratios.csv --targetdir mtu-ens-2014 --numruns 10 --blocks blocks.csv --inclusion inclusion_blocks.csv --exclusion exclusion_blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ChIPSeq.csv,DE.csv --csh
+   $ python generate_cm2_runs.py --organism mtu --ratios ratios.csv --targetdir mtu-ens-2014 --numruns 10 --blocks blocks.csv --inclusion inclusion_blocks.csv --exclusion exclusion_blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ChIPSeq.csv,DE.csv --csh
 
 
 Optionally you can run this within the iPython, assuming this iPython notebook is running within the egrin2-tools Git repository.
@@ -192,8 +192,7 @@ Optionally you can run this within the iPython, assuming this iPython notebook i
 
 ::
 
-
-   %run ..//cMonkeyQSub.py --organism mtu --ratios ./static/example_files/ratios.csv --targetdir mtu-ens-2014 --numruns 5 --blocks ./static/example_files/blocks.csv --inclusion ./static/example_files/inclusion_blocks.csv --exclusion ./static/example_files/exclusion_blocks.csv --pipeline ./static/example_files/setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ./static/example_files/ChIPSeq.csv,./static/example_files/DE.csv --csh
+   %run ..//generate_cm2_runs.py --organism mtu --ratios ./static/example_files/ratios.csv --targetdir mtu-ens-2014 --numruns 5 --blocks ./static/example_files/blocks.csv --inclusion ./static/example_files/inclusion_blocks.csv --exclusion ./static/example_files/exclusion_blocks.csv --pipeline ./static/example_files/setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ./static/example_files/ChIPSeq.csv,./static/example_files/DE.csv --csh
 
    Choosing ensemble conditions
    Writing reports

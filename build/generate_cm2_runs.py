@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""cm2sge.py
+"""generate_cm2_runs.py
 This is a tool to prepare a directory for ensemble runs. Given an organism code
 and the ratios, matrix, split up the matrix into sub matrices and create
 SGE qsub shell scripts
@@ -12,7 +12,7 @@ python cm2sge.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir
 
 Without pre-defined condition blocks:
 
-python cm2sge.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir mtb-ens-20141230 --numruns 20 --mincols 50 --num_cores 1 --csh
+python generate_cm2_runs.py --organism mtu --ratios 20141130.MTB.all.ratios.csv --targetdir mtb-ens-20141230 --numruns 20 --mincols 50 --num_cores 1 --csh
 """
 import argparse
 import os
@@ -26,7 +26,7 @@ import cmconfig
 import ensemble
 
 
-DESCRIPTION = "cm2sge.py - prepare cluster runs for Sun Grid Engine"
+DESCRIPTION = "generate_cm2_runs.py - prepare cluster runs for Sun Grid Engine"
 
 # Templates for Bourne Shell
 QSUB_TEMPLATE_HEADER = """#!/bin/bash
@@ -48,7 +48,7 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -pe serial %d
 #$ -l mem_free=10G
 
-python cmonkey.py --organism %s --ratios %s --config %s --out %s
+cmonkey2 --organism %s --config %s --out %s %s
 
 bzip2 -f %s/*.pkl
 """
@@ -142,8 +142,8 @@ if __name__ == '__main__':
                                   login,
                                   args.max_tasks,
                                   args.organism,
-                                  os.path.join(args.targetdir, "ratios-$BATCHNUM.tsv"),
                                   os.path.join(args.targetdir, "config-$BATCHNUM.ini"),
                                   "%s-out-$BATCHNUM" % (args.organism),
+                                  os.path.join(args.targetdir, "ratios-$BATCHNUM.tsv"),
                                   "%s-out-$BATCHNUM" % (args.organism)))
         logging.info("Done")
