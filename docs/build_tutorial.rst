@@ -101,7 +101,7 @@ Each of these files need to be supplied by the user.
 
 `cMonkey2 <https://github.com/baliga-lab/cmonkey2>`_ can use a custom scoring pipeline. Currently, this is limited to set-enrichment.
 
-In this example, we will generate an ensemble. We do so by providing several additional options to the ``cMonkeyQSub.py`` function, namely:
+In this example, we will generate an ensemble. We do so by providing several additional options to the ``generate_cm2_runs.py`` function, namely:
 
   * ``pipeline``: a JSON file containing custom scoring pipeline. Currently only set-enrichment pipeline is supported
   * ``setenrich``: Name(s) of set enrichment 'sets' to include. Names should be comma separated.
@@ -128,6 +128,7 @@ Generating an ensemble configuration entails calling a single Python script. The
                                [--inclusion INCLUSION] [--exclusion EXCLUSION]
                                [--pipeline PIPELINE] [--setenrich SETENRICH]
                                [--setenrich_files SETENRICH_FILES]
+                               [--rsat_base_url RSAT_BASE_URL]
 
    generate_cm2_params.py - prepare cluster runs for Sun Grid Engine
 
@@ -161,6 +162,8 @@ Generating an ensemble configuration entails calling a single Python script. The
      --setenrich_files SETENRICH_FILES
                            Set enrichment files. File paths should be comma
                            separated.
+     --rsat_base_url RSAT_BASE_URL
+                           Alternative RSAT base URL.
 
 Here we will concentrate on the required arguments.
 
@@ -284,4 +287,13 @@ The columns of this report file signify:
 STEP 4: Transfer to cluster and run cMonkey2
 --------------------------------------------
 
-The entire targetdir (e.g. ``mtu-ens-2014`` in our example) is now ready to be transfered to the cluster, where you can generate the ensemble by running ``org.sh``, where ``org`` is the 3-letter organism code you provided.
+The entire targetdir (e.g. ``mtu-ens-2014`` in our example) is now ready to be transfered to the cluster, where you can generate the ensemble by running ``<org>.sh``, where ``<org>`` is the 3-letter organism code you provided. In our example case this would be ``mtu.sh``.
+
+**Example for a SGE submission:**
+
+.. highlight:: none
+
+::
+
+  $ cd <target directory>
+  $ qsub mtu.sh

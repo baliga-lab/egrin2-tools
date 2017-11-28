@@ -19,6 +19,7 @@ import os
 import itertools
 import logging
 import random
+import shutil
 
 import datamatrix as dm
 # need to be in python path!!!
@@ -48,7 +49,7 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -pe serial %d
 #$ -l mem_free=10G
 
-cmonkey2 --organism %s --config %s --out %s %s
+cmonkey2 --organism %s --config %s --out %s --minimize_io %s %s
 
 bzip2 -f %s/*.pkl
 """
@@ -74,7 +75,7 @@ QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -pe serial %d
 #$ -l mem_free=10G
 
-python cmonkey.py --organism %s --ratios %s --config %s --out %s --minimize_io
+cmonkey2 --organism %s --config %s --out %s --minimize_io %s %s
 
 bzip2 -f %s/*.pkl
 """
@@ -106,6 +107,7 @@ if __name__ == '__main__':
     parser.add_argument('--pipeline', default=None, help="Path to scoring pipeline config file")
     parser.add_argument('--setenrich', default=None, help="Name(s) of set enrichment 'sets' to include. Names should be comma separated.")
     parser.add_argument('--setenrich_files', default=None, help="Set enrichment files. File paths should be comma separated.")
+    parser.add_argument('--rsat_base_url', default=None, help="Alternative RSAT base URL.")
     args = parser.parse_args()
 
     if args.csh:
@@ -129,21 +131,31 @@ if __name__ == '__main__':
         ensemble.make_ensemble_ratios(args.ratios, args.blocks, args.exclusion, args.inclusion,
                                       args.numruns, args.targetdir)
 
-    cmconfig.make_config_files(args.num_cores, args.setenrich.split(','),
-                               args.setenrich_files.split(","), args.numruns,
-                               args.pipeline, args.targetdir)
+    enrich_sets = args.setenrich.split(",")
+    setenrich_files = args.setenrich_files.split(",")
+    stripped_setenrich_files = [f.split('/')[-1] for f in setenrich_files]
+    cmconfig.make_config_files(args.num_cores, enrich_sets, stripped_setenrich_files,
+                               args.numruns, args.pipeline.split('/')[-1], args.targetdir)
+    # copy auxiliary files
+    shutil.copy(args.pipeline, args.targetdir)
+    for f in setenrich_files:
+        shutil.copy(f, args.targetdir)
 
     with open(os.path.join(args.targetdir, "%s.sh" % args.organism), 'w') as outfile:
         login = args.user if args.user is not None else os.getlogin()
         outfile.write(header)
+        rsat_base_url = ""
+        if args.rsat_base_url is not None:
+            rsat_base_url = "--rsat_base_url %s" % args.rsat_base_url
         outfile.write(template % (login,
                                   args.numruns,
                                   args.num_cores,
                                   login,
                                   args.max_tasks,
                                   args.organism,
-                                  os.path.join(args.targetdir, "config-$BATCHNUM.ini"),
+                                  "config-$BATCHNUM.ini",
                                   "%s-out-$BATCHNUM" % (args.organism),
-                                  os.path.join(args.targetdir, "ratios-$BATCHNUM.tsv"),
+                                  rsat_base_url,
+                                  "ratios-$BATCHNUM.tsv",
                                   "%s-out-$BATCHNUM" % (args.organism)))
         logging.info("Done")
