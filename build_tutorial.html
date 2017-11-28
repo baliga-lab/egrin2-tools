@@ -75,7 +75,7 @@
 <h2>Scripts<a class="headerlink" href="#scripts" title="Permalink to this headline">¶</a></h2>
 <blockquote>
 <div><ul class="simple">
-<li><code class="docutils literal"><span class="pre">cMonkeyQSub.py</span></code>: The control function for BUILD scripts. Writes QSub script.</li>
+<li><code class="docutils literal"><span class="pre">generate_cm2_runs.py</span></code>: The control function for BUILD scripts. Writes QSub script.</li>
 <li><code class="docutils literal"><span class="pre">cMonkeyIniGen.py</span></code>: Templating function to generate cMonkey2 initialization (.ini) files.</li>
 <li><code class="docutils literal"><span class="pre">ensemblePicker.py</span></code>: Picks experiments to include in a run given user-supplied experimental blocks</li>
 </ul>
@@ -125,7 +125,7 @@
 <div class="section" id="optional-generate-custom-scoring-pipeline-and-files">
 <h2>(Optional) Generate custom scoring pipeline and files<a class="headerlink" href="#optional-generate-custom-scoring-pipeline-and-files" title="Permalink to this headline">¶</a></h2>
 <p><a class="reference external" href="https://github.com/baliga-lab/cmonkey2">cMonkey2</a> can use a custom scoring pipeline. Currently, this is limited to set-enrichment.</p>
-<p>In this example, we will generate an ensemble. We do so by providing several additional options to the <code class="docutils literal"><span class="pre">cMonkeyQSub.py</span></code> function, namely:</p>
+<p>In this example, we will generate an ensemble. We do so by providing several additional options to the <code class="docutils literal"><span class="pre">generate_cm2_runs.py</span></code> function, namely:</p>
 <blockquote>
 <div><ul class="simple">
 <li><code class="docutils literal"><span class="pre">pipeline</span></code>: a JSON file containing custom scoring pipeline. Currently only set-enrichment pipeline is supported</li>
@@ -135,21 +135,22 @@
 </div></blockquote>
 <p>Users interested in building custom scoring pipelines or configuring set-enrichment should consult the cMonkey2 documentation.</p>
 </div>
-<div class="section" id="step-2-call-cmonkeyqsub-py">
-<h2>STEP 2: Call cMonkeyQSub.py<a class="headerlink" href="#step-2-call-cmonkeyqsub-py" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="step-2-call-generate-cm2-runs-py">
+<h2>STEP 2: Call generate_cm2_runs.py<a class="headerlink" href="#step-2-call-generate-cm2-runs-py" title="Permalink to this headline">¶</a></h2>
 <p>Generating an ensemble configuration entails calling a single Python script. There are a number of required and optional parameters that can be passed to this command line function, which are described below:</p>
-<div class="highlight-none"><div class="highlight"><pre><span></span>%run ..//cMonkeyQSub.py -h
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ python generate_cm2_runs.py -h
 
-usage: cMonkeyQSub.py [-h] --organism ORGANISM --ratios RATIOS --targetdir
-                      TARGETDIR [--numruns NUMRUNS] [--ncbi_code NCBI_CODE]
-                      [--mincols MINCOLS] [--num_cores NUM_CORES]
-                      [--max_tasks MAX_TASKS] [--user USER] [--csh]
-                      [--blocks BLOCKS] [--inclusion INCLUSION]
-                      [--exclusion EXCLUSION] [--pipeline PIPELINE]
-                      [--setenrich SETENRICH]
-                      [--setenrich_files SETENRICH_FILES]
+usage: generate_cm2_runs.py [-h] --organism ORGANISM --ratios RATIOS
+                            --targetdir TARGETDIR [--numruns NUMRUNS]
+                            [--ncbi_code NCBI_CODE] [--mincols MINCOLS]
+                            [--num_cores NUM_CORES] [--max_tasks MAX_TASKS]
+                            [--user USER] [--csh] [--blocks BLOCKS]
+                            [--inclusion INCLUSION] [--exclusion EXCLUSION]
+                            [--pipeline PIPELINE] [--setenrich SETENRICH]
+                            [--setenrich_files SETENRICH_FILES]
+                            [--rsat_base_url RSAT_BASE_URL]
 
-cMonkeyQSub.py - prepare cluster runs
+generate_cm2_params.py - prepare cluster runs for Sun Grid Engine
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -181,6 +182,8 @@ optional arguments:
   --setenrich_files SETENRICH_FILES
                         Set enrichment files. File paths should be comma
                         separated.
+  --rsat_base_url RSAT_BASE_URL
+                        Alternative RSAT base URL.
 </pre></div>
 </div>
 <p>Here we will concentrate on the required arguments.</p>
@@ -194,14 +197,14 @@ optional arguments:
 </ul>
 </div></blockquote>
 <p>If you do not supply block files as described above, the experiments to include in each run will be choosen randomly. Several random exclusion_blocks will be defined for testing (currently not supported - block files must be supplied / ANB 03042015)</p>
-<p>Here we will assume that the required files are in the local working directory. Furthermore, we will assume that the <code class="docutils literal"><span class="pre">cMonkeyQSub.py</span></code> is in the working directory and that all of the required modules are in your <code class="docutils literal"><span class="pre">$PYTHONPATH</span></code>.</p>
+<p>Here we will assume that the required files are in the local working directory. Furthermore, we will assume that the <code class="docutils literal"><span class="pre">generate_cm2_runs.py</span></code> is in the working directory and that all of the required modules are in your <code class="docutils literal"><span class="pre">$PYTHONPATH</span></code>.</p>
 <p>For the following example, we will generate 5 cMonkey2 runs.</p>
 <p>On the command line this would be called as follows:</p>
-<div class="highlight-none"><div class="highlight"><pre><span></span>python cMonkeyQSub.py --organism mtu --ratios ratios.csv --targetdir mtu-ens-2014 --numruns 10 --blocks blocks.csv --inclusion inclusion_blocks.csv --exclusion exclusion_blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ChIPSeq.csv,DE.csv --csh
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ python generate_cm2_runs.py --organism mtu --ratios ratios.csv --targetdir mtu-ens-2014 --numruns 10 --blocks blocks.csv --inclusion inclusion_blocks.csv --exclusion exclusion_blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ChIPSeq.csv,DE.csv --csh
 </pre></div>
 </div>
 <p>Optionally you can run this within the iPython, assuming this iPython notebook is running within the egrin2-tools Git repository.</p>
-<div class="highlight-none"><div class="highlight"><pre><span></span>%run ..//cMonkeyQSub.py --organism mtu --ratios ./static/example_files/ratios.csv --targetdir mtu-ens-2014 --numruns 5 --blocks ./static/example_files/blocks.csv --inclusion ./static/example_files/inclusion_blocks.csv --exclusion ./static/example_files/exclusion_blocks.csv --pipeline ./static/example_files/setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ./static/example_files/ChIPSeq.csv,./static/example_files/DE.csv --csh
+<div class="highlight-none"><div class="highlight"><pre><span></span>%run ..//generate_cm2_runs.py --organism mtu --ratios ./static/example_files/ratios.csv --targetdir mtu-ens-2014 --numruns 5 --blocks ./static/example_files/blocks.csv --inclusion ./static/example_files/inclusion_blocks.csv --exclusion ./static/example_files/exclusion_blocks.csv --pipeline ./static/example_files/setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ./static/example_files/ChIPSeq.csv,./static/example_files/DE.csv --csh
 
 Choosing ensemble conditions
 Writing reports
@@ -297,7 +300,12 @@ Done
 </div>
 <div class="section" id="step-4-transfer-to-cluster-and-run-cmonkey2">
 <h2>STEP 4: Transfer to cluster and run cMonkey2<a class="headerlink" href="#step-4-transfer-to-cluster-and-run-cmonkey2" title="Permalink to this headline">¶</a></h2>
-<p>The entire targetdir (e.g. <code class="docutils literal"><span class="pre">mtu-ens-2014</span></code> in our example) is now ready to be transfered to the cluster, where you can generate the ensemble by running <code class="docutils literal"><span class="pre">org.sh</span></code>, where <code class="docutils literal"><span class="pre">org</span></code> is the 3-letter organism code you provided.</p>
+<p>The entire targetdir (e.g. <code class="docutils literal"><span class="pre">mtu-ens-2014</span></code> in our example) is now ready to be transfered to the cluster, where you can generate the ensemble by running <code class="docutils literal"><span class="pre">&lt;org&gt;.sh</span></code>, where <code class="docutils literal"><span class="pre">&lt;org&gt;</span></code> is the 3-letter organism code you provided. In our example case this would be <code class="docutils literal"><span class="pre">mtu.sh</span></code>.</p>
+<p><strong>Example for a SGE submission:</strong></p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ cd &lt;target directory&gt;
+$ qsub mtu.sh
+</pre></div>
+</div>
 </div>
 </div>
 
@@ -344,7 +352,7 @@ Done
 <li class="toctree-l2"><a class="reference internal" href="#build-an-egrin-2-0-ensemble"><strong>BUILD</strong> an EGRIN 2.0 ensemble</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-1-generate-required-input-files">STEP 1: Generate required input files</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#optional-generate-custom-scoring-pipeline-and-files">(Optional) Generate custom scoring pipeline and files</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#step-2-call-cmonkeyqsub-py">STEP 2: Call cMonkeyQSub.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-2-call-generate-cm2-runs-py">STEP 2: Call generate_cm2_runs.py</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-3-evaluate-ensemblereport-files">STEP 3: Evaluate ensembleReport files</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-4-transfer-to-cluster-and-run-cmonkey2">STEP 4: Transfer to cluster and run cMonkey2</a></li>
 </ul>

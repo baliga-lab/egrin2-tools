@@ -162,6 +162,7 @@ Here is the code. You can copy this to your own notebook or download a blank sla
    db = ""
 
    corem = 1
+
    # find corem genes
    corem_genes =  coremFinder(x = corem,x_type = "corem", y_type="genes",host=host,db=db)
    # find corem conditions
