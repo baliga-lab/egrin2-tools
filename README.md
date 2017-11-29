@@ -1,4 +1,4 @@
-![cMonkey2 Logo](https://github.com/baliga-lab/egrin2-tools/blob/master/egrin2_logo_80px.png "EGRIN2.0 Logo")
+![cMonkey2 Logo](https://github.com/baliga-lab/egrin2-tools/blob/master/graphics/egrin2_logo_80px.png "EGRIN2.0 Logo")
 
 # egrin2-tools 
 
