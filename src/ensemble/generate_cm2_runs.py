@@ -22,9 +22,8 @@ import random
 import shutil
 
 import cmonkey.datamatrix as dm
-# need to be in python path!!!
-import build.cmconfig as cmconfig
-import build.ensemble as ensemble
+import ensemble.cmconfig as cmconfig
+import ensemble.ensemble as ensemble
 
 
 DESCRIPTION = "generate_cm2_runs.py - prepare cluster runs for Sun Grid Engine"
