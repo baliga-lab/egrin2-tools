@@ -21,10 +21,10 @@ import logging
 import random
 import shutil
 
-import datamatrix as dm
+import cmonkey.datamatrix as dm
 # need to be in python path!!!
-import cmconfig
-import ensemble
+import build.cmconfig as cmconfig
+import build.ensemble as ensemble
 
 
 DESCRIPTION = "generate_cm2_runs.py - prepare cluster runs for Sun Grid Engine"
@@ -85,8 +85,7 @@ LOG_LEVEL = logging.DEBUG
 LOG_FILE = None  # "make_ensemble.log"
 
 
-
-if __name__ == '__main__':
+def main():
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
                         level=LOG_LEVEL, filename=LOG_FILE)
 

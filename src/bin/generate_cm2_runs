@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""generate_cm2_runs - generate cmonkey2 runs
+
+This file is part of egrin2-tools. Please see README and LICENSE for
+more information and licensing details.
+"""
+import build.generate_cm2_runs as cm2runs
+
+cm2runs.main()
