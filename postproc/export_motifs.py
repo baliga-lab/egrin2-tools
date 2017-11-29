@@ -92,10 +92,10 @@ def make_meme_file(dbpaths, maxiter, targetdir, gene,
             conn = sqlite3.connect(dbpath)
             cursor = conn.cursor()
             cursor2 = conn.cursor()
-	    try:
+            try:
                 cursor.execute('select count(*) from row_names where name=?', [gene])
-	    except:
-                print "SKIPPING:", dbpath
+            except:
+                print("SKIPPING:", dbpath)
                 continue
             # make sure we have at least one
             if cursor.fetchone()[0] > 0:
@@ -143,7 +143,7 @@ def current_millis():
 
 def get_all_genes(inpath, prefix):
     def finalpath(entry):
-	return os.path.join(inpath, entry)
+        return os.path.join(inpath, entry)
 
     #print os.listdir(inpath)
     resultdirs = map(lambda s: os.path.join(inpath, s),
@@ -155,7 +155,7 @@ def get_all_genes(inpath, prefix):
     ## print "adding indexes..."
     ## for dbpath in dbpaths:
     ##     try:
-    ## 	    conn = sqlite3.connect(dbpath)
+    ##         conn = sqlite3.connect(dbpath)
     ##         cursor = conn.cursor()
     ##         cursor.execute("create index if not exists cluststat_iter_index on cluster_stats (iteration)")
     ##         cursor.execute("create index if not exists rowmemb_order_index on row_members (order_num)")
@@ -163,8 +163,8 @@ def get_all_genes(inpath, prefix):
     ##         cursor.execute("create index if not exists motinf_clust_index on motif_infos (cluster)")
     ##         cursor.close()
     ##         conn.close()
-    ## 	except:
-    ## 	    conn.close()
+    ##         except:
+    ##              conn.close()
     ## print "indexes added."
 
     # extract max iteration
@@ -188,10 +188,10 @@ def make_meme_files(inpath, prefix, targetdir, gene=None):
     start_time0 = current_millis()
     for gene in genes:
         start_time = current_millis()
-        print "processing gene '%s'..." % gene,
+        print("processing gene '%s'..." % gene)
         num_written = make_meme_file(dbpaths, max_iteration, targetdir, gene)
         elapsed = current_millis() - start_time
-        print "%d motifs written in %.2f s." % (num_written, elapsed / 1000.0)
+        print("%d motifs written in %.2f s." % (num_written, elapsed / 1000.0))
     elapsed0 = current_millis() - start_time0
-    print "%d genes processed in %.2f s." % (len(genes), elapsed0 / 1000.0)
+    print("%d genes processed in %.2f s." % (len(genes), elapsed0 / 1000.0))
     return genes

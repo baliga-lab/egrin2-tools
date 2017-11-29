@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """tomtom.py - running MEME tomtom on cmonkey-python ensemble runs
 
@@ -110,7 +110,7 @@ def run_tomtom(targetdir, targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_meth
                '-target-pseudo', '%.3f' % t_pseudo,
                '-target', targetfile, '-query', queryfile]
     try:
-        print " ".join(command)
+        print(" ".join(command))
         output = subprocess.check_output(command)
         targetname = os.path.basename(targetfile).rstrip('.meme')
         queryname = os.path.basename(queryfile).rstrip('.meme')
@@ -130,7 +130,6 @@ if __name__ == '__main__':
     ##parser.add_argument('--meme_file_only', default=False, action='store_true') ## make meme file for gene
 
     args = parser.parse_args()
-    
     if args.user is not None:
         login = args.user
     else:
@@ -154,5 +153,5 @@ if __name__ == '__main__':
     else:
         genes, dbpaths, max_iteration = export_motifs.get_all_genes('.', args.prefix)
         for gene in genes:
-            print gene
+            print(gene)
             emit_tomtom_script(target_dir, os.path.join(target_dir, '%s.meme' % gene), args.prefix, gene, login)
