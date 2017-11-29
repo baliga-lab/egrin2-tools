@@ -21,7 +21,7 @@ import logging
 import random
 import shutil
 
-import cmonkey.datamatrix as dm
+import ensemble.datamatrix as dm
 import ensemble.cmconfig as cmconfig
 import ensemble.ensemble as ensemble
 

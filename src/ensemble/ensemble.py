@@ -107,7 +107,7 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
     def __weighted_reservoir_sample(self, n_samples, sample_df):
         """Choose a block loosely based on weighted reservoir sampling - the easy way"""
         k = pd.DataFrame([np.power(random.random(), 1.0 / sample_df.loc[i]) for i in sample_df.index],
-                         index=sample_df.index, columns=["p"]).sort("p", ascending=False)
+                         index=sample_df.index, columns=["p"]).sort_values("p", ascending=False)
         return k.iloc[0: n_samples].index.values
 
     def __update_weights(self, blocks):
@@ -142,9 +142,19 @@ of runs at the requested exclusion rate. Maximum exclusion rate for %d runs is %
                     if j in self.run_composition[i]["blocks"]:
                         co_freq.loc[j, i] = co_freq.loc[j, i] + 1
             block_stats.loc[block, "freq_single"] = round(sum(co_freq.sum(0) > 0) / float(co_freq.shape[1]), 2)
-            block_stats.loc[block, "freq_coinclusion"] = round(sum(co_freq.sum(1))/ float((co_freq.shape[0] * sum(co_freq.sum(0) > 0))), 2)
+            try:
+                block_stats.loc[block, "freq_coinclusion"] = round(sum(co_freq.sum(1)) /
+                                                                   float((co_freq.shape[0] * sum(co_freq.sum(0) > 0))), 2)
+            except ZeroDivisionError:
+                block_stats.loc[block, "freq_coinclusion"] = 0
+
             block_stats.loc[block, "max_coinclusion_all"] = round(sum(co_freq.sum(0) == co_freq.shape[0]) / float(co_freq.shape[1]), 2)
-            block_stats.loc[block, "max_coinclusion_sub"] = round(sum(co_freq.sum(0) == co_freq.shape[0]) / float(sum(co_freq.sum(0) > 0)), 2)
+            try:
+                block_stats.loc[block, "max_coinclusion_sub"] = round(sum(co_freq.sum(0) == co_freq.shape[0]) /
+                                                                      float(sum(co_freq.sum(0) > 0)), 2)
+            except ZeroDivisionError:
+                block_stats.loc[block, "max_coinclusion_sub"] = 0
+
         self.inclusion = pd.merge(self.inclusion, block_stats, left_index=True, right_index=True)
 
     def __find_col_inclusion_freq(self):
