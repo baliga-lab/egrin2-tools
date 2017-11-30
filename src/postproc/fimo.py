@@ -1,10 +1,9 @@
-#!/tools/bin/python
 """ fimo.py
 Author:  Micheleen M. Harris, David J Reiss
-Description:  FIMO step of the EGRIN2 pipeline.  This program makes a script which can be submitted to 
-an SGE scheduler on a cluster.
+Description:  FIMO step of the EGRIN2 pipeline. This program makes a script which can
+be submitted to an SGE scheduler on a cluster.
 
-This script assumes an ensemble run under a directory structure that 
+This script assumes an ensemble run under a directory structure that
 is as follows:
 
 <dir>
@@ -20,13 +19,12 @@ Note:  if you are using c-shell make sure to use the --csh flag when running thi
 
 Example:
 
-python fimo.py --genome 'cache/Escherichia_coli_K12_NC_*' --user mharris 
+python fimo.py --genome 'cache/Escherichia_coli_K12_NC_*' --user mharris
                 --qsub_script fimo_batch_script.sh --csh --organism eco
 
-Output will be in subdirectory to input directory (<prefix>001/fimo_outs/ for example will have all fimo 
-files associated with the meme files).
+Output will be in subdirectory to input directory (<prefix>001/fimo_outs/ for
+  example will have all fimo files associated with the meme files).
 """
-
 import optparse
 import sys
 import os
@@ -64,9 +62,7 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 %s
 """
 
-
 # Templates for csh
-
 SHELL_HEADER_CSH = """#!/bin/csh -f"""
 
 QSUB_TEMPLATE_HEADER_CSH = """#!/bin/csh -f
@@ -94,7 +90,8 @@ def fix_meme_files(meme_files):
     	fix_meme_file(memef)
 
 def fix_meme_file(meme_files):
-    #  Read memefile line by line and output, replacing strange e-value formats (e.g. "E= 10.0e+003" to "E= 1.0e+004")
+    """Read memefile line by line and output, replacing strange e-value formats
+    (e.g. "E= 10.0e+003" to "E= 1.0e+004")"""
     IN = open(memef,'rb')
     OUT = open(memef+'_fimo', 'wb')
     for line in IN:
@@ -134,25 +131,18 @@ def fix_meme_file(meme_files):
 def main():
     #  Collect & check args
     op = optparse.OptionParser()
-    op.add_option('-g', '--genome', help='The genome sequence file glob (i.e., cache/<organism name>_NC_*')
+    op.add_option('-g', '--genome',
+                  help='The genome sequence file glob (i.e., cache/<organism name>_NC_*')
     op.add_option('-o', '--organism', help='KEGG name for organism (e.g. eco, hal')
     op.add_option('-u', '--user', help='User name on cluster')
-    #op.add_option('-i', '--base_dir', default='.', help='Cmonkey-python base directory.')
-    #op.add_option('-t', '--target_dir', default='.', help='The output directory name')
-    op.add_option('-q', '--qsub_script', default='qsub_fimo.sh', help='The script name for running fimo on cmonkey results')
-    ##op.add_option('-n', '--num_cores', default=1, help='Number of cores to use on cluster')
+    op.add_option('-q', '--qsub_script', default='qsub_fimo.sh',
+                  help='The script name for running fimo on cmonkey results')
     op.add_option('-s', '--csh', help='If c-shell indicate with this flag', action='store_true')
     op.add_option('-f', '--fix', default=False, help='Fix meme files', action='store_true')
     opt, args = op.parse_args()
 
     if not opt.genome:
         op.error('need --genome option.  Use -h for help.')
-    #if not opt.target_dir:
-    #    op.error('need --target_dir option.  Use -h for help.')
-    #if not opt.base_dir:
-    #    op.error('need --base_dir option.  Use -h for help.')
-    ##if not opt.num_cores:
-    ##    op.error('need --num_cores option.  Use -h for help.')
     if not opt.qsub_script:
         op.error('need --qsub_script option.  Use -h for help.')
     if not opt.organism:
@@ -169,71 +159,56 @@ def main():
         template = QSUB_TEMPLATE
         shellheader = SHELL_HEADER
 
-    # Fix genome seqs file(s) for fimo (to upper and add header for fasta format), ouput to new file, 
-    # put in cache dir (might be better way)
+    # Fix genome seqs file(s) for fimo (to upper and add header for fasta format),
+    # output to new file, put in cache dir (might be better way)
     seqsfiles = glob.glob(opt.genome)
     seqsfile_out = os.path.join(os.path.dirname(seqsfiles[0]), opt.organism)+'_genome.fst'
-    out = open(seqsfile_out, 'wb')
+    out = open(seqsfile_out, 'w')
     for fname in seqsfiles:
-        seqsfile_in = open(fname, 'rb')
+        seqsfile_in = open(fname, 'r')
         lines = seqsfile_in.readlines()
         genomeseq = lines[0].upper() # to upper may not be necessary
 
-        out.write(">"+fname[fname.find('_NC_')+1:]+'\n') ## just use chromosome NCBI code in fasta header - is this robust enough?
+        ## just use chromosome NCBI code in fasta header - is this robust enough?
+        out.write(">%s\n" % fname[fname.find('_NC_') + 1:])
         out.write(genomeseq)
     out.close()
 
     #  Create a dict of run output dirs with array of meme file names
     org_out_dirs = glob.glob("%s-out-*" % opt.organism)
-    ##out_dir_dict = {}
 
     for org_dir in sorted(org_out_dirs):
-        print org_dir
+        print(org_dir)
         #  Find MEME files
         meme_files = sorted(glob.glob(os.path.join(org_dir, "meme-out-*")))
         if opt.fix:
             fix_meme_files(meme_files) # Fixes e-value formats  - TODO: make more efficient
-        ##out_dir_dict[org_dir] = meme_files
-
-        #  We will make a subscripts for each run directory to call fimo on all meme files within that directory
-        ##sub_scripts = {}
-        ##for org_dir in org_out_dirs:
-        ##meme_files = out_dir_dict[org_dir]
 
         try:
             os.mkdir(os.path.join(org_dir, "fimo-outs")) ## location of output files
         except:
             None
 
-        #  We will make a subscript for each run directory to call fimo on all meme files within that directory
+        #  We will make a subscript for each run directory to call fimo on
+        # all meme files within that directory
         fimo_cmd = ""
         for meme in meme_files:
             num = os.path.basename(meme).split('-')[3] # Get the bicluster number
-            #num = num[1:] # remove leading 0
             if os.path.isfile( os.path.join(org_dir, "fimo-outs/fimo-out-%s.bz2" % num) ):
-                print 'SKIPPING:', os.path.join(org_dir, "fimo-outs/fimo-out-%s.bz2" % num)
+                print('SKIPPING:', os.path.join(org_dir, "fimo-outs/fimo-out-%s.bz2" % num))
                 fimo_cmd += '\n' + 'echo SKIPPING, already exists "%s"' % (meme) + '\n'
             else:
                 fimo_cmd += '\n' + 'echo "%s"' % (meme) + '\n'
-                fimo_cmd += '\n' + FIMO_TEMPLATE % (meme, seqsfile_out, 
-                                                    os.path.join(org_dir, "fimo-outs/fimo-out-%s" % num)) + '\n'
+                fimo_cmd += '\n' + FIMO_TEMPLATE % (meme, seqsfile_out,
+                                                    os.path.join(org_dir,
+                                                                 "fimo-outs/fimo-out-%s" % num)) + '\n'
 
-        ##sub_scripts[org_dir] = fimo_cmd
-
-    ##for org_dir in org_out_dirs:
         outfile_name = os.path.join(org_dir, 'fimo_script.sh')
         with open(outfile_name, 'w') as outfile:
-            #subscript_template = shellheader + '\n' + fimo_cmd ##sub_scripts[org_dir]
             outfile.write(shellheader + '\n')
-            outfile.write(fimo_cmd) ##sub_scripts[org_dir])
-            #rendered = Template(subscript_template).render()
-            #outfile.write(rendered)
-            #st = os.stat(outfile)
-            #os.chmod(subscript, st.st_mode | stat.S_IEXEC)
+            outfile.write(fimo_cmd)
         outfile.close()
-        #st = os.stat(outfile)
-        #os.chmod(subscript, st.st_mode | stat.S_IEXEC)
-        os.chmod(outfile_name,0744)
+        os.chmod(outfile_name, 0o744)
 
     #  Create master script
     with open(opt.qsub_script, 'w') as outfile:
@@ -242,35 +217,10 @@ def main():
         else:
             os.getlogin()
 
-        ##num_runs = len(org_out_dirs)
-	max_run = max( [int(i.split('-')[2]) for i in org_out_dirs] )
-        subscript = "%s-out-${BATCHNUM}/fimo_script.sh >& %s-out-${BATCHNUM}/fimo_script.sh.out" % (opt.organism, \
-                                                                                                    opt.organism)
-        num_cores = 1 ## dont need more
+        max_run = max( [int(i.split('-')[2]) for i in org_out_dirs] )
+        subscript = "%s-out-${BATCHNUM}/fimo_script.sh >& %s-out-${BATCHNUM}/fimo_script.sh.out" % (opt.organism, opt.organism)
+        num_cores = 1
         outfile.write(header + '\n')
-        outfile.write(template % (login, 
-            login,
-            ##num_runs,
-	    max_run,
-            num_cores, 
-            subscript))
+        outfile.write(template % (login, login, max_run, num_cores, subscript))
 
     outfile.close()
-
-if __name__ == '__main__':
-    main()
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-

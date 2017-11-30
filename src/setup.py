@@ -9,7 +9,7 @@ DESCRIPTION = 'egrin2-tools is a tool suite to build EGRIN2 networks'
 LICENSE = 'LGPL V3'
 URI = 'https://github.com/baliga-lab/egrin2-tools'
 AUTHOR = 'Baliga Lab, Institute for Systems Biology'
-VERSION = '1.0.2'
+VERSION = '0.8.0'
 
 KEYWORDS = ['class', 'egrin2']
 
@@ -17,6 +17,7 @@ KEYWORDS = ['class', 'egrin2']
 # https://testpypi.python.org/pypi?%3Aaction=list_classifiers
 
 CLASSIFIERS = [
+    "Development Status :: 4 - Beta",
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Science/Research",
@@ -49,4 +50,4 @@ if __name__ == '__main__':
           zip_safe=False,
           classifiers=CLASSIFIERS,
           install_requires=INSTALL_REQUIRES,
-          scripts=['bin/generate_cm2_runs'])
+          scripts=['bin/egrin2-make_ensemble', 'bin/egrin2-fimojobs'])

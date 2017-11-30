@@ -37,7 +37,7 @@ Additionally, the Python modules described in this documentation's dependencies 
 Scripts
 -------
 
-  * ``generate_cm2_runs.py``: The control function for BUILD scripts. Writes QSub script.
+  * ``egrin2-make_ensemble``: The control function for BUILD scripts. Writes QSub script.
   * ``cMonkeyIniGen.py``: Templating function to generate cMonkey2 initialization (.ini) files.
   * ``ensemblePicker.py``: Picks experiments to include in a run given user-supplied experimental blocks
 
@@ -101,7 +101,7 @@ Each of these files need to be supplied by the user.
 
 `cMonkey2 <https://github.com/baliga-lab/cmonkey2>`_ can use a custom scoring pipeline. Currently, this is limited to set-enrichment.
 
-In this example, we will generate an ensemble. We do so by providing several additional options to the ``generate_cm2_runs.py`` function, namely:
+In this example, we will generate an ensemble. We do so by providing several additional options to the ``egrin2-make_ensemble`` function, namely:
 
   * ``pipeline``: a JSON file containing custom scoring pipeline. Currently only set-enrichment pipeline is supported
   * ``setenrich``: Name(s) of set enrichment 'sets' to include. Names should be comma separated.
@@ -109,7 +109,7 @@ In this example, we will generate an ensemble. We do so by providing several add
 
 Users interested in building custom scoring pipelines or configuring set-enrichment should consult the cMonkey2 documentation.
 
-STEP 2: Call generate_cm2_runs.py
+STEP 2: Call egrin2-make_ensemble
 ---------------------------------
 
 Generating an ensemble configuration entails calling a single Python script. There are a number of required and optional parameters that can be passed to this command line function, which are described below:
@@ -118,9 +118,9 @@ Generating an ensemble configuration entails calling a single Python script. The
 
 ::
 
-   $ python generate_cm2_runs.py -h
+   $ egrin2-make_ensemble -h
 
-   usage: generate_cm2_runs.py [-h] --organism ORGANISM --ratios RATIOS
+   usage: egrin2-make_ensemble [-h] --organism ORGANISM --ratios RATIOS
                                --targetdir TARGETDIR [--numruns NUMRUNS]
                                [--ncbi_code NCBI_CODE] [--mincols MINCOLS]
                                [--num_cores NUM_CORES] [--max_tasks MAX_TASKS]
@@ -130,7 +130,7 @@ Generating an ensemble configuration entails calling a single Python script. The
                                [--setenrich_files SETENRICH_FILES]
                                [--rsat_base_url RSAT_BASE_URL]
 
-   generate_cm2_params.py - prepare cluster runs for Sun Grid Engine
+   egrin2-make_ensemble - prepare cluster runs for Sun Grid Engine
 
    optional arguments:
      -h, --help            show this help message and exit
@@ -176,7 +176,7 @@ Required Arguments
 
 If you do not supply block files as described above, the experiments to include in each run will be choosen randomly. Several random exclusion_blocks will be defined for testing (currently not supported - block files must be supplied / ANB 03042015)
 
-Here we will assume that the required files are in the local working directory. Furthermore, we will assume that the ``generate_cm2_runs.py`` is in the working directory and that all of the required modules are in your ``$PYTHONPATH``.
+Here we will assume that the required files are in the local working directory. Furthermore, we will assume that the ``egrin2-make_ensemble`` is in the working directory and that all of the required modules are in your ``$PYTHONPATH``.
 
 For the following example, we will generate 5 cMonkey2 runs.
 
@@ -186,26 +186,9 @@ On the command line this would be called as follows:
 
 ::
 
-   $ python generate_cm2_runs.py --organism mtu --ratios ratios.csv --targetdir mtu-ens-2014 --numruns 10 --blocks blocks.csv --inclusion inclusion_blocks.csv --exclusion exclusion_blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ChIPSeq.csv,DE.csv --csh
+   $ egrin2-make_ensemble --organism mtu --ratios ratios.csv --targetdir mtu-ens-2014 --numruns 10 --blocks blocks.csv --inclusion inclusion_blocks.csv --exclusion exclusion_blocks.csv --pipeline setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ChIPSeq.csv,DE.csv --csh
 
-
-Optionally you can run this within the iPython, assuming this iPython notebook is running within the egrin2-tools Git repository.
-
-.. highlight:: none
-
-::
-
-   %run ..//generate_cm2_runs.py --organism mtu --ratios ./static/example_files/ratios.csv --targetdir mtu-ens-2014 --numruns 5 --blocks ./static/example_files/blocks.csv --inclusion ./static/example_files/inclusion_blocks.csv --exclusion ./static/example_files/exclusion_blocks.csv --pipeline ./static/example_files/setenrich_pipeline.json --setenrich chipseq,tfoe --setenrich_files ./static/example_files/ChIPSeq.csv,./static/example_files/DE.csv --csh
-
-   Choosing ensemble conditions
-   Writing reports
-   Writing ratio files
-   Done
-   Writing ensemble config files
-   Done
-
-
-If the scripts run successfully, they should print the messages above, populate the ``mtu-ens-2014`` directory with ``ratios-xxx.tsv`` files and ``config-xxx.ini`` files, as well as generate several report files in the parent directory. The ensemble report files contain information about the run composition, detailed for each report file below:
+If the script runs successfully, they should print the messages above, populate the ``mtu-ens-2014`` directory with ``ratios-xxx.tsv`` files and ``config-xxx.ini`` files, as well as generate several report files in the parent directory. The ensemble report files contain information about the run composition, detailed for each report file below:
 
 STEP 3: Evaluate ensembleReport files
 -------------------------------------

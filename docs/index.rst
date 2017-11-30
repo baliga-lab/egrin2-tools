@@ -27,6 +27,7 @@ including running multiple cMonkey2 runs and postprocessing the cMonkey2 results
    Introduction <introduction>
    Build <build>
    Build Tutorial <build_tutorial>
+   Postprocessing <postprocessing>
    Assemble <assemble>
    Assemble Tutorial <assemble_tutorial>
    Query <query>
