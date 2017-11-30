@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+from postproc import tomtom
+
+if __name__ == '__main__':
+    tomtom.main()

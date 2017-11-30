@@ -34,7 +34,7 @@ CLASSIFIERS = [
     "Topic :: Software Development :: Libraries :: Python Modules"
 ]
 INSTALL_REQUIRES = ['numpy', 'scipy', 'pandas', 'biopython', 'statsmodels',
-                    'plotly', 'matplotlib', 'pymongo', 'cmonkey2']
+                    'plotly', 'matplotlib', 'pymongo', 'jgraph', 'cmonkey2']
 
 if __name__ == '__main__':
     setup(name=NAME, description=DESCRIPTION,
@@ -50,4 +50,5 @@ if __name__ == '__main__':
           zip_safe=False,
           classifiers=CLASSIFIERS,
           install_requires=INSTALL_REQUIRES,
-          scripts=['bin/egrin2-make_ensemble', 'bin/egrin2-fimojobs'])
+          scripts=['bin/egrin2-make_ensemble', 'bin/egrin2-fimo', 'bin/egrin2-codingfracs',
+                   'bin/egrin2-tomtom', 'bin/egrin2-mcl'])

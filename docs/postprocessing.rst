@@ -17,7 +17,7 @@ Generate FIMO runs
 ::
 
   $ cd <target directory>
-  $ egrin2-fimojobs --user <username> --organism <organism code> --genome <path to genome file>
+  $ egrin2-fimo --user <username> --organism <organism code> --genome <path to genome file>
 
 Coding Fractions
 ----------------

@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+from postproc import coding_fracs
+
+if __name__ == '__main__':
+    coding_fracs.main()
