@@ -18,9 +18,3 @@ TODO: This will be available through pypi soon.
 
 In addition, you must compile the C++ code provided in the [`src directory`](./src/). Instructions for compiling this code are available on the [wiki](http://nbviewer.ipython.org/github/baliga-lab/egrin2-tools/blob/master/doc/cpp_scripts.ipynb).
 
-
-
-
-
-
-

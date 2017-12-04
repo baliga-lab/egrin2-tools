@@ -25,10 +25,11 @@ python fimo.py --genome 'cache/Escherichia_coli_K12_NC_*' --user mharris
 Output will be in subdirectory to input directory (<prefix>001/fimo_outs/ for
   example will have all fimo files associated with the meme files).
 """
-import optparse
+import argparse
 import sys
 import os
 import glob
+import stat
 
 #  TODO:
 #	-Instead of creating a fimo_script.sh for every run with simple multiple calls to fimo
@@ -37,7 +38,7 @@ import glob
 #	-Make the iteration through all MEME files to check e-value formats more efficient
 
 #  Fimo command
-FIMO_TEMPLATE = """fimo --max-stored-scores 9999999 --max-seq-length 1e8 --text --verbosity 2 %s %s | bzip2 -c > %s.bz2"""
+FIMO_TEMPLATE = """fimo --max-stored-scores 9999999 --text --verbosity 2 %s %s | bzip2 -c > %s.bz2"""
 
 SHELL_HEADER = """#!/bin/bash"""
 
@@ -85,6 +86,15 @@ QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 %s
 """
 
+BATCH_TEMPLATE = """#!/bin/bash
+for i in `seq %d %d`;
+do
+  DIRNUM=`printf "%%03d" $i`
+  echo "processing %s-${DIRNUM}"
+  %s
+done
+"""
+
 def fix_meme_files(meme_files):
     for memef in meme_files:
     	fix_meme_file(memef)
@@ -130,27 +140,20 @@ def fix_meme_file(meme_files):
 
 def main():
     #  Collect & check args
-    op = optparse.OptionParser()
-    op.add_option('-g', '--genome',
-                  help='The genome sequence file glob (i.e., cache/<organism name>_NC_*')
-    op.add_option('-o', '--organism', help='KEGG name for organism (e.g. eco, hal')
-    op.add_option('-u', '--user', help='User name on cluster')
-    op.add_option('-q', '--qsub_script', default='qsub_fimo.sh',
-                  help='The script name for running fimo on cmonkey results')
-    op.add_option('-s', '--csh', help='If c-shell indicate with this flag', action='store_true')
-    op.add_option('-f', '--fix', default=False, help='Fix meme files', action='store_true')
-    opt, args = op.parse_args()
+    parser = argparse.ArgumentParser(description="egrin2_fimo - create fimo jobs for EGRIN2")
+    parser.add_argument('--genome', required=True,
+                      help='The genome sequence file glob (i.e., cache/<organism name>_NC_*')
+    parser.add_argument('--organism', required=True,
+                      help='KEGG name for organism (e.g. eco, hal')
+    parser.add_argument('--user', required=True, help='User name on cluster')
+    parser.add_argument('--qsub_script', default='qsub_fimo.sh',
+                      help='The script name for running fimo on cmonkey results')
+    parser.add_argument('--csh', help='If c-shell indicate with this flag',
+                      action='store_true')
+    parser.add_argument('--fix', default=False, help='Fix meme files', action='store_true')
+    args = parser.parse_args()
 
-    if not opt.genome:
-        op.error('need --genome option.  Use -h for help.')
-    if not opt.qsub_script:
-        op.error('need --qsub_script option.  Use -h for help.')
-    if not opt.organism:
-        op.error('need --organism option.  Use -h for help.')
-    if not opt.user:
-        op.error('need --user option.  Use -h for help.')
-
-    if opt.csh:
+    if args.csh:
         header = QSUB_TEMPLATE_HEADER_CSH
         template = QSUB_TEMPLATE_CSH
         shellheader = SHELL_HEADER_CSH
@@ -161,8 +164,8 @@ def main():
 
     # Fix genome seqs file(s) for fimo (to upper and add header for fasta format),
     # output to new file, put in cache dir (might be better way)
-    seqsfiles = glob.glob(opt.genome)
-    seqsfile_out = os.path.join(os.path.dirname(seqsfiles[0]), opt.organism)+'_genome.fst'
+    seqsfiles = glob.glob(args.genome)
+    seqsfile_out = os.path.join(os.path.dirname(seqsfiles[0]), args.organism)+'_genome.fst'
     out = open(seqsfile_out, 'w')
     for fname in seqsfiles:
         seqsfile_in = open(fname, 'r')
@@ -175,13 +178,13 @@ def main():
     out.close()
 
     #  Create a dict of run output dirs with array of meme file names
-    org_out_dirs = glob.glob("%s-out-*" % opt.organism)
+    org_out_dirs = glob.glob("%s-out-*" % args.organism)
 
     for org_dir in sorted(org_out_dirs):
         print(org_dir)
         #  Find MEME files
         meme_files = sorted(glob.glob(os.path.join(org_dir, "meme-out-*")))
-        if opt.fix:
+        if args.fix:
             fix_meme_files(meme_files) # Fixes e-value formats  - TODO: make more efficient
 
         try:
@@ -211,16 +214,20 @@ def main():
         os.chmod(outfile_name, 0o744)
 
     #  Create master script
-    with open(opt.qsub_script, 'w') as outfile:
-        if opt.user is not None:
-            login = opt.user
+    with open(args.qsub_script, 'w') as outfile:
+        if args.user is not None:
+            login = args.user
         else:
             os.getlogin()
 
         max_run = max( [int(i.split('-')[2]) for i in org_out_dirs] )
-        subscript = "%s-out-${BATCHNUM}/fimo_script.sh >& %s-out-${BATCHNUM}/fimo_script.sh.out" % (opt.organism, opt.organism)
+        subscript = "%s-out-${BATCHNUM}/fimo_script.sh >& %s-out-${BATCHNUM}/fimo_script.sh.out" % (args.organism, args.organism)
         num_cores = 1
         outfile.write(header + '\n')
         outfile.write(template % (login, login, max_run, num_cores, subscript))
 
-    outfile.close()
+    with open('all_fimo.sh', 'w') as outfile:
+        subscript = "%s-out-${DIRNUM}/fimo_script.sh >& %s-out-${DIRNUM}/fimo_script.sh.out" % (args.organism, args.organism)
+        max_run = max( [int(i.split('-')[2]) for i in org_out_dirs] )
+        outfile.write(BATCH_TEMPLATE % (1, max_run, args.organism, subscript))
+    os.chmod('all_fimo.sh', stat.S_IXUSR|stat.S_IRUSR|stat.S_IWUSR|stat.S_IRGRP)
