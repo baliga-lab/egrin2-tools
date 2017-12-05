@@ -21,10 +21,42 @@ problems, please verify that you have this version of MEME.
 ::
 
   $ cd <target directory>
-  $ egrin2-fimo --user <username> --organism <organism code> --genome <path to genome file>
+  $ egrin2-fimo --user <username> --organism <organism code> --genome <path pattern to genome files>
+
+This generates the necessary scripts for running FIMO an SGE cluster. To submit
+these jobs, on the head node, type
+
+.. highlight:: none
+
+::
+
+  $ qsub qsub_fimo.sh
 
 Coding Fractions
 ----------------
+
+Immediately following the FIMO step is the Coding Fractions step. Coding fractions are
+computed based on the FIMO results, so the entire FIMO step needs to be completed before
+Coding Fractions can be run.
+
+In order to generate scripts for running on the cluster, we need:
+
+.. highlight:: none
+
+::
+
+  $ cd <target directory>
+  $ egrin2-codingfracs --user <username> --organism <organism code> --features <RSAT features file>
+
+and then on the SGE head node
+
+.. highlight:: none
+
+::
+
+  $ qsub qsub_coding_fracs.sh
+
+
 
 Tomtom
 ------
