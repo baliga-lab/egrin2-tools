@@ -61,7 +61,7 @@ QSUB_TEMPLATE = """#$ -S /bin/bash
 #$ -pe serial %s
 #$ -l mem_free=8G
 
-python egrin2-tools/postproc/coding_fracs.py --features %s --organism %s --input_dir %s > %s/coding_fracs.out
+python egrin2-tools/src/postproc/coding_fracs.py --features %s --organism %s --input_dir %s > %s/coding_fracs.out
 """
 
 
@@ -84,7 +84,7 @@ QSUB_TEMPLATE_CSH = """#$ -S /bin/csh
 #$ -pe serial %s
 #$ -l mem_free=8G
 
-python egrin2-tools/postproc/coding_fracs.py --features %s --organism %s --input_dir %s >& %s/coding_fracs.out
+python egrin2-tools/src/postproc/coding_fracs.py --features %s --organism %s --input_dir %s >& %s/coding_fracs.out
 """
 
 def get_in_coding_rgn(input_dir, features):
@@ -225,3 +225,6 @@ def main():
                                       args.organism,
                                       "%s-out-${BATCHNUM}" % (args.organism),
                                       "%s-out-${BATCHNUM}" % (args.organism)))
+
+if __name__ == '__main__':
+    main()
