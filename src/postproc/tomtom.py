@@ -47,8 +47,8 @@ QSUB_TEMPLATE = """#!/bin/bash
 
 export LD_LIBRARY_PATH=/tools/lib:/tools/R-3.0.3/lib64/R/lib
 export PATH=/tools/bin:${PATH}
-export PYTHONPATH=egrin2-tools/src
 
+#$ -S /bin/bash
 #$ -m be
 #$ -q baliga
 #$ -P Bal_%s
@@ -57,7 +57,7 @@ export PYTHONPATH=egrin2-tools/src
 #$ -pe serial %d
 #$ -l mem_free=8G
 
-python egrin2-tools/src/postproc/tomtom.py --prefix %s --gene %s
+PYTHONPATH=egrin2-tools/src python egrin2-tools/src/postproc/tomtom.py --prefix %s --gene %s
 
 tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s | bzip2 -c  > %s
 """
