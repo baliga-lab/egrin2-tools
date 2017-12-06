@@ -45,6 +45,7 @@ MAX_EVALUE = None
 # Template for tomtom 4.9.0
 QSUB_TEMPLATE = """#!/bin/bash
 
+export LD_LIBRARY_PATH=/tools/lib:/tools/R-3.0.3/lib64/R/lib
 export PATH=/tools/bin:${PATH}
 
 #$ -m be
@@ -55,7 +56,7 @@ export PATH=/tools/bin:${PATH}
 #$ -pe serial %d
 #$ -l mem_free=8G
 
-python ./egrin2-tools/postproc/tomtom.py --prefix %s --gene %s
+python egrin2-tools/src/postproc/tomtom.py --prefix %s --gene %s
 
 tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s | bzip2 -c  > %s
 """
@@ -63,6 +64,7 @@ tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.
 # Template for tomtom 4.9.0
 QSUB_TEMPLATE_CSH = """#!/bin/csh -f
 
+export LD_LIBRARY_PATH=/tools/lib:/tools/R-3.0.3/lib64/R/lib
 setenv PATH /tools/bin:${PATH}
 
 ##$ -m be
@@ -74,9 +76,16 @@ setenv PATH /tools/bin:${PATH}
 #$ -pe serial %d
 #$ -l mem_free=8G
 
-python ./egrin2-tools/postproc/tomtom.py --prefix %s --gene %s
+python egrin2-tools/src/postproc/tomtom.py --prefix %s --gene %s
 
 tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s | bzip2 -c > %s
+"""
+
+QSUB_SCRIPT_BASH = """#!/bin/bash
+for f in %s/*-tomtom.sh; do
+  echo "qsub $f"
+  qsub $f
+done
 """
 
 QSUB_SCRIPT_CSH = """#!/bin/csh
@@ -86,6 +95,7 @@ qsub $f
 end
 """
 
+QSUB_CONTROL_SCRIPT = QSUB_SCRIPT_BASH
 
 def emit_tomtom_script(targetdir, filepath, prefix, gene, login, q_thresh=Q_THRESHOLD,
                        dist_method=DIST_METHOD,
@@ -96,7 +106,7 @@ def emit_tomtom_script(targetdir, filepath, prefix, gene, login, q_thresh=Q_THRE
                                        dist_method, min_overlap, q_pseudo, t_pseudo,
                                        filepath, filepath, '%s-tomtom.tsv.bz2' % filepath))
     with open('qsub_tomtom.sh', 'w') as outfile:
-        outfile.write(QSUB_SCRIPT_CSH % targetdir)
+        outfile.write(QSUB_CONTROL_SCRIPT % targetdir)
 
 
 def run_tomtom(targetdir, targetfile, queryfile, q_thresh=Q_THRESHOLD, dist_method=DIST_METHOD,
@@ -137,7 +147,10 @@ def main():
         None
 
     if args.csh:
-      QSUB_TEMPLATE = QSUB_TEMPLATE_CSH
+        QSUB_TEMPLATE = QSUB_TEMPLATE_CSH
+        QSUB_CONTROL_SCRIPT = QSUB_SCRIPT_CSH
+    else:
+        QSUB_CONTROL_SCRIPT = QSUB_SCRIPT_BASH
 
     target_dir = 'tomtom_out'
     try:
@@ -150,6 +163,9 @@ def main():
     else:
         genes, dbpaths, max_iteration = export_motifs.get_all_genes('.', args.prefix)
         for gene in genes:
-            print(gene)
             emit_tomtom_script(target_dir, os.path.join(target_dir, '%s.meme' % gene),
                                args.prefix, gene, login)
+
+
+if __name__ == '__main__':
+    main()
