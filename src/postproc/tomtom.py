@@ -56,7 +56,7 @@ export PATH=/tools/bin:${PATH}
 #$ -pe serial %d
 #$ -l mem_free=8G
 
-python egrin2-tools/src/postproc/tomtom.py --prefix %s --gene %s
+PYTHONPATH=egrin2-tools/src python egrin2-tools/src/postproc/tomtom.py --prefix %s --gene %s
 
 tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s | bzip2 -c  > %s
 """
@@ -76,7 +76,7 @@ setenv PATH /tools/bin:${PATH}
 #$ -pe serial %d
 #$ -l mem_free=8G
 
-python egrin2-tools/src/postproc/tomtom.py --prefix %s --gene %s
+PYTHONPATH=egrin2-tools/src python egrin2-tools/src/postproc/tomtom.py --prefix %s --gene %s
 
 tomtom -verbosity 1 -q-thresh %f -dist %s -min-overlap %d -text -query-pseudo %.3f -target-pseudo %.3f %s %s | bzip2 -c > %s
 """

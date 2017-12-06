@@ -61,5 +61,26 @@ and then on the SGE head node
 Tomtom
 ------
 
+The TOMTOM step is somewhat independent of FIMO and Coding Fractions and could
+theoretically be run in parallel if sufficient computing resources are available.
+This command generates the control scripts for running TOMTOM.
+
+.. highlight:: none
+
+::
+
+  $ cd <target directory>
+  $ egrin2-tomtom --user <username> --prefix <output directory prefix>
+
+then execute
+
+.. highlight:: none
+
+::
+
+  $ qsub qsub_tomtom.sh
+
+on the head node of your cluster.
+
 Motif Clustering
 ----------------
