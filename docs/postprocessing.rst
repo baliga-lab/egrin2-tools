@@ -78,7 +78,7 @@ then execute
 
 ::
 
-  $ qsub qsub_tomtom.sh
+  $ ./qsub_tomtom.sh
 
 on the head node of your cluster.
 
