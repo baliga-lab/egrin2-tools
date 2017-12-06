@@ -7,7 +7,6 @@ import csv
 import time
 
 import pandas as pd
-from pandas.errors import EmptyDataError
 import numpy as np
 import numpy.core.defchararray as npstr
 
@@ -47,6 +46,7 @@ Output will be in each <prefix> directory named coding_fracs.tsv.
 # Templates for Bourne Shell
 QSUB_TEMPLATE_HEADER = """#!/bin/bash
 
+export LD_LIBRARY_PATH=/tools/lib:/tools/R-3.0.3/lib64/R/lib
 export PATH=/tools/bin:${PATH}
 export BATCHNUM=`printf "%03d" $SGE_TASK_ID`
 """
@@ -69,6 +69,7 @@ python egrin2-tools/postproc/coding_fracs.py --features %s --organism %s --input
 
 QSUB_TEMPLATE_HEADER_CSH = """#!/bin/csh -f
 
+setenv LD_LIBRARY_PATH=/tools/lib:/tools/R-3.0.3/lib64/R/lib
 setenv PATH /tools/bin:${PATH}
 set BATCHNUM="`printf '%03d' ${SGE_TASK_ID}`"
 """
@@ -141,7 +142,9 @@ def get_in_coding_rgn(input_dir, features):
             mean_is_bad[ mean_is_bad == False ] = 0.0
             for i in range(len(mean_is_bad)):
                 total_coding_fracs[ff + '_' + str(mot_ind[i])] = round(mean_is_bad[i], 4)
-        except EmptyDataError:
+        except:
+            # This is catching a pandas.errors.EmptyDataError
+            # However, older versions of pandas don't have this class
             print('SKIPPING -- cannot read fimo output')
 
     coding_fracs = pd.DataFrame({'motif': [a for a in sorted(total_coding_fracs.keys())],
@@ -182,7 +185,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate scripts for running coding_fracs")
     parser.add_argument('--features', required=True, help='The features file (with coding regions) (found in cache/<organism name>features')
     parser.add_argument('--organism', required=True, help='The organism name (e.g. eco or hal)')
-    parser.add_argument('--user', required=True, help='User name on cluster')
+    parser.add_argument('--user', help='User name on cluster')
     parser.add_argument('--csh', help='If c-shell indicate with this flag', action='store_true')
     parser.add_argument('--input_dir', default=None, help='The cmonkey run input dir where the fimo files live (e.g. eco-out-001)')
 
