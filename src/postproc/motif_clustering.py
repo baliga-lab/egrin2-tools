@@ -8,7 +8,7 @@ import argparse
 import numpy as np
 import numpy.core.defchararray as npstr
 import pandas as pd
-import jgraph as ig
+import igraph as ig
 
 import postproc.coding_fracs as cf
 
