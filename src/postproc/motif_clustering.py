@@ -159,7 +159,7 @@ def main():
     del gr
 
     gr2 = ig.Graph.Read_Ncol('motifs_graph.tsv', names=True, weights=True, directed=False)
-    system('pbzip2 -fv9 motifs_graph.tsv &')
+    system('bzip2 -fv9 motifs_graph.tsv &')
 
     print(gr2.ecount(), gr2.vcount())
 
