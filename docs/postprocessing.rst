@@ -84,3 +84,13 @@ on the head node of your cluster.
 
 Motif Clustering
 ----------------
+
+The final postprocessing step invokes mcl for processing the
+TOMTOM results from the previous step. This step is not performed
+on the cluster, instead invoke the script directly:
+
+.. highlight:: none
+
+::
+
+  $ egrin2-mcl <tomtom output directory> <your feature file>
