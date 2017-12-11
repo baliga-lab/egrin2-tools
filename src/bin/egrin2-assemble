@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+from assemble import assembler
+
+
+if __name__ == '__main__':
+    assembler.main()

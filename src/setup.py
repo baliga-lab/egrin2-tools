@@ -51,4 +51,4 @@ if __name__ == '__main__':
           classifiers=CLASSIFIERS,
           install_requires=INSTALL_REQUIRES,
           scripts=['bin/egrin2-make_ensemble', 'bin/egrin2-fimo', 'bin/egrin2-codingfracs',
-                   'bin/egrin2-tomtom', 'bin/egrin2-mcl'])
+                   'bin/egrin2-tomtom', 'bin/egrin2-mcl', 'bin/egrin2-assemble'])

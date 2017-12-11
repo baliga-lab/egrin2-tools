@@ -24,12 +24,12 @@ import sqlite3
 
 #import kbase.WorkspaceClient as wsc
 
-import assemble_sqlite as asl
-import assemble_mongodb as assmongo
-import sql2mongoDB as rdb
-from makeCorems import CoremMaker
-import resample
-import assemble_finish
+import assemble.assemble_sqlite as asl
+import assemble.assemble_mongodb as assmongo
+import assemble.sql2mongoDB as rdb
+from assemble.makeCorems import CoremMaker
+import assemble.resample as resample
+import assemble.assemble_finish as assemble_finish
 
 QSUB_TEMPLATE_HEADER_CSH = """#!/bin/csh
 
@@ -181,7 +181,7 @@ def merge_runs(args, dbclient, dbname):
 
 def make_corems(args, dbclient):
     """db: use the db client adapter"""
-    corems = CoremMaker(args.organism, dbclient, args.backbone_pval, targetdir,
+    corems = CoremMaker(args.organism, dbclient, args.backbone_pval, args.targetdir,
                         args.cores, args.link_comm_score,
                         args.link_comm_increment,
                         args.link_comm_density_score,
@@ -222,7 +222,7 @@ def store_kb_workspace(conn):
                                          'workspace': target_ws})
 """
 
-if __name__ == '__main__':
+def main():
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
                         level=LOG_LEVEL, filename=LOG_FILE)
 
@@ -295,3 +295,8 @@ if __name__ == '__main__':
             make_resample_scripts(args, dbname, targetdir, corem_sizes)
     else:
         logging.error("Could not locate cMonkey2 result files. Please specify --ensembledir")
+
+
+if __name__ == '__main__':
+    main()
+
