@@ -191,60 +191,21 @@
 <div class="section" id="step-2-run-egrin2-assemble">
 <h2>STEP 2: Run <code class="docutils literal"><span class="pre">egrin2-assemble</span></code><a class="headerlink" href="#step-2-run-egrin2-assemble" title="Permalink to this headline">¶</a></h2>
 <p><strong>Important!!! TOMTOM, MCL, and FIMO should be run prior to assembly. Otherwise the ensemble will not contain GREs or motif scans.</strong></p>
-<p>To run the assembler, you must supply several files as well as specify where you would like to host the MongoDB database. If you do not supply a host for the MongoDB databse, it will be stored on <code class="docutils literal"><span class="pre">localhost</span></code>. At a minimum, you should supply:</p>
+<p>To run the assembler, you must supply several files. At a minimum, you should supply:</p>
 <blockquote>
 <div><ul class="simple">
 <li><code class="docutils literal"><span class="pre">--organism</span></code>: 3 letter organism code</li>
 <li><code class="docutils literal"><span class="pre">--ratios</span></code>: Path to ratios file. Should be ‘raw’ (normalized) ratios, not the standardized ratios used by cMonkey</li>
 <li><code class="docutils literal"><span class="pre">--targetdir</span></code>: Storage path for MongoDB and corem data</li>
-<li><code class="docutils literal"><span class="pre">--ncbi_code</span></code>: NCBI organism code</li>
-<li><code class="docutils literal"><span class="pre">--ensembledir</span></code>: Path to ensemble runs. Default: cwd</li>
 </ul>
 </div></blockquote>
-<p>Assuming your terminal current working directory is within the E. coli ensemble, with the cMonkey2 runs located in the subfolder <code class="docutils literal"><span class="pre">./eco-ens-m3d/</span></code>, you can call the assembler as follows:</p>
-<p>The MongoDB path has been deprecated and was replaced in favor of storing data in
-relational databases, which is by default sqlite because it does not require a
-running database server.</p>
-<div class="highlight-none"><div class="highlight"><pre><span></span>$ egrin2-assemble --organism mtu --ratios &lt;ratios file&gt; --targetdir &lt;output directory&gt; --ensembledir &lt;ensemble directory&gt; --dbengine sqlite --targetdb &lt;output database name&gt;
+<p><em>Note: The MongoDB engine has been replaced in favor of storing data in
+sqlite because it does not require a running database server. Furthermore
+the assembly step does not require a cluster anymore</em></p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ egrin2-assemble --organism mtu --ratios &lt;ratios file&gt; --targetdir &lt;output directory&gt; --targetdb &lt;output database name&gt;
 </pre></div>
 </div>
-<p>This is the old MongoDB way</p>
-<div class="highlight-none"><div class="highlight"><pre><span></span>$ egrin2-assemble --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0
-</pre></div>
-</div>
-<p>We have included a small test ensemble (need to find a place to host this!!!). In this call we set <code class="docutils literal"><span class="pre">--n_resamples</span></code> to 0. This means that you will not have to perform condition resampling for corems, which currently requires access to an SGE cluster.</p>
-<p>The MongoDB Database Schema is available here</p>
-</div>
-<div class="section" id="step-3-run-col-resample-on-sge-cluster">
-<h2>STEP 3: Run <code class="docutils literal"><span class="pre">col_resample</span></code> on SGE cluster<a class="headerlink" href="#step-3-run-col-resample-on-sge-cluster" title="Permalink to this headline">¶</a></h2>
-<p>After loading all of the data from cMonkey2 into MongoDB and detecting corems, the <code class="docutils literal"><span class="pre">assembler.py</span></code> script will pause so that a computationally intensive procedure can be run on an SGE cluster.</p>
-<p>This step assigns conditions to the corems. In short, it computes brute force resamples of the gene expression data (default: 10,000 resamples) to determine the conditions in which genes from each corem are tightly co-expressed. For more information about this step, please refer to the <a class="reference external" href="http://msb.embopress.org/highwire/filestream/49752/field_highwire_a_enclosures/0/supplementary-material.inline-supplementary-material-10.pdf?download=true">Supplementary Information of our 2014 paper</a>.</p>
-<p>The script generates an output directory containing QSub scripts and a master control script called <code class="docutils literal"><span class="pre">resample.sh</span></code>. You should transfer this folder as well as the <code class="docutils literal"><span class="pre">resample.py</span></code> script located in the assemble folder of the egrin2-tools repository to the cluster to compute the resamples.</p>
-<p>When <code class="docutils literal"><span class="pre">egrin2-assemble</span></code> pauses for this step, you will see the following message displayed on the screen.</p>
-<div class="highlight-none"><div class="highlight"><pre><span></span>Output Qsub scripts to targetdir
-
-Transfer these documents to the cluster. Run &#39;resample.sh&#39; with resample.py in your working directory to compute all resamples.
-
-Once this is done, return here to finish processing corems.
-
-Please type: &#39;Done&#39; to continue
-</pre></div>
-</div>
-<p>Be sure that the SGE cluster on which the resampling is run has access to the MongoDB host, as the script directly writes the output of the resampling to this database. Once the resampling is finished (all resample database entries present), you can return to this prompt and type Done to finish the assembly</p>
-<p><strong>Alternatively:</strong> if for some reason your session terminates prematurely or for any other reason there is an interruption at this step, you can start <code class="docutils literal"><span class="pre">egrin2-assemble</span></code> with the flag <code class="docutils literal"><span class="pre">--finish_only</span> <span class="pre">True</span></code>. You must also include all of the original parameters to the <code class="docutils literal"><span class="pre">egrin2-assemble</span></code> script.</p>
-<p>Importantly, this still assumes that all of the information from the resampling procedure is contained in the MongoDB database.</p>
-<p>For example, returning to our original <code class="docutils literal"><span class="pre">egrin2-assemble</span></code> call, we would type:</p>
-<div class="highlight-none"><div class="highlight"><pre><span></span>$ egrin2-assemble --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0 --finish_only True
-</pre></div>
-</div>
-<p>To finish the assembly.</p>
-</div>
-<div class="section" id="step-4-finish-assembly">
-<h2>STEP 4: Finish assembly<a class="headerlink" href="#step-4-finish-assembly" title="Permalink to this headline">¶</a></h2>
-<p>Having finished assembly, the <code class="docutils literal"><span class="pre">assembler.py</span></code> script will dump the MongoDB database to BSON, which are subsequently compressed in the supplied <code class="docutils literal"><span class="pre">--targetdir</span></code>. This file can be uncompressed and read directly into MongoDB using the <code class="docutils literal"><span class="pre">mongorestore</span></code> command, e.g.:</p>
-<div class="highlight-none"><div class="highlight"><pre><span></span>mongorestore eco_db
-</pre></div>
-</div>
+<p>This will run the entire assembly step</p>
 </div>
 </div>
 
@@ -294,8 +255,6 @@ Please type: &#39;Done&#39; to continue
 <li class="toctree-l2"><a class="reference internal" href="#assemble-an-egrin-2-0-ensemble">ASSEMBLE an EGRIN 2.0 ensemble</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-1-generate-optional-input-files">STEP 1: Generate optional input files</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-2-run-egrin2-assemble">STEP 2: Run <code class="docutils literal"><span class="pre">egrin2-assemble</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#step-3-run-col-resample-on-sge-cluster">STEP 3: Run <code class="docutils literal"><span class="pre">col_resample</span></code> on SGE cluster</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#step-4-finish-assembly">STEP 4: Finish assembly</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="query.html">Query</a></li>
