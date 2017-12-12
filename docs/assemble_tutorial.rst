@@ -168,89 +168,24 @@ The `col_annot` file should look like the tab-delimited file depicted below. You
 
 
 STEP 2: Run ``egrin2-assemble``
-----------------------------
+-------------------------------
 
 **Important!!! TOMTOM, MCL, and FIMO should be run prior to assembly. Otherwise the ensemble will not contain GREs or motif scans.**
 
-To run the assembler, you must supply several files as well as specify where you would like to host the MongoDB database. If you do not supply a host for the MongoDB databse, it will be stored on ``localhost``. At a minimum, you should supply:
+To run the assembler, you must supply several files. At a minimum, you should supply:
 
   * ``--organism``: 3 letter organism code
   * ``--ratios``: Path to ratios file. Should be 'raw' (normalized) ratios, not the standardized ratios used by cMonkey
   * ``--targetdir``: Storage path for MongoDB and corem data
-  * ``--ncbi_code``: NCBI organism code
-  * ``--ensembledir``: Path to ensemble runs. Default: cwd
 
-Assuming your terminal current working directory is within the E. coli ensemble, with the cMonkey2 runs located in the subfolder ``./eco-ens-m3d/``, you can call the assembler as follows:
-
-The MongoDB path has been deprecated and was replaced in favor of storing data in
-relational databases, which is by default sqlite because it does not require a
-running database server.
+*Note: The MongoDB engine has been replaced in favor of storing data in
+sqlite because it does not require a running database server. Furthermore
+the assembly step does not require a cluster anymore*
 
 .. highlight:: none
 
 ::
 
-  $ egrin2-assemble --organism mtu --ratios <ratios file> --targetdir <output directory> --ensembledir <ensemble directory> --dbengine sqlite --targetdb <output database name>
+  $ egrin2-assemble --organism mtu --ratios <ratios file> --targetdir <output directory> --targetdb <output database name>
 
-This is the old MongoDB way
-
-.. highlight:: none
-
-::
-
-   $ egrin2-assemble --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0
-
-We have included a small test ensemble (need to find a place to host this!!!). In this call we set ``--n_resamples`` to 0. This means that you will not have to perform condition resampling for corems, which currently requires access to an SGE cluster.
-
-The MongoDB Database Schema is available here
-
-STEP 3: Run ``col_resample`` on SGE cluster
--------------------------------------------
-
-After loading all of the data from cMonkey2 into MongoDB and detecting corems, the ``assembler.py`` script will pause so that a computationally intensive procedure can be run on an SGE cluster.
-
-This step assigns conditions to the corems. In short, it computes brute force resamples of the gene expression data (default: 10,000 resamples) to determine the conditions in which genes from each corem are tightly co-expressed. For more information about this step, please refer to the `Supplementary Information of our 2014 paper <http://msb.embopress.org/highwire/filestream/49752/field_highwire_a_enclosures/0/supplementary-material.inline-supplementary-material-10.pdf?download=true>`_.
-
-The script generates an output directory containing QSub scripts and a master control script called ``resample.sh``. You should transfer this folder as well as the ``resample.py`` script located in the assemble folder of the egrin2-tools repository to the cluster to compute the resamples.
-
-When ``egrin2-assemble`` pauses for this step, you will see the following message displayed on the screen.
-
-.. highlight:: none
-
-::
-
-   Output Qsub scripts to targetdir
-
-   Transfer these documents to the cluster. Run 'resample.sh' with resample.py in your working directory to compute all resamples.
-
-   Once this is done, return here to finish processing corems.
-
-   Please type: 'Done' to continue
-
-
-Be sure that the SGE cluster on which the resampling is run has access to the MongoDB host, as the script directly writes the output of the resampling to this database. Once the resampling is finished (all resample database entries present), you can return to this prompt and type Done to finish the assembly
-
-**Alternatively:** if for some reason your session terminates prematurely or for any other reason there is an interruption at this step, you can start ``egrin2-assemble`` with the flag ``--finish_only True``. You must also include all of the original parameters to the ``egrin2-assemble`` script.
-
-Importantly, this still assumes that all of the information from the resampling procedure is contained in the MongoDB database.
-
-For example, returning to our original ``egrin2-assemble`` call, we would type:
-
-.. highlight:: none
-
-::
-
-   $ egrin2-assemble --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0 --finish_only True
-
-To finish the assembly.
-
-STEP 4: Finish assembly
------------------------
-
-Having finished assembly, the ``assembler.py`` script will dump the MongoDB database to BSON, which are subsequently compressed in the supplied ``--targetdir``. This file can be uncompressed and read directly into MongoDB using the ``mongorestore`` command, e.g.:
-
-.. highlight:: none
-
-::
-
-   mongorestore eco_db
+This will run the entire assembly step

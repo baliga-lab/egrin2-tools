@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import argparse
 import logging
 import pymongo
@@ -124,28 +122,3 @@ def finish_corems(dbclient):
         except:
             logging.exception('ERROR on corem %d %s' % (corem['corem_id'], str(corem['_id'])))
             raise
-
-
-if __name__ == '__main__':
-    logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
-                        level=LOG_LEVEL, filename=LOG_FILE)
-    parser = argparse.ArgumentParser(description=DESCRIPTION)
-    parser.add_argument('db', help="database name")
-    parser.add_argument('--host', default='localhost', help="MongoDB database host")
-    parser.add_argument('--port', default=27017, type=int, help="MongoDB database port")
-    parser.add_argument('--dbengine', default='sqlite', help="Database engine (mongodb|sqlite)")
-    args = parser.parse_args()
-
-    print("Connecting to database: ", args.db)
-    if args.dbengine == 'sqlite':
-        conn = sqlite3.connect(args.db)
-        dbclient = SqliteDB(conn)
-    elif args.dbengine == 'mongodb':
-        client = pymongo.MongoClient(host=args.host, port=args.port)
-        dbclient = MongoDB(client[args.db])
-    else:
-        raise Exception('please specify a supported database engine !!')
-    try:
-        finish_corems(dbclient)
-    finally:
-        dbclient.close()
