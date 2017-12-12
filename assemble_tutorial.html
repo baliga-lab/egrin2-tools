@@ -83,53 +83,82 @@
 <h2>Scripts<a class="headerlink" href="#scripts" title="Permalink to this headline">¶</a></h2>
 <blockquote>
 <div><ul class="simple">
-<li><code class="docutils literal"><span class="pre">assembler.py</span></code>: The control function for ASSEMBLE scripts.</li>
+<li><code class="docutils literal"><span class="pre">egrin2-assemble</span></code>: The control function for ASSEMBLE scripts.</li>
 <li><code class="docutils literal"><span class="pre">makeCorems.py</span></code>: Identifies corems using C++ scripts compiled above</li>
 <li><code class="docutils literal"><span class="pre">resample_QSub.py</span></code>: Generates QSub script for submission of resamples to cluster</li>
 <li><code class="docutils literal"><span class="pre">sql2mongoDB.py</span></code>: Merges individual cMonkey SQLite dbs and post-processing data into MongoDB</li>
 </ul>
 </div></blockquote>
-<div class="highlight-none"><div class="highlight"><pre><span></span>%run ..//assembler.py -h
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ egrin2-assemble -h
 
-usage: assembler.py [-h] --organism ORGANISM --ratios RATIOS --targetdir TARGETDIR --ncbi_code NCBI_CODE [--cores CORES] [--ensembledir ENSEMBLEDIR] [--col_annot COL_ANNOT] [--host HOST] [--port PORT] [--prefix PREFIX] [--row_annot ROW_ANNOT] [--row_annot_matchCol ROW_ANNOT_MATCHCOL] [--gre2motif GRE2MOTIF] [--db DB] [--genome_annot GENOME_ANNOT] [--backbone_pval BACKBONE_PVAL] [--link_comm_score LINK_COMM_SCORE] [--link_comm_increment LINK_COMM_INCREMENT] [--link_comm_density_score LINK_COMM_DENSITY_SCORE] [--corem_size_threshold COREM_SIZE_THRESHOLD] [--n_resamples N_RESAMPLES] [--cluster CLUSTER] [--finish_only FINISH_ONLY] [--user USER]
+ usage: egrin2-assemble [-h] --organism ORGANISM --ratios RATIOS
+                        [--targetdir TARGETDIR] [--backbone_pval BACKBONE_PVAL]
+                        [--cores CORES] [--link_comm_score LINK_COMM_SCORE]
+                        [--link_comm_increment LINK_COMM_INCREMENT]
+                        [--link_comm_density_score LINK_COMM_DENSITY_SCORE]
+                        [--corem_size_threshold COREM_SIZE_THRESHOLD]
+                        [--n_resamples N_RESAMPLES]
+                        [--cluster_arch CLUSTER_ARCH] [--sge_user SGE_USER]
+                        [--dbengine DBENGINE] [--host HOST] [--port PORT]
+                        [--targetdb TARGETDB] [--prefix PREFIX]
+                        [--ensembledir ENSEMBLEDIR] [--col_annot COL_ANNOT]
+                        [--row_annot ROW_ANNOT]
+                        [--row_annot_match_col ROW_ANNOT_MATCH_COL]
+                        [--gre2motif GRE2MOTIF] [--genome_annot GENOME_ANNOT]
+                        [result_dbs [result_dbs ...]]
 
-assemble.py - prepare cluster runs
+ assemble.py - prepare cluster runs
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --organism ORGANISM   3 letter organism code
-  --ratios RATIOS       Path to ratios file. Should be &#39;raw&#39; (normalized) ratios, not the standardized ratios used by cMonkey
-  --targetdir TARGETDIR Storage path for MongoDB and corem data
-  --ncbi_code NCBI_CODE NCBI organism code
-  --cores CORES Number  local cores to use for corem C++ scripts
-  --ensembledir ENSEMBLEDIR
-                        Path to ensemble runs. Default: cwd
-  --col_annot COL_ANNOT Tab-delimited file with experiment annotations
-  --host HOST           MongoDB host. Default &#39;localhost&#39;
-  --port PORT           MongoDB port
-  --prefix PREFIX       Ensemble run prefix. Default: organism-out-
-  --row_annot ROW_ANNOT Optional row (gene) annotation tab-delimited file. If not specified, annotations will be downloaded from MicrobesOnline using --ncbi_code.
-  --row_annot_matchCol ROW_ANNOT_MATCHCOL
-                        Name of column in row_annot that matches row names in ratios file.
-  --gre2motif GRE2MOTIF Motif-&gt;GRE clustering file
-  --db DB               Optional ensemble MongoDB database name
-  --genome_annot GENOME_ANNOT
-                        Optional genome annotation file. Automatically downloaded from MicrobesOnline using --ncbi_code
-  --backbone_pval BACKBONE_PVAL
-                        Significance pvalue for gene-gene backbone. Default = 0.05.
-  --link_comm_score LINK_COMM_SCORE
-                        Scoring metric for link communities
-  --link_comm_increment LINK_COMM_INCREMENT
-                        Height increment for cutting agglomerative clustering of link communities
-  --link_comm_density_score LINK_COMM_DENSITY_SCORE
-                        Density score for evaluating link communities
-  --corem_size_threshold COREM_SIZE_THRESHOLD Defines minimum corem size. Default = 3.
-  --n_resamples N_RESAMPLES
-                        Number resamples to compute for corem condition assignment. Default = 10,000
-  --cluster CLUSTER     Run re-samples on cluster? Boolean.
-  --finish_only FINISH_ONLY
-                        Finish corems only. In case session gets dropped
-  --user USER Cluster   user name
+ positional arguments:
+   result_dbs
+
+ optional arguments:
+   -h, --help            show this help message and exit
+   --organism ORGANISM   3 letter organism code
+   --ratios RATIOS       Path to ratios file. Should be &#39;raw&#39; (normalized)
+                         ratios, not the standardized ratios used by cMonkey
+   --targetdir TARGETDIR
+                         Storage path for MongoDB and corem data
+   --backbone_pval BACKBONE_PVAL
+                         Significance pvalue for gene-gene backbone. Default =
+                         0.05.
+   --cores CORES         Number local cores to use for corem C++ scripts
+   --link_comm_score LINK_COMM_SCORE
+                         Scoring metric for link communities
+   --link_comm_increment LINK_COMM_INCREMENT
+                         Height increment for cutting agglomerative clustering
+                         of link communities
+   --link_comm_density_score LINK_COMM_DENSITY_SCORE
+                         Density score for evaluating link communities
+   --corem_size_threshold COREM_SIZE_THRESHOLD
+                         Defines minimum corem size. Default = 3.
+   --n_resamples N_RESAMPLES
+                         Number resamples to compute for corem condition
+                         assignment. Default = 10,000
+   --cluster_arch CLUSTER_ARCH
+                         where to run resampling on
+   --sge_user SGE_USER   Cluster user name
+   --dbengine DBENGINE   mongodb or sqlite
+   --host HOST           MongoDB host. Default &#39;localhost&#39;
+   --port PORT           MongoDB port
+   --targetdb TARGETDB   Optional ensemble MongoDB database name
+   --prefix PREFIX       Ensemble run prefix. Default: *organism*-out-
+   --ensembledir ENSEMBLEDIR
+                         Path to ensemble runs. Default: cwd
+   --col_annot COL_ANNOT
+                         Tab-delimited file with experiment annotations
+   --row_annot ROW_ANNOT
+                         Optional row (gene) annotation tab-delimited file. If
+                         not specified, annotations will be downloaded from
+                         MicrobesOnline using --ncbi_code.
+   --row_annot_match_col ROW_ANNOT_MATCH_COL
+                         Name of column in row_annot that matches row names in
+                         ratios file.
+   --gre2motif GRE2MOTIF
+                         Motif-&gt;GRE clustering file
+   --genome_annot GENOME_ANNOT
+                         Optional genome annotation file. Automatically
+                         downloaded from MicrobesOnline using --ncbi_code
 </pre></div>
 </div>
 </div>
@@ -144,7 +173,7 @@ optional arguments:
 <h3><code class="docutils literal"><span class="pre">row_annot</span></code><a class="headerlink" href="#row-annot" title="Permalink to this headline">¶</a></h3>
 <p>As noted above, the <code class="docutils literal"><span class="pre">row_annot</span></code> file will be downloaded automatically from MicrobesOnline if a custom annotation is not provided. If you provide your own row_annot file, however, you will also need to specificy <code class="docutils literal"><span class="pre">--row_annot_matchCol</span></code>, which is the name of the column in your annotation file that matches the gene name used by cMonkey2 (i.e. the row names in your ratios file).</p>
 <p>The row annotation file should look like the annotation file supplied by MicrobesOnline, where each row specifies a gene and each of the columns specifies some information about that gene. Again, you must ensure that at least one of the columns contains gene names that match the gene names in the ratios file used by cMonkey2, in the case of MicrobesOnline, it is the <code class="docutils literal"><span class="pre">sysName</span></code> column.</p>
-<p>Here is an example annotation file for <em>E. coli</em> direct from MicrobesOnline, the file itself is available here.</p>
+<p>Here is an example annotation fil e for <em>E. coli</em> direct from MicrobesOnline, the file itself is available here.</p>
 <div class="figure">
 <img alt="Example row_annot file" src="_images/row_annot.png" />
 </div>
@@ -159,8 +188,8 @@ optional arguments:
 </div>
 </div>
 </div>
-<div class="section" id="step-2-run-assembler-py">
-<h2>STEP 2: Run <code class="docutils literal"><span class="pre">assembler.py</span></code><a class="headerlink" href="#step-2-run-assembler-py" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="step-2-run-egrin2-assemble">
+<h2>STEP 2: Run <code class="docutils literal"><span class="pre">egrin2-assemble</span></code><a class="headerlink" href="#step-2-run-egrin2-assemble" title="Permalink to this headline">¶</a></h2>
 <p><strong>Important!!! TOMTOM, MCL, and FIMO should be run prior to assembly. Otherwise the ensemble will not contain GREs or motif scans.</strong></p>
 <p>To run the assembler, you must supply several files as well as specify where you would like to host the MongoDB database. If you do not supply a host for the MongoDB databse, it will be stored on <code class="docutils literal"><span class="pre">localhost</span></code>. At a minimum, you should supply:</p>
 <blockquote>
@@ -173,7 +202,14 @@ optional arguments:
 </ul>
 </div></blockquote>
 <p>Assuming your terminal current working directory is within the E. coli ensemble, with the cMonkey2 runs located in the subfolder <code class="docutils literal"><span class="pre">./eco-ens-m3d/</span></code>, you can call the assembler as follows:</p>
-<div class="highlight-none"><div class="highlight"><pre><span></span>python assembler.py --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0
+<p>The MongoDB path has been deprecated and was replaced in favor of storing data in
+relational databases, which is by default sqlite because it does not require a
+running database server.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ egrin2-assemble --organism mtu --ratios &lt;ratios file&gt; --targetdir &lt;output directory&gt; --ensembledir &lt;ensemble directory&gt; --dbengine sqlite --targetdb &lt;output database name&gt;
+</pre></div>
+</div>
+<p>This is the old MongoDB way</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ egrin2-assemble --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0
 </pre></div>
 </div>
 <p>We have included a small test ensemble (need to find a place to host this!!!). In this call we set <code class="docutils literal"><span class="pre">--n_resamples</span></code> to 0. This means that you will not have to perform condition resampling for corems, which currently requires access to an SGE cluster.</p>
@@ -184,7 +220,7 @@ optional arguments:
 <p>After loading all of the data from cMonkey2 into MongoDB and detecting corems, the <code class="docutils literal"><span class="pre">assembler.py</span></code> script will pause so that a computationally intensive procedure can be run on an SGE cluster.</p>
 <p>This step assigns conditions to the corems. In short, it computes brute force resamples of the gene expression data (default: 10,000 resamples) to determine the conditions in which genes from each corem are tightly co-expressed. For more information about this step, please refer to the <a class="reference external" href="http://msb.embopress.org/highwire/filestream/49752/field_highwire_a_enclosures/0/supplementary-material.inline-supplementary-material-10.pdf?download=true">Supplementary Information of our 2014 paper</a>.</p>
 <p>The script generates an output directory containing QSub scripts and a master control script called <code class="docutils literal"><span class="pre">resample.sh</span></code>. You should transfer this folder as well as the <code class="docutils literal"><span class="pre">resample.py</span></code> script located in the assemble folder of the egrin2-tools repository to the cluster to compute the resamples.</p>
-<p>When <code class="docutils literal"><span class="pre">assembler.py</span></code> pauses for this step, you will see the following message displayed on the screen.</p>
+<p>When <code class="docutils literal"><span class="pre">egrin2-assemble</span></code> pauses for this step, you will see the following message displayed on the screen.</p>
 <div class="highlight-none"><div class="highlight"><pre><span></span>Output Qsub scripts to targetdir
 
 Transfer these documents to the cluster. Run &#39;resample.sh&#39; with resample.py in your working directory to compute all resamples.
@@ -194,11 +230,11 @@ Once this is done, return here to finish processing corems.
 Please type: &#39;Done&#39; to continue
 </pre></div>
 </div>
-<p>Be sure that the SGE cluster on which the resampling is run has access to the MongoDB host, as the script directly writes the output of the resampling to this database. Once the resampling is finsihed (all resample database entries present), you can return to this prompt and type Done to finish the assembly</p>
-<p><strong>Alternatively:</strong> if for some reason your session terminates prematurely or for any other reason there is an interruption at this step, you can start <code class="docutils literal"><span class="pre">assembler.py</span></code> with the flag <code class="docutils literal"><span class="pre">--finish_only</span> <span class="pre">True</span></code>. You must also include all of the original parameters to the <code class="docutils literal"><span class="pre">assembler.py</span></code> script.</p>
+<p>Be sure that the SGE cluster on which the resampling is run has access to the MongoDB host, as the script directly writes the output of the resampling to this database. Once the resampling is finished (all resample database entries present), you can return to this prompt and type Done to finish the assembly</p>
+<p><strong>Alternatively:</strong> if for some reason your session terminates prematurely or for any other reason there is an interruption at this step, you can start <code class="docutils literal"><span class="pre">egrin2-assemble</span></code> with the flag <code class="docutils literal"><span class="pre">--finish_only</span> <span class="pre">True</span></code>. You must also include all of the original parameters to the <code class="docutils literal"><span class="pre">egrin2-assemble</span></code> script.</p>
 <p>Importantly, this still assumes that all of the information from the resampling procedure is contained in the MongoDB database.</p>
-<p>For example, returning to our original <code class="docutils literal"><span class="pre">assembler.py</span></code> call, we would type:</p>
-<div class="highlight-none"><div class="highlight"><pre><span></span>python assembler.py --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0 --finish_only True
+<p>For example, returning to our original <code class="docutils literal"><span class="pre">egrin2-assemble</span></code> call, we would type:</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ egrin2-assemble --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0 --finish_only True
 </pre></div>
 </div>
 <p>To finish the assembly.</p>
@@ -249,6 +285,7 @@ Please type: &#39;Done&#39; to continue
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="build.html">Build</a></li>
 <li class="toctree-l1"><a class="reference internal" href="build_tutorial.html">Build Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="postprocessing.html">Postprocessing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="assemble.html">Assemble</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Assemble Tutorial</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#in-a-nutshell">In a nutshell</a></li>
@@ -256,7 +293,7 @@ Please type: &#39;Done&#39; to continue
 <li class="toctree-l2"><a class="reference internal" href="#scripts">Scripts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#assemble-an-egrin-2-0-ensemble">ASSEMBLE an EGRIN 2.0 ensemble</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-1-generate-optional-input-files">STEP 1: Generate optional input files</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#step-2-run-assembler-py">STEP 2: Run <code class="docutils literal"><span class="pre">assembler.py</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-2-run-egrin2-assemble">STEP 2: Run <code class="docutils literal"><span class="pre">egrin2-assemble</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-3-run-col-resample-on-sge-cluster">STEP 3: Run <code class="docutils literal"><span class="pre">col_resample</span></code> on SGE cluster</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-4-finish-assembly">STEP 4: Finish assembly</a></li>
 </ul>

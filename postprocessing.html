@@ -1,0 +1,205 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Postprocessing &#8212; egrin2-tools 1.0.0 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Assemble" href="assemble.html" />
+    <link rel="prev" title="Build Tutorial" href="build_tutorial.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="postprocessing">
+<h1>Postprocessing<a class="headerlink" href="#postprocessing" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
+<p>After the individual cmonkey2 runs of the ensemble have run, we need to
+perform additional postprocessing.
+Most of them are very compute-intensive task, which is why the tools actually
+generate scripts to run on an SGE cluster.</p>
+</div>
+<div class="section" id="generate-fimo-runs">
+<h2>Generate FIMO runs<a class="headerlink" href="#generate-fimo-runs" title="Permalink to this headline">¶</a></h2>
+<p>We have tested this with the fimo tool from the MEME suite 4.11.3. The command
+line interface can changed between minor releases of MEME, so if you experience
+problems, please verify that you have this version of MEME.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ cd &lt;target directory&gt;
+$ egrin2-fimo --user &lt;username&gt; --organism &lt;organism code&gt; --genome &lt;path pattern to genome files&gt;
+</pre></div>
+</div>
+<p>This generates the necessary scripts for running FIMO an SGE cluster. To submit
+these jobs, on the head node, type</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ qsub qsub_fimo.sh
+</pre></div>
+</div>
+</div>
+<div class="section" id="coding-fractions">
+<h2>Coding Fractions<a class="headerlink" href="#coding-fractions" title="Permalink to this headline">¶</a></h2>
+<p>Immediately following the FIMO step is the Coding Fractions step. Coding fractions are
+computed based on the FIMO results, so the entire FIMO step needs to be completed before
+Coding Fractions can be run.</p>
+<p>In order to generate scripts for running on the cluster, we need:</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ cd &lt;target directory&gt;
+$ egrin2-codingfracs --user &lt;username&gt; --organism &lt;organism code&gt; --features &lt;RSAT features file&gt;
+</pre></div>
+</div>
+<p>and then on the SGE head node</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ qsub qsub_coding_fracs.sh
+</pre></div>
+</div>
+</div>
+<div class="section" id="tomtom">
+<h2>Tomtom<a class="headerlink" href="#tomtom" title="Permalink to this headline">¶</a></h2>
+<p>The TOMTOM step is somewhat independent of FIMO and Coding Fractions and could
+theoretically be run in parallel if sufficient computing resources are available.
+This command generates the control scripts for running TOMTOM.</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ cd &lt;target directory&gt;
+$ egrin2-tomtom --user &lt;username&gt; --prefix &lt;output directory prefix&gt;
+</pre></div>
+</div>
+<p>then execute</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ ./qsub_tomtom.sh
+</pre></div>
+</div>
+<p>on the head node of your cluster.</p>
+</div>
+<div class="section" id="motif-clustering">
+<h2>Motif Clustering<a class="headerlink" href="#motif-clustering" title="Permalink to this headline">¶</a></h2>
+<p>The final postprocessing step invokes mcl for processing the
+TOMTOM results from the previous step. This step is not performed
+on the cluster, instead invoke the script directly:</p>
+<div class="highlight-none"><div class="highlight"><pre><span></span>$ egrin2-mcl &lt;tomtom output directory&gt; &lt;your feature file&gt;
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="index.html">
+    <img class="logo" src="_static/egrin2_logo_80px.png" alt="Logo"/>
+    
+    <h1 class="logo logo-name">egrin2-tools</h1>
+    
+  </a>
+</p>
+
+
+
+<p class="blurb">EGRIN2 tool chain</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=baliga-lab&repo=egrin2-tools&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html">Build</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build_tutorial.html">Build Tutorial</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Postprocessing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#generate-fimo-runs">Generate FIMO runs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#coding-fractions">Coding Fractions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tomtom">Tomtom</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#motif-clustering">Motif Clustering</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="assemble.html">Assemble</a></li>
+<li class="toctree-l1"><a class="reference internal" href="assemble_tutorial.html">Assemble Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="query.html">Query</a></li>
+<li class="toctree-l1"><a class="reference internal" href="basic_mining_agglom.html">Basic Mining Using agglom</a></li>
+<li class="toctree-l1"><a class="reference internal" href="basic_mining_coremfinder.html">Basic Mining Using coremFinder</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced_mining.html">Advanced Mining</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plot_expression_tutorial.html">Plot Expression Tutorial</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="build_tutorial.html" title="previous chapter">Build Tutorial</a></li>
+      <li>Next: <a href="assemble.html" title="next chapter">Assemble</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Aaron Brooks, David Reiss, Wei-ju Wu, Micheleen Harris.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.4</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/postprocessing.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+    <a href="https://github.com/baliga-lab/egrin2-tools" class="github">
+        <img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"  class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>

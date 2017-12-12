@@ -13,9 +13,10 @@ What's different here ?
 
 Good question. We wanted to put you back in control. We wanted you to query the models in whatever way is appropriate for your biological question. That's what you can do here.
 
-The 3 Steps of EGRIN 2.0
+The 4 Steps of EGRIN 2.0
 ------------------------
 
   * :doc:`build`
+  * :doc:`postprocessing`
   * :doc:`assemble`
   * :doc:`query`

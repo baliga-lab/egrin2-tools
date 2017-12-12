@@ -50,7 +50,7 @@ Additionally, the Python modules described on the Home page are required to run 
 Scripts
 -------
 
-  * ``assembler.py``: The control function for ASSEMBLE scripts.
+  * ``egrin2-assemble``: The control function for ASSEMBLE scripts.
   * ``makeCorems.py``: Identifies corems using C++ scripts compiled above
   * ``resample_QSub.py``: Generates QSub script for submission of resamples to cluster
   * ``sql2mongoDB.py``: Merges individual cMonkey SQLite dbs and post-processing data into MongoDB
@@ -60,47 +60,76 @@ Scripts
 
 ::
 
-   %run ..//assembler.py -h
+   $ egrin2-assemble -h
 
-   usage: assembler.py [-h] --organism ORGANISM --ratios RATIOS --targetdir TARGETDIR --ncbi_code NCBI_CODE [--cores CORES] [--ensembledir ENSEMBLEDIR] [--col_annot COL_ANNOT] [--host HOST] [--port PORT] [--prefix PREFIX] [--row_annot ROW_ANNOT] [--row_annot_matchCol ROW_ANNOT_MATCHCOL] [--gre2motif GRE2MOTIF] [--db DB] [--genome_annot GENOME_ANNOT] [--backbone_pval BACKBONE_PVAL] [--link_comm_score LINK_COMM_SCORE] [--link_comm_increment LINK_COMM_INCREMENT] [--link_comm_density_score LINK_COMM_DENSITY_SCORE] [--corem_size_threshold COREM_SIZE_THRESHOLD] [--n_resamples N_RESAMPLES] [--cluster CLUSTER] [--finish_only FINISH_ONLY] [--user USER]
+    usage: egrin2-assemble [-h] --organism ORGANISM --ratios RATIOS
+                           [--targetdir TARGETDIR] [--backbone_pval BACKBONE_PVAL]
+                           [--cores CORES] [--link_comm_score LINK_COMM_SCORE]
+                           [--link_comm_increment LINK_COMM_INCREMENT]
+                           [--link_comm_density_score LINK_COMM_DENSITY_SCORE]
+                           [--corem_size_threshold COREM_SIZE_THRESHOLD]
+                           [--n_resamples N_RESAMPLES]
+                           [--cluster_arch CLUSTER_ARCH] [--sge_user SGE_USER]
+                           [--dbengine DBENGINE] [--host HOST] [--port PORT]
+                           [--targetdb TARGETDB] [--prefix PREFIX]
+                           [--ensembledir ENSEMBLEDIR] [--col_annot COL_ANNOT]
+                           [--row_annot ROW_ANNOT]
+                           [--row_annot_match_col ROW_ANNOT_MATCH_COL]
+                           [--gre2motif GRE2MOTIF] [--genome_annot GENOME_ANNOT]
+                           [result_dbs [result_dbs ...]]
 
-   assemble.py - prepare cluster runs
+    assemble.py - prepare cluster runs
 
-   optional arguments:
-     -h, --help            show this help message and exit
-     --organism ORGANISM   3 letter organism code
-     --ratios RATIOS       Path to ratios file. Should be 'raw' (normalized) ratios, not the standardized ratios used by cMonkey
-     --targetdir TARGETDIR Storage path for MongoDB and corem data
-     --ncbi_code NCBI_CODE NCBI organism code
-     --cores CORES Number  local cores to use for corem C++ scripts
-     --ensembledir ENSEMBLEDIR
-                           Path to ensemble runs. Default: cwd
-     --col_annot COL_ANNOT Tab-delimited file with experiment annotations
-     --host HOST           MongoDB host. Default 'localhost'
-     --port PORT           MongoDB port
-     --prefix PREFIX       Ensemble run prefix. Default: organism-out-
-     --row_annot ROW_ANNOT Optional row (gene) annotation tab-delimited file. If not specified, annotations will be downloaded from MicrobesOnline using --ncbi_code.
-     --row_annot_matchCol ROW_ANNOT_MATCHCOL
-                           Name of column in row_annot that matches row names in ratios file.
-     --gre2motif GRE2MOTIF Motif->GRE clustering file
-     --db DB               Optional ensemble MongoDB database name
-     --genome_annot GENOME_ANNOT
-                           Optional genome annotation file. Automatically downloaded from MicrobesOnline using --ncbi_code
-     --backbone_pval BACKBONE_PVAL
-                           Significance pvalue for gene-gene backbone. Default = 0.05.
-     --link_comm_score LINK_COMM_SCORE
-                           Scoring metric for link communities
-     --link_comm_increment LINK_COMM_INCREMENT
-                           Height increment for cutting agglomerative clustering of link communities
-     --link_comm_density_score LINK_COMM_DENSITY_SCORE
-                           Density score for evaluating link communities
-     --corem_size_threshold COREM_SIZE_THRESHOLD Defines minimum corem size. Default = 3.
-     --n_resamples N_RESAMPLES
-                           Number resamples to compute for corem condition assignment. Default = 10,000
-     --cluster CLUSTER     Run re-samples on cluster? Boolean.
-     --finish_only FINISH_ONLY
-                           Finish corems only. In case session gets dropped
-     --user USER Cluster   user name
+    positional arguments:
+      result_dbs
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      --organism ORGANISM   3 letter organism code
+      --ratios RATIOS       Path to ratios file. Should be 'raw' (normalized)
+                            ratios, not the standardized ratios used by cMonkey
+      --targetdir TARGETDIR
+                            Storage path for MongoDB and corem data
+      --backbone_pval BACKBONE_PVAL
+                            Significance pvalue for gene-gene backbone. Default =
+                            0.05.
+      --cores CORES         Number local cores to use for corem C++ scripts
+      --link_comm_score LINK_COMM_SCORE
+                            Scoring metric for link communities
+      --link_comm_increment LINK_COMM_INCREMENT
+                            Height increment for cutting agglomerative clustering
+                            of link communities
+      --link_comm_density_score LINK_COMM_DENSITY_SCORE
+                            Density score for evaluating link communities
+      --corem_size_threshold COREM_SIZE_THRESHOLD
+                            Defines minimum corem size. Default = 3.
+      --n_resamples N_RESAMPLES
+                            Number resamples to compute for corem condition
+                            assignment. Default = 10,000
+      --cluster_arch CLUSTER_ARCH
+                            where to run resampling on
+      --sge_user SGE_USER   Cluster user name
+      --dbengine DBENGINE   mongodb or sqlite
+      --host HOST           MongoDB host. Default 'localhost'
+      --port PORT           MongoDB port
+      --targetdb TARGETDB   Optional ensemble MongoDB database name
+      --prefix PREFIX       Ensemble run prefix. Default: *organism*-out-
+      --ensembledir ENSEMBLEDIR
+                            Path to ensemble runs. Default: cwd
+      --col_annot COL_ANNOT
+                            Tab-delimited file with experiment annotations
+      --row_annot ROW_ANNOT
+                            Optional row (gene) annotation tab-delimited file. If
+                            not specified, annotations will be downloaded from
+                            MicrobesOnline using --ncbi_code.
+      --row_annot_match_col ROW_ANNOT_MATCH_COL
+                            Name of column in row_annot that matches row names in
+                            ratios file.
+      --gre2motif GRE2MOTIF
+                            Motif->GRE clustering file
+      --genome_annot GENOME_ANNOT
+                            Optional genome annotation file. Automatically
+                            downloaded from MicrobesOnline using --ncbi_code
 
 
 ASSEMBLE an EGRIN 2.0 ensemble
@@ -120,7 +149,7 @@ As noted above, the ``row_annot`` file will be downloaded automatically from Mic
 
 The row annotation file should look like the annotation file supplied by MicrobesOnline, where each row specifies a gene and each of the columns specifies some information about that gene. Again, you must ensure that at least one of the columns contains gene names that match the gene names in the ratios file used by cMonkey2, in the case of MicrobesOnline, it is the ``sysName`` column.
 
-Here is an example annotation file for *E. coli* direct from MicrobesOnline, the file itself is available here.
+Here is an example annotation fil e for *E. coli* direct from MicrobesOnline, the file itself is available here.
 
 .. figure:: _static/assemble/row_annot.png
             :alt: Example row_annot file
@@ -138,7 +167,7 @@ The `col_annot` file should look like the tab-delimited file depicted below. You
             :alt: Example col_annot file
 
 
-STEP 2: Run ``assembler.py``
+STEP 2: Run ``egrin2-assemble``
 ----------------------------
 
 **Important!!! TOMTOM, MCL, and FIMO should be run prior to assembly. Otherwise the ensemble will not contain GREs or motif scans.**
@@ -153,11 +182,23 @@ To run the assembler, you must supply several files as well as specify where you
 
 Assuming your terminal current working directory is within the E. coli ensemble, with the cMonkey2 runs located in the subfolder ``./eco-ens-m3d/``, you can call the assembler as follows:
 
+The MongoDB path has been deprecated and was replaced in favor of storing data in
+relational databases, which is by default sqlite because it does not require a
+running database server.
+
 .. highlight:: none
 
 ::
 
-   python assembler.py --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0
+  $ egrin2-assemble --organism mtu --ratios <ratios file> --targetdir <output directory> --ensembledir <ensemble directory> --dbengine sqlite --targetdb <output database name>
+
+This is the old MongoDB way
+
+.. highlight:: none
+
+::
+
+   $ egrin2-assemble --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0
 
 We have included a small test ensemble (need to find a place to host this!!!). In this call we set ``--n_resamples`` to 0. This means that you will not have to perform condition resampling for corems, which currently requires access to an SGE cluster.
 
@@ -172,7 +213,7 @@ This step assigns conditions to the corems. In short, it computes brute force re
 
 The script generates an output directory containing QSub scripts and a master control script called ``resample.sh``. You should transfer this folder as well as the ``resample.py`` script located in the assemble folder of the egrin2-tools repository to the cluster to compute the resamples.
 
-When ``assembler.py`` pauses for this step, you will see the following message displayed on the screen.
+When ``egrin2-assemble`` pauses for this step, you will see the following message displayed on the screen.
 
 .. highlight:: none
 
@@ -187,19 +228,19 @@ When ``assembler.py`` pauses for this step, you will see the following message d
    Please type: 'Done' to continue
 
 
-Be sure that the SGE cluster on which the resampling is run has access to the MongoDB host, as the script directly writes the output of the resampling to this database. Once the resampling is finsihed (all resample database entries present), you can return to this prompt and type Done to finish the assembly
+Be sure that the SGE cluster on which the resampling is run has access to the MongoDB host, as the script directly writes the output of the resampling to this database. Once the resampling is finished (all resample database entries present), you can return to this prompt and type Done to finish the assembly
 
-**Alternatively:** if for some reason your session terminates prematurely or for any other reason there is an interruption at this step, you can start ``assembler.py`` with the flag ``--finish_only True``. You must also include all of the original parameters to the ``assembler.py`` script.
+**Alternatively:** if for some reason your session terminates prematurely or for any other reason there is an interruption at this step, you can start ``egrin2-assemble`` with the flag ``--finish_only True``. You must also include all of the original parameters to the ``egrin2-assemble`` script.
 
 Importantly, this still assumes that all of the information from the resampling procedure is contained in the MongoDB database.
 
-For example, returning to our original ``assembler.py`` call, we would type:
+For example, returning to our original ``egrin2-assemble`` call, we would type:
 
 .. highlight:: none
 
 ::
 
-   python assembler.py --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0 --finish_only True
+   $ egrin2-assemble --organism eco --ratios ./ratios_eco_m3d.tsv.gz --targetdir ./ --ncbi_code 511145 --ensembledir ./eco-ens-m3d/ --col_annot ./E_coli_v4_Build_6.experiment_feature_descriptions.tsv.gz --n_resamples 0 --finish_only True
 
 To finish the assembly.
 
