@@ -1,16 +1,14 @@
 import argparse
 import logging
-import pymongo
 import sqlite3
-
-import query.egrin2_query as e2q
-import assemble.resample as resample
-from assemble.assemble_sqlite import SqliteDB
-from assemble.assemble_mongodb import MongoDB
 import json
 
+import egrin2.query.egrin2_query as e2q
+import egrin2.assemble.resample as resample
+from egrin2.assemble.assemble_sqlite import SqliteDB
 
-DESCRIPTION = """assemble_finish.py - finish and dump mongodb"""
+
+DESCRIPTION = """assemble_finish.py - finish assembling"""
 LOG_FORMAT = '%(asctime)s %(levelname)-8s %(message)s'
 LOG_LEVEL = logging.DEBUG
 LOG_FILE = None

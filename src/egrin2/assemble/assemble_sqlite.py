@@ -8,7 +8,7 @@ from datetime import datetime
 import itertools
 import json
 
-import assemble.util as util
+import egrin2.assemble.util as util
 
 """
 This assemble module is the sqlite3 based implementation

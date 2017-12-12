@@ -8,10 +8,10 @@ import logging
 import datetime
 import sqlite3
 
-import assemble.assemble_sqlite as asl
-from assemble.makeCorems import CoremMaker
-import assemble.resample as resample
-import assemble.assemble_finish as assemble_finish
+import egrin2.assemble.assemble_sqlite as asl
+from egrin2.assemble.makeCorems import CoremMaker
+import egrin2.assemble.resample as resample
+import egrin2.assemble.assemble_finish as assemble_finish
 
 
 RUN_INFO_TEMPLATE = """[ General ensemble info ]

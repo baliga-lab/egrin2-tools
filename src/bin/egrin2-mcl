@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from postproc import motif_clustering
+from egrin2.postproc import motif_clustering
 
 if __name__ == '__main__':
     motif_clustering.main()

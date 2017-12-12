@@ -10,7 +10,7 @@ import numpy.core.defchararray as npstr
 import pandas as pd
 import igraph as ig
 
-import postproc.coding_fracs as cf
+import egrin2.postproc.coding_fracs as cf
 
 def system(cmd):
     print(cmd)

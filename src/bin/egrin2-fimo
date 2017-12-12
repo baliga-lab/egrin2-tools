@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from postproc import fimo
+from egrin2.postproc import fimo
 
 if __name__ == '__main__':
     fimo.main()

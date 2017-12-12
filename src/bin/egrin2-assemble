@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from assemble import assembler
+from egrin2.assemble import assembler
 
 
 if __name__ == '__main__':

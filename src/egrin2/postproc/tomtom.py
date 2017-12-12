@@ -27,7 +27,7 @@ import bz2
 import os
 import subprocess
 
-from postproc import export_motifs
+from egrin2.postproc import export_motifs
 
 # These are default parameters for tomtom that we chose for now
 EVALUE_CUTOFF = 100

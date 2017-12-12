@@ -4,6 +4,6 @@
 This file is part of egrin2-tools. Please see README and LICENSE for
 more information and licensing details.
 """
-import ensemble.generate_cm2_runs as cm2runs
+from egrin2.ensemble import generate_cm2_runs
 
-cm2runs.main()
+generate_cm2_runs.main()

@@ -23,7 +23,7 @@ import json
 
 import multiprocessing
 
-import assemble.util as util
+import egrin2.assemble.util as util
 
 
 DESCRIPTION = """resample.py - prepare brute force random resamples"""

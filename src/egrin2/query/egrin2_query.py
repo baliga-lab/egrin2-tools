@@ -283,7 +283,6 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                         len(r['rows']),
                         row2id_with(db, list(r['rows']), "row_id", return_field="egrin2_row_name"))
                        for r in res]
-
             query = pd.DataFrame(list(results), columns=["_id", 'num_genes', "genes"])
     else:
         logging.error("I don't recognize the logic you are trying to use. 'logic' must be 'and', 'or', or 'nor'.")
@@ -309,7 +308,7 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                         logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
                         db.bicluster_info.map_reduce(MAP_ROWS, REDUCE, "rowsCount_mapreduce")
 
-                rows = pd.Series(list(itertools.chain(*query.rows.tolist()))).value_counts().to_frame("counts")
+                rows = pd.Series(list(itertools.chain(*query.genes.tolist()))).value_counts().to_frame("counts")
 
                 # filter out rows that aren't in the database - i.e. not annotated in MicrobesOnline
                 in_db = pd.DataFrame(list(db.row_info.find({}, {"_id": 0, "row_id": 1}))).row_id.tolist()

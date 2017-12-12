@@ -21,9 +21,9 @@ import logging
 import random
 import shutil
 
-import ensemble.datamatrix as dm
-import ensemble.cmconfig as cmconfig
-import ensemble.ensemble as ensemble
+import egrin2.ensemble.datamatrix as dm
+import egrin2.ensemble.cmconfig as cmconfig
+import egrin2.ensemble.ensemble as ensemble
 
 
 DESCRIPTION = "generate_cm2_runs.py - prepare cluster runs for Sun Grid Engine"
