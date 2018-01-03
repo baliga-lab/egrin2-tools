@@ -7,6 +7,8 @@ import requests
 from datetime import datetime
 import itertools
 import json
+import urllib.request
+from Bio import SeqIO
 
 import egrin2.assemble.util as util
 import egrin2.assemble.fimo as fimo
@@ -232,6 +234,7 @@ def read_ratios(path):
 
 def create_tables(conn):
     """Create tables in the result database"""
+    conn.execute('create table if not exists genome (refseq text, mo_scaffold_id int, sequence text)')
     conn.execute('create table if not exists rows (name text)')
     conn.execute('create table if not exists row_annotations (name text)')
     conn.execute('create table if not exists row_annotation_values (row_id int, annot_id int, value text)')
@@ -449,6 +452,32 @@ def store_motifs(conn, src_conn, cluster2id):
         src_cursor2.close()
         cursor.close()
 
+
+def import_genome(conn, ncbi_code):
+    """Import genome information into database"""
+    logging.info("Downloading genome information for NCBI taxonomy ID %s from Microbes Online",
+                 ncbi_code)
+
+    # download genome from microbes online. store in database
+    url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId=%d;export=genome" % ncbi_code
+    #save_name = "%d_genome.fa" % ncbi_code
+    save_name, headers = urllib.request.urlretrieve(url)
+    print("downloaded genome as '%s'" % save_name)
+    with open(save_name, 'r') as f:
+        fasta_sequences = SeqIO.parse(f ,'fasta')
+        for fasta in fasta_sequences:
+            fasta_comps = fasta.description.split(" ")
+            #seqs_b.append({"scaffoldId": fasta.id,
+            #               "NCBI_RefSeq": fasta.description.split(" ")[1],
+            #               "NCBI_taxonomyId": fasta.description.split(" ")[-1],
+            #               "sequence": str(fasta.seq)})
+            print("inserting: ", fasta_comps[1])
+            conn.execute('insert into genome (refseq,mo_scaffold_id,sequence) values (?,?,?)',
+                         [fasta_comps[1],
+                          fasta.id,
+                          str(fasta.seq)])
+
+
 def merge(dbclient, args, result_dbs):
     conn = dbclient.conn
     create_tables(conn)
@@ -456,6 +485,7 @@ def merge(dbclient, args, result_dbs):
     if len(cmonkey_dbs) > 0:
         ncbi_code = extract_ncbi_code(cmonkey_dbs[0])
         print("NCBI code: ", ncbi_code)
+        import_genome(conn, ncbi_code)
         raw_ratios, std_ratios = read_ratios(args.ratios)
         row2id = db_insert_rows(conn, raw_ratios.index.values)
         col2id = db_insert_cols(conn, raw_ratios.columns.values)
