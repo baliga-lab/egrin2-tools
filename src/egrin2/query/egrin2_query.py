@@ -90,9 +90,12 @@ def row2id_with(db, values, input_field, return_field="row_id"):
     if input_field in entry_fields:
         q = {input_field: {"$in": values}}
         query = pd.DataFrame(list(db.row_info.find(q, output_spec)))
-        query = query.set_index(input_field)
-        to_r = query.loc[values][return_field].tolist()
-        return remove_list_duplicates(to_r)
+        if query.shape[0] > 0:
+            query = query.set_index(input_field)
+            to_r = query.loc[values][return_field].tolist()
+            return remove_list_duplicates(to_r)
+        else:
+            return []
     else:
         raise Exception('row2id_with() called without input_type !!')
 
@@ -295,6 +298,8 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
         else:
             if y_type == "rows":
 
+                # rowsCount_mapreduce is a collection of how many times each gene
+                # is found in a bicluster
                 if db.rowsCount_mapreduce.count() == 0:
                     logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
                     db.bicluster_info.map_reduce(MAP_ROWS, REDUCE, "rowsCount_mapreduce")
@@ -308,16 +313,22 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
                         logging.info("Initializing MapReduce lookup table. Future queries will be much faster!")
                         db.bicluster_info.map_reduce(MAP_ROWS, REDUCE, "rowsCount_mapreduce")
 
+                # gene names and their counts (how many time they uniquely appear in biclusters)
+                print(query)
                 rows = pd.Series(list(itertools.chain(*query.genes.tolist()))).value_counts().to_frame("counts")
 
                 # filter out rows that aren't in the database - i.e. not annotated in MicrobesOnline
                 in_db = pd.DataFrame(list(db.row_info.find({}, {"_id": 0, "row_id": 1}))).row_id.tolist()
+                #print("rows: ", rows.index)
+                #print("in_db: ", in_db)
                 common_rows = list(set(rows.index).intersection(set(in_db)))
                 rows = rows.loc[common_rows]
 
                 # find all bicluster counts
                 all_counts = pd.DataFrame(list(db.rowsCount_mapreduce.find()))
                 all_counts = all_counts.set_index("_id")
+                #print("all_counts: ", all_counts)
+                #print("rows: ", rows)
 
                 # combine two data frames
                 to_r = rows.join(all_counts).sort_values("counts", ascending=False)
@@ -369,7 +380,11 @@ Types include: 'rows' (genes), 'columns' (conditions), 'gres'. Biclusters will b
             if y_type == "gre_id":
                 to_r = __map_reduce_to_gres(db, query, gre_lim)
 
-            return __enrich_counts(db, to_r, query, pval_cutoff)
+            if to_r.shape[0] > 0:
+                return __enrich_counts(db, to_r, query, pval_cutoff)
+            else:
+                logging.info("Could not find any results matching your criteria")
+                return None
 
     else:
         logging.info("Could not find any biclusters matching your criteria")

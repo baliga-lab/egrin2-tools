@@ -9,6 +9,7 @@ import itertools
 import json
 
 import egrin2.assemble.util as util
+import egrin2.assemble.fimo as fimo
 
 """
 This assemble module is the sqlite3 based implementation
@@ -243,7 +244,7 @@ def create_tables(conn):
     conn.execute('create table if not exists expr_values (row_id int,col_id,value decimal,std_value decimal)')
 
     # information about individual ensemble runs
-    conn.execute('create table if not exists ensemble_runs (date_added timestamp,start_time timestamp,finish_time timestamp,num_iterations int,organism text,species text,num_rows int,num_columns,num_clusters int,git_sha text)')
+    conn.execute('create table if not exists ensemble_runs (date_added timestamp,start_time timestamp,finish_time timestamp,num_iterations int,organism text,species text,num_rows int,num_columns,num_clusters int,dirname text,git_sha text)')
     conn.execute('create table if not exists ensemble_run_rows (run_id int, row_id int)')
     conn.execute('create table if not exists ensemble_run_cols (run_id int, col_id int)')
 
@@ -351,7 +352,7 @@ def store_ratios(conn, raw_ratios, std_ratios, row2id, col2id):
     logging.info("done.")
 
 
-def store_run_info(conn, src_conn, row2id, col2id):
+def store_run_info(conn, src_conn, row2id, col2id, dirname):
     """Stores the information about an individual ensemble run in the database"""
     logging.info("Store individual run information...")
     src_cur = src_conn.cursor()
@@ -359,10 +360,10 @@ def store_run_info(conn, src_conn, row2id, col2id):
     try:
         src_cur.execute('select start_time,finish_time,num_iterations,organism,species,num_rows,num_columns,num_clusters,git_sha from run_infos')
         run_info = src_cur.fetchone()
-        cursor.execute('insert into ensemble_runs (date_added,start_time,finish_time,num_iterations,organism,species,num_rows,num_columns,num_clusters,git_sha) values (?,?,?,?,?,?,?,?,?,?)',
-                        [datetime.now(), run_info[0], run_info[1], run_info[2],
+        cursor.execute('insert into ensemble_runs (date_added,start_time,finish_time,num_iterations,organism,species,num_rows,num_columns,num_clusters,dirname,git_sha) values (?,?,?,?,?,?,?,?,?,?,?)',
+                       [datetime.now(), run_info[0], run_info[1], run_info[2],
                         run_info[3], run_info[4], run_info[5], run_info[6],
-                        run_info[7], run_info[8]])
+                        run_info[7], dirname, run_info[8]])
         run_id = cursor.lastrowid
         src_cur.execute('select name from row_names')
         row_names = [row[0] for row in src_cur.fetchall()]
@@ -448,7 +449,6 @@ def store_motifs(conn, src_conn, cluster2id):
         src_cursor2.close()
         cursor.close()
 
-
 def merge(dbclient, args, result_dbs):
     conn = dbclient.conn
     create_tables(conn)
@@ -466,12 +466,15 @@ def merge(dbclient, args, result_dbs):
         create_expr_indexes(conn)
 
         for cmonkey_db in cmonkey_dbs:
+            dirname = os.path.basename(os.path.dirname(cmonkey_db))
             src_conn = sqlite3.connect(cmonkey_db)
             try:
-                run_id = store_run_info(conn, src_conn, row2id, col2id)
+                run_id = store_run_info(conn, src_conn, row2id, col2id, dirname)
                 cluster2id = store_biclusters(conn, src_conn, run_id, row2id, col2id)
                 start = util.current_millis()
                 store_motifs(conn, src_conn, cluster2id)
+                # store_gres TODO
+                #fimo.store_fimo(conn, args, os.path.dirname(cmonkey_db))
                 elapsed = util.current_millis() - start
                 logging.info('copied motifs in %d ms.', elapsed)
             finally:

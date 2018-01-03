@@ -87,6 +87,27 @@ def make_dbclient(targetdb):
     return asl.SqliteDB(conn)
 
 
+def import_genome(conn, ncbi_code):
+    """Import genome information into database"""
+    logging.info("Downloading genome information for NCBI taxonomy ID %s from Microbes Online",
+                 ncbi_code)
+
+    # download genome from microbes online. store in database
+    url = "http://www.microbesonline.org/cgi-bin/genomeInfo.cgi?tId=%d;export=genome" % ncbi_code
+    save_name = "%d_genome.fa" % ncbi_code
+    download_url(url, save_name)
+    seqs_b = []
+    with open(save_name, 'r') as f:
+        fasta_sequences = SeqIO.parse(f ,'fasta')
+        for fasta in fasta_sequences:
+            #seqs_b.append({"scaffoldId": fasta.id,
+            #               "NCBI_RefSeq": fasta.description.split(" ")[1],
+            #               "NCBI_taxonomyId": fasta.description.split(" ")[-1],
+            #               "sequence": str(fasta.seq)})
+            # TODO: insert into table
+            print("inserting: ", fasta.id)
+
+
 def main():
     logging.basicConfig(format=LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S',
                         level=LOG_LEVEL, filename=LOG_FILE)
@@ -127,6 +148,8 @@ def main():
     dbclient = make_dbclient(args.targetdb)
 
     if merge_runs(args, dbclient, args.targetdb):
+        # TODO: insert FIMO (fimo table)
+        # TODO: handle meta clustering (GRE -> motif info)
         make_corems(args, dbclient)
         corem_sizes = dbclient.corem_sizes()
         logging.debug("corem sizes: '%s'", str(corem_sizes))
