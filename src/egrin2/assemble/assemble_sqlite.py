@@ -235,6 +235,9 @@ def read_ratios(path):
 def create_tables(conn):
     """Create tables in the result database"""
     conn.execute('create table if not exists genome (refseq text, mo_scaffold_id int, sequence text)')
+    conn.execute('create table if not exists fimo (cluster_id int, motif_num int, strand text, start int, stop int, score decimal, pvalue decimal, in_coding_rgn text, mo_scaffold_id int)')
+    conn.execute('create table if not exists fimo_small (cluster_id int, motif_num int, strand text, start int, stop int, score decimal, pvalue decimal, in_coding_rgn text, mo_scaffold_id int)')
+
     conn.execute('create table if not exists rows (name text)')
     conn.execute('create table if not exists row_annotations (name text)')
     conn.execute('create table if not exists row_annotation_values (row_id int, annot_id int, value text)')
