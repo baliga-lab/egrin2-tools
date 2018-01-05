@@ -146,8 +146,10 @@ def main():
         dbclient.conn.commit()
 
         # store GRE information into motif_infos table
+        logging.info("storing GREs...")
         motif2gre = motif_clusters.load_gre_map(args.ensembledir)
         motif_clusters.store_gres(dbclient.conn, motif2gre)  # does commit
+        logging.info("GREs stored...")
 
         # TODO: insert FIMO (fimo tables fimo and fimo_small)
     else:

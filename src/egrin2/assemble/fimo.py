@@ -45,29 +45,21 @@ def process_fimo_file(conn, dirname, f):
 
         # only store hits with p-value lte 1e-5
         fimo_df = fimo_df.loc[fimo_df["p-value"] <= 1e-5, ]
-        #d_f = fimo_df.to_dict('records')
-        #  db.fimo.insert(d_f) TODO
         for index, r in fimo_df.iterrows():
             in_coding_rgn = None
             if not np.isnan(r['in_coding_rgn']):
                 in_coding_rgn = r['in_coding_rgn']
+            # TODO: optimization: use the motifinfo_id, because the motif_info
+            # already knows about the cluster and motif number
             conn.execute('insert into fimo (cluster_id,motif_num,strand,start,stop,score,pvalue,in_coding_rgn,mo_scaffold_id) values (?,?,?,?,?,?,?,?,?)',
                          [cluster_id, r['motif_num'],
                           r['strand'], r['start'], r['stop'], r['score'], r['p-value'],
                           in_coding_rgn, r['scaffoldId']])
+
+        # The original inserted fimo_small, which is a subset of fimo that only contains the
+        # entries whose motif_info entry also contains a GRE. But this is a redundancy
+        # and SQL can find these entries easily
         conn.commit()
-
-        """
-        # insert into fimo_small only if the motif maps to a GRE and the pval is less than 1e-5
-        mot2gre = pd.DataFrame(list(db.motif_info.find({"cluster_id": cluster_id},
-                                                       {"motif_num": 1, "gre_id": 1})))
-
-        for x in range( mot2gre.shape[0]):
-            if mot2gre.iloc[x].gre_id != "NaN":
-                tmp_fimo = fimo.loc[fimo["motif_num"] == mot2gre.iloc[x].motif_num, ]
-                d_f = tmp_fimo.to_dict('records')
-                db.fimo_small.insert(d_f)
-        """
     except:
         print("no data, skip")
     finally:
