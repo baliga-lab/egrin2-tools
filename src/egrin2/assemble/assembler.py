@@ -12,6 +12,7 @@ import egrin2.assemble.assemble_sqlite as asl
 from egrin2.assemble.makeCorems import CoremMaker
 import egrin2.assemble.resample as resample
 import egrin2.assemble.assemble_finish as assemble_finish
+import egrin2.assemble.motif_clusters as motif_clusters
 
 
 RUN_INFO_TEMPLATE = """[ General ensemble info ]
@@ -127,8 +128,6 @@ def main():
     dbclient = make_dbclient(args.targetdb)
 
     if merge_runs(args, dbclient, args.targetdb):
-        # TODO: insert FIMO (fimo table)
-        # TODO: handle meta clustering (GRE -> motif info)
         make_corems(args, dbclient)
         corem_sizes = dbclient.corem_sizes()
         logging.debug("corem sizes: '%s'", str(corem_sizes))
@@ -145,6 +144,12 @@ def main():
         # do the finish step
         assemble_finish.finish_corems(dbclient)
         dbclient.conn.commit()
+
+        # store GRE information into motif_infos table
+        motif2gre = motif_clusters.load_gre_map(args.ensembledir)
+        motif_clusters.store_gres(dbclient.conn, motif2gre)  # does commit
+
+        # TODO: insert FIMO (fimo tables fimo and fimo_small)
     else:
         logging.error("Could not locate cMonkey2 result files. Please specify --ensembledir")
 

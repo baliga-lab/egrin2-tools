@@ -259,7 +259,7 @@ def create_tables(conn):
     conn.execute('create table if not exists bicluster_rows (cluster_id int, row_id int)')
     conn.execute('create table if not exists bicluster_cols (cluster_id int, col_id int)')
 
-    conn.execute('create table if not exists motif_infos (cluster_id int, seqtype text, motif_num int, evalue decimal)')
+    conn.execute('create table if not exists motif_infos (cluster_id int, seqtype text, motif_num int, evalue decimal, gre_id int)')
     conn.execute('create table if not exists motif_pssm_rows (motif_info_id int, row int, a decimal, c decimal, g decimal, t decimal)')
     conn.execute('create table if not exists meme_motif_sites (motif_info_id int, seq_name text, reverse boolean, start int, pvalue decimal)')
 
