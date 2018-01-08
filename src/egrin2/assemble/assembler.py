@@ -13,6 +13,7 @@ from egrin2.assemble.makeCorems import CoremMaker
 import egrin2.assemble.resample as resample
 import egrin2.assemble.assemble_finish as assemble_finish
 import egrin2.assemble.motif_clusters as motif_clusters
+import egrin2.assemble.fimo as fimo
 
 
 RUN_INFO_TEMPLATE = """[ General ensemble info ]
@@ -151,7 +152,10 @@ def main():
         motif_clusters.store_gres(dbclient.conn, motif2gre)  # does commit
         logging.info("GREs stored...")
 
-        # TODO: insert FIMO (fimo tables fimo and fimo_small)
+        # insert FIMO (fimo tables fimo and fimo_small)
+        logging.info("storing FIMO...")
+        fimo.store_fimo(dbclient.conn, args)  # does commit
+        logging.info("FIMO stored.")
     else:
         logging.error("Could not locate cMonkey2 result files. Please specify --ensembledir")
 

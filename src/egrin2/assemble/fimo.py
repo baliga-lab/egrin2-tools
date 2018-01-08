@@ -45,20 +45,21 @@ def process_fimo_file(conn, dirname, f):
 
         # only store hits with p-value lte 1e-5
         fimo_df = fimo_df.loc[fimo_df["p-value"] <= 1e-5, ]
+        data = []
         for index, r in fimo_df.iterrows():
             in_coding_rgn = None
+            cursor.execute('select rowid from motif_infos where cluster_id=? and motif_num=?',
+                           [cluster_id, r['motif_num']])
+            motif_id = cursor.fetchone()[0]
             if not np.isnan(r['in_coding_rgn']):
                 in_coding_rgn = r['in_coding_rgn']
-            # TODO: optimization: use the motifinfo_id, because the motif_info
-            # already knows about the cluster and motif number
-            conn.execute('insert into fimo (cluster_id,motif_num,strand,start,stop,score,pvalue,in_coding_rgn,mo_scaffold_id) values (?,?,?,?,?,?,?,?,?)',
-                         [cluster_id, r['motif_num'],
-                          r['strand'], r['start'], r['stop'], r['score'], r['p-value'],
-                          in_coding_rgn, r['scaffoldId']])
+            data.append([motif_id, r['strand'], r['start'], r['stop'], r['score'], r['p-value'],
+                         in_coding_rgn, r['scaffoldId']])
+        conn.executemany('insert into fimo (motif_info_id,strand,start,stop,score,pvalue,in_coding_rgn,mo_scaffold_id) values (?,?,?,?,?,?,?,?)', data)
 
         # The original inserted fimo_small, which is a subset of fimo that only contains the
         # entries whose motif_info entry also contains a GRE. But this is a redundancy
-        # and SQL can find these entries easily
+        # and SQL can find these entries easily using a merge
         conn.commit()
     except:
         print("no data, skip")
@@ -81,7 +82,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="fimo.py - add fimo information")
     parser.add_argument('organism')
     parser.add_argument('targetdb')
-    parser.add_argument('outdir')
     parser.add_argument('--ensembledir', default='.', help="Path to ensemble runs. Default: cwd")
     args = parser.parse_args()
     conn = sqlite3.connect(args.targetdb)
